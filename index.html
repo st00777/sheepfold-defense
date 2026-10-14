@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2b2a26">
+<title>羊圈守夜</title>
+<style>
+  /* 色票集中在這裡，之後換美術只改這一區 */
+  :root {
+    --bg: #2b2a26;         /* 夜色底 */
+    --panel: #3a3831;      /* 面板 */
+    --grass: #4f6b3a;      /* 草地格 */
+    --grass2: #5a7a43;     /* 草地格（交錯色） */
+    --line: #2e3d24;
+    --text: #f3ead8;
+    --muted: #b9b09c;
+    --gold: #e6b84a;       /* 糧 */
+    --danger: #d9534f;
+    --ok: #7bc47f;
+    --card: #4a4639;
+    --card-on: #6e6447;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; overscroll-behavior: none; }
+  body { display: flex; flex-direction: column; min-height: 100dvh; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+
+  /* 上方資源列 */
+  #top { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--panel); font-size: 15px; }
+  #top b { font-size: 18px; }
+  #food { color: var(--gold); }
+  #wave-info { color: var(--muted); }
+
+  /* 卡片列 */
+  #cards { display: flex; gap: 8px; padding: 8px 12px; background: var(--panel); border-top: 1px solid #000; }
+  .card { flex: 1; background: var(--card); border: 2px solid transparent; border-radius: 10px; padding: 8px 4px; text-align: center; cursor: pointer; transition: transform .08s; min-height: 64px; }
+  .card .ico { font-size: 26px; line-height: 1; }
+  .card .name { font-size: 13px; margin-top: 2px; }
+  .card .cost { font-size: 12px; color: var(--gold); }
+  .card.selected { border-color: var(--gold); background: var(--card-on); }
+  .card.poor { opacity: .45; }
+  .card.shake { animation: shake .3s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+
+  /* 棋盤 */
+  #board-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; }
+  #board { position: relative; width: 100%; max-width: 640px; aspect-ratio: 7 / 5; display: grid;
+    grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(5, 1fr); border: 3px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .cell { position: relative; background: var(--grass); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); }
+  .cell.alt { background: var(--grass2); }
+  .cell.hint { outline: 2px dashed var(--gold); outline-offset: -4px; }
+  .cell .unit { position: relative; display: flex; align-items: center; justify-content: center; width: 80%; height: 80%; border-radius: 8px; }
+  .unit.shepherd { background: #3d6ea8; }
+  .unit.slinger  { background: #a8553d; }
+  .unit.wall     { background: #777; }
+  .unit .hp, .enemy .hp { position: absolute; left: 10%; right: 10%; bottom: 2px; height: 3px; background: #0006; }
+  .hp > i { display: block; height: 100%; background: var(--ok); }
+  .unit.hurt { animation: hurt .2s; }
+  @keyframes hurt { 50% { filter: brightness(1.8); } }
+
+  /* 敵人與石頭用絕對定位，位置用百分比，不用算像素 */
+  .enemy { position: absolute; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; }
+  .enemy .body { width: 70%; height: 70%; border-radius: 50%; background: #5b5b66; display: flex; align-items: center; justify-content: center; }
+  .enemy.fast .body { background: #8a4b6b; }
+  .enemy .hp > i { background: var(--danger); }
+  .stone { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #e9e4d0; pointer-events: none; }
+  .pop { position: absolute; color: var(--gold); font-weight: bold; font-size: 14px; pointer-events: none; animation: pop 1s forwards; }
+  @keyframes pop { to { transform: translateY(-24px); opacity: 0; } }
+
+  /* 底部進度條 */
+  #bottom { padding: 8px 12px 14px; background: var(--panel); }
+  #bar { height: 8px; background: #0006; border-radius: 4px; overflow: hidden; }
+  #bar > i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .3s; }
+  #toast { text-align: center; font-size: 13px; color: var(--muted); min-height: 18px; margin-top: 6px; }
+
+  /* 蓋在上面的對話／結果畫面 */
+  .overlay { position: fixed; inset: 0; background: #000a; display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
+  .overlay[hidden] { display: none; }
+  .dialog { background: var(--panel); border-radius: 14px; padding: 22px 20px; max-width: 420px; width: 100%; text-align: center; }
+  .dialog h1 { margin: 0 0 6px; font-size: 24px; }
+  .dialog .ref { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+  .dialog p { line-height: 1.7; font-size: 15px; text-align: left; }
+  .dialog .who { color: var(--gold); }
+  .btn { display: inline-block; margin-top: 12px; padding: 12px 28px; font-size: 17px; border-radius: 10px; border: 0; background: var(--gold); color: #2b2a26; font-weight: bold; cursor: pointer; }
+  .tips { font-size: 13px; color: var(--muted); text-align: left; margin-top: 10px; line-height: 1.6; }
+  #best { font-size: 12px; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div id="top">
+  <span>🌾 糧 <b id="food">0</b></span>
+  <span id="wave-info">準備中</span>
+</div>
+
+<div id="cards"></div>
+
+<div id="board-wrap"><div id="board"></div></div>
+
+<div id="bottom">
+  <div id="bar"><i></i></div>
+  <div id="toast">先點一張卡，再點草地放下去</div>
+</div>
+
+<!-- 開場 -->
+<div class="overlay" id="intro">
+  <div class="dialog">
+    <h1>羊圈守夜</h1>
+    <div class="ref">取材：創世記 31 章，雅各替拉班看守羊群</div>
+    <p><span class="who">雅各：</span>這群羊是拉班交給我的，二十年來我沒少過一隻。今晚換你守夜，狼從東邊來，擋住牠們，天亮前羊一隻都不能少。</p>
+    <div class="tips">
+      🧑‍🌾 牧人：每隔一陣子送來糧<br>
+      🪨 投石手：朝同一排的狼丟石頭<br>
+      🧱 石牆：擋在前面，很耐咬<br>
+      狼走到最左邊就守夜失敗，撐過三波就天亮。
+    </div>
+    <button class="btn" id="start">開始守夜</button>
+    <div id="best"></div>
+  </div>
+</div>
+
+<!-- 結果 -->
+<div class="overlay" id="result" hidden>
+  <div class="dialog">
+    <h1 id="result-title"></h1>
+    <p id="result-text"></p>
+    <button class="btn" id="retry">再守一夜</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ====== 基本設定 ======
+const ROWS = 5, COLS = 7;
+
+// 可放置的單位。cost 是要花的糧，hp 是能被咬幾下
+const UNITS = {
+  shepherd: { name: '牧人',   ico: '🧑‍🌾', cost: 50,  hp: 60,  every: 7, gives: 25 },
+  slinger:  { name: '投石手', ico: '🪨',   cost: 100, hp: 60,  every: 1.3, dmg: 20 },
+  wall:     { name: '石牆',   ico: '🧱',   cost: 50,  hp: 300 },
+};
+
+// 敵人種類。speed 是每秒走幾格，bite 是每秒咬掉多少血
+const ENEMIES = {
+  wolf: { ico: '🐺', hp: 60, speed: 0.22, bite: 12 },
+  fast: { ico: '🐺', hp: 40, speed: 0.40, bite: 10, cls: 'fast' },
+};
+
+// 三波。每一項是 [種類, 隻數]，gap 是隔幾秒放一隻出來
+const WAVES = [
+  { list: [['wolf', 5]],              gap: 4.0 },
+  { list: [['wolf', 6], ['fast', 2]], gap: 3.0 },
+  { list: [['wolf', 8], ['fast', 4]], gap: 2.4 },
+];
+const PREP_TIME = 18;   // 第一波來之前的準備秒數
+const WAVE_REST = 6;    // 清完一波後休息幾秒
+const START_FOOD = 125;
+const TRICKLE = { every: 5, gives: 5 }; // 就算沒放牧人也會慢慢有糧，不會卡死
+
+// ====== 狀態 ======
+let S;           // 這一局的所有狀態
+let selected = null;
+let last = 0, raf = 0;
+
+const $ = s => document.querySelector(s);
+const board = $('#board');
+const cells = [];
+
+function freshState() {
+  return {
+    food: START_FOOD, trickle: 0,
+    phase: 'prep', wave: 0, timer: PREP_TIME,
+    queue: [], spawnTimer: 0, spawnedTotal: 0, killed: 0,
+    units: {}, enemies: [], stones: [], pops: [],
+    over: false,
+  };
+}
+
+// ====== 畫面建立 ======
+function buildBoard() {
+  board.innerHTML = '';
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const d = document.createElement('div');
+    d.className = 'cell' + ((r + c) % 2 ? ' alt' : '');
+    d.dataset.r = r; d.dataset.c = c;
+    d.addEventListener('click', () => tapCell(r, c));
+    board.appendChild(d);
+    cells.push(d);
+  }
+}
+
+function buildCards() {
+  const wrap = $('#cards');
+  wrap.innerHTML = '';
+  for (const key in UNITS) {
+    const u = UNITS[key];
+    const d = document.createElement('div');
+    d.className = 'card'; d.dataset.key = key;
+    d.innerHTML = `<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
+    d.addEventListener('click', () => tapCard(key, d));
+    wrap.appendChild(d);
+  }
+}
+
+function toast(msg) { $('#toast').textContent = msg; }
+
+// ====== 操作 ======
+function tapCard(key, el) {
+  if (S.over) return;
+  const u = UNITS[key];
+  if (S.food < u.cost) {
+    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+    toast(`糧不夠，${u.name}要 ${u.cost} 糧`);
+    return;
+  }
+  selected = (selected === key) ? null : key;
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.key === selected));
+  cells.forEach(c => c.classList.toggle('hint', !!selected && !S.units[c.dataset.r + ',' + c.dataset.c]));
+  toast(selected ? `點一格草地放下${u.name}` : '先點一張卡，再點草地放下去');
+}
+
+function tapCell(r, c) {
+  if (S.over || !selected) { if (!S.over && !selected) toast('先點一張卡'); return; }
+  const key = r + ',' + c;
+  if (S.units[key]) { toast('這格已經有人了'); return; }
+  const u = UNITS[selected];
+  if (S.food < u.cost) { toast('糧不夠'); return; }
+  S.food -= u.cost;
+  S.units[key] = { type: selected, r, c, hp: u.hp, maxHp: u.hp, timer: u.every ? u.every * 0.6 : 0 };
+  renderUnit(r, c);
+  const name = u.name;
+  selected = null;
+  document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
+  cells.forEach(x => x.classList.remove('hint'));
+  toast(`${name}就位`);
+}
+
+function renderUnit(r, c) {
+  const cell = cells[r * COLS + c];
+  const u = S.units[r + ',' + c];
+  cell.innerHTML = '';
+  if (!u) return;
+  const d = document.createElement('div');
+  d.className = 'unit ' + u.type;
+  d.innerHTML = `${UNITS[u.type].ico}<div class="hp"><i style="width:${u.hp / u.maxHp * 100}%"></i></div>`;
+  cell.appendChild(d);
+}
+
+// ====== 波次 ======
+function startWave(i) {
+  S.wave = i + 1;
+  S.phase = 'wave';
+  S.queue = [];
+  for (const [type, n] of WAVES[i].list) for (let k = 0; k < n; k++) S.queue.push(type);
+  // 洗牌，讓快狼混在裡面
+  for (let k = S.queue.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [S.queue[k], S.queue[j]] = [S.queue[j], S.queue[k]]; }
+  S.spawnTimer = 0;
+  toast(`第 ${S.wave} 波來了`);
+}
+
+function spawn(type) {
+  const e = ENEMIES[type];
+  const r = Math.floor(Math.random() * ROWS);
+  const d = document.createElement('div');
+  d.className = 'enemy ' + (e.cls || '');
+  d.innerHTML = `<div class="body">${e.ico}</div><div class="hp"><i style="width:100%"></i></div>`;
+  board.appendChild(d);
+  S.enemies.push({ type, r, x: COLS, hp: e.hp, maxHp: e.hp, el: d, biting: null });
+  S.spawnedTotal++;
+}
+
+// ====== 每一幀 ======
+function tick(now) {
+  raf = requestAnimationFrame(tick);
+  let dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.over) return;
+
+  // 糧慢慢來
+  S.trickle += dt;
+  if (S.trickle >= TRICKLE.every) { S.trickle -= TRICKLE.every; S.food += TRICKLE.gives; }
+
+  // 波次節奏
+  if (S.phase === 'prep' || S.phase === 'rest') {
+    S.timer -= dt;
+    if (S.timer <= 0) {
+      if (S.wave >= WAVES.length) return win();
+      startWave(S.wave);
+    }
+  } else if (S.phase === 'wave') {
+    if (S.queue.length) {
+      S.spawnTimer -= dt;
+      if (S.spawnTimer <= 0) { spawn(S.queue.shift()); S.spawnTimer = WAVES[S.wave - 1].gap; }
+    } else if (!S.enemies.length) {
+      S.phase = 'rest'; S.timer = WAVE_REST;
+      toast(S.wave >= WAVES.length ? '最後一隻狼跑了……' : `第 ${S.wave} 波擋住了，喘口氣`);
+    }
+  }
+
+  // 單位做事：牧人送糧、投石手丟石頭
+  for (const key in S.units) {
+    const u = S.units[key], def = UNITS[u.type];
+    if (!def.every) continue;
+    u.timer -= dt;
+    if (u.timer > 0) continue;
+    if (u.type === 'shepherd') {
+      u.timer = def.every; S.food += def.gives; pop(u.r, u.c, `+${def.gives}`);
+    } else if (u.type === 'slinger') {
+      const target = S.enemies.some(e => e.r === u.r && e.x > u.c);
+      if (target) {
+        u.timer = def.every;
+        const d = document.createElement('div'); d.className = 'stone'; board.appendChild(d);
+        S.stones.push({ r: u.r, x: u.c + 0.6, dmg: def.dmg, el: d });
+      }
+    }
+  }
+
+  // 石頭飛
+  for (const s of S.stones) {
+    s.x += 6 * dt;
+    const hit = S.enemies.find(e => e.r === s.r && Math.abs(e.x + 0.5 - s.x) < 0.35);
+    if (hit) { hit.hp -= s.dmg; s.dead = true; }
+    if (s.x > COLS + 1) s.dead = true;
+  }
+
+  // 狼走路、咬東西
+  for (const e of S.enemies) {
+    const def = ENEMIES[e.type];
+    // 前面那一格有沒有單位擋著
+    const frontCol = Math.floor(e.x + 0.3);
+    const blocker = S.units[e.r + ',' + frontCol];
+    if (blocker && e.x <= frontCol + 0.6) {
+      blocker.hp -= def.bite * dt;
+      e.biting = blocker;
+      if (blocker.hp <= 0) { delete S.units[e.r + ',' + frontCol]; renderUnit(e.r, frontCol); e.biting = null; }
+      else if (Math.random() < dt * 4) renderUnit(e.r, frontCol);
+    } else {
+      e.biting = null;
+      e.x -= def.speed * dt;
+    }
+    if (e.x < -0.6) return lose();
+  }
+
+  // 清掉死掉的
+  S.enemies = S.enemies.filter(e => { if (e.hp <= 0) { e.el.remove(); S.killed++; return false; } return true; });
+  S.stones = S.stones.filter(s => { if (s.dead) { s.el.remove(); return false; } return true; });
+
+  draw();
+}
+
+function pop(r, c, text) {
+  const d = document.createElement('div'); d.className = 'pop'; d.textContent = text;
+  d.style.left = ((c + 0.3) / COLS * 100) + '%'; d.style.top = ((r + 0.2) / ROWS * 100) + '%';
+  board.appendChild(d); setTimeout(() => d.remove(), 1000);
+}
+
+function draw() {
+  $('#food').textContent = Math.floor(S.food);
+  const t = Math.ceil(S.timer);
+  $('#wave-info').textContent =
+    S.phase === 'prep' ? `第 1 波 ${t} 秒後來` :
+    S.phase === 'rest' ? (S.wave >= WAVES.length ? '天快亮了' : `第 ${S.wave + 1} 波 ${t} 秒後來`) :
+    `第 ${S.wave} / ${WAVES.length} 波`;
+  for (const e of S.enemies) {
+    e.el.style.left = (e.x / COLS * 100) + '%';
+    e.el.style.top = (e.r / ROWS * 100) + '%';
+    e.el.querySelector('.hp > i').style.width = (e.hp / e.maxHp * 100) + '%';
+  }
+  for (const s of S.stones) {
+    s.el.style.left = `calc(${s.x / COLS * 100}% - 5px)`;
+    s.el.style.top = `calc(${(s.r + 0.5) / ROWS * 100}% - 5px)`;
+  }
+  const total = WAVES.reduce((n, w) => n + w.list.reduce((m, [, k]) => m + k, 0), 0);
+  $('#bar > i').style.width = (S.killed / total * 100) + '%';
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('poor', S.food < UNITS[c.dataset.key].cost));
+}
+
+// ====== 勝負 ======
+function endGame(title, text) {
+  S.over = true;
+  $('#result-title').textContent = title;
+  $('#result-text').textContent = text;
+  $('#result').hidden = false;
+}
+function win() {
+  saveBest(WAVES.length, true);
+  endGame('天亮了 🌅', '羊一隻不少。雅各走過來數了一遍，點點頭，什麼也沒說，把水袋遞給你。');
+}
+function lose() {
+  saveBest(S.wave, false);
+  endGame('狼闖進羊圈了', `你撐到了第 ${S.wave} 波。雅各說：明晚再來，先把石牆放前面一點。`);
+}
+
+// 最高紀錄只存在這支手機裡
+function saveBest(wave, cleared) {
+  try {
+    const old = JSON.parse(localStorage.getItem('sheepfold-best') || '{}');
+    const score = cleared ? WAVES.length + 1 : wave;
+    if (!(old.score >= score)) localStorage.setItem('sheepfold-best', JSON.stringify({ score, cleared, wave }));
+  } catch (e) {}
+}
+function showBest() {
+  try {
+    const b = JSON.parse(localStorage.getItem('sheepfold-best') || 'null');
+    $('#best').textContent = !b ? '' : b.cleared ? '最高紀錄：守過整夜 ✅' : `最高紀錄：撐到第 ${b.wave} 波`;
+  } catch (e) {}
+}
+
+// ====== 開始／重來 ======
+function reset() {
+  cancelAnimationFrame(raf);
+  S = freshState();
+  selected = null;
+  board.querySelectorAll('.enemy, .stone, .pop').forEach(x => x.remove());
+  cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint'); });
+  document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
+  $('#result').hidden = true;
+  toast('先點一張卡，再點草地放下去');
+  draw();
+  last = performance.now();
+  raf = requestAnimationFrame(tick);
+}
+
+buildBoard(); buildCards(); showBest();
+S = freshState(); draw();
+$('#start').addEventListener('click', () => { $('#intro').hidden = true; reset(); });
+$('#retry').addEventListener('click', reset);
+</script>
+</body>
+</html>
