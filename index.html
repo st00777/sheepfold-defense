@@ -192,6 +192,7 @@ function applyDiff(key) {
 }
 const PREP_TIME = 18;   // 第一波來之前的準備秒數
 const WAVE_REST = 6;    // 清完一波後休息幾秒
+const FORESHADOW_LEAD = 3; // 倒數剩幾秒時，先印出下一波第一隻狼的腳印
 const START_FOOD = 150;  // 剛好夠一開局放一個牧人＋一個投石手
 const TRICKLE = { every: 5, gives: 5 }; // 就算沒放牧人也會慢慢有糧，不會卡死
 
@@ -296,10 +297,10 @@ function startWave(i) {
   toast(WAVES[i].say);
 }
 
-// 下一隻狼還沒出現，先在那一排最右邊印腳印，讓玩家有時間補防
-function foreshadow() {
+// 下一隻狼還沒出現，先在那一排最右邊印腳印，讓玩家有時間補防。i 是波次索引（0 起算）
+function foreshadow(i) {
   if (S.nextRow !== null) return;
-  const rows = WAVES[S.wave - 1].rows;
+  const rows = WAVES[i].rows;
   S.nextRow = rows[Math.floor(Math.random() * rows.length)];
   const d = document.createElement('div'); d.className = 'marker'; d.textContent = '🐾';
   d.style.top = (S.nextRow / ROWS * 100) + '%';
@@ -335,13 +336,15 @@ function tick(now) {
   // 波次節奏
   if (S.phase === 'prep' || S.phase === 'rest') {
     S.timer -= dt;
+    // 倒數快結束就先印腳印，波次一開始第一隻狼就從那排來
+    if (S.wave < WAVES.length && S.timer <= FORESHADOW_LEAD) foreshadow(S.wave);
     if (S.timer <= 0) {
       if (S.wave >= WAVES.length) return win();
       startWave(S.wave);
     }
   } else if (S.phase === 'wave') {
     if (S.queue.length) {
-      foreshadow();
+      foreshadow(S.wave - 1);
       S.spawnTimer -= dt;
       if (S.spawnTimer <= 0) { spawn(S.queue.shift()); S.spawnTimer = WAVES[S.wave - 1].gap; }
     } else if (!S.enemies.length) {
