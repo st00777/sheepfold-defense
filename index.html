@@ -64,6 +64,8 @@
   .enemy .body { width: 70%; height: 70%; border-radius: 50%; background: #5b5b66; display: flex; align-items: center; justify-content: center; }
   .enemy.fast .body { background: #8a4b6b; }
   .enemy .hp > i { background: var(--danger); }
+  .marker { position: absolute; right: 2px; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(14px, 4.5vw, 26px); opacity: .85; pointer-events: none; animation: blink .8s infinite alternate; }
+  @keyframes blink { from { opacity: .35; } to { opacity: .95; } }
   .stone { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #e9e4d0; pointer-events: none; }
   .pop { position: absolute; color: var(--gold); font-weight: bold; font-size: 14px; pointer-events: none; animation: pop 1s forwards; }
   @keyframes pop { to { transform: translateY(-24px); opacity: 0; } }
@@ -113,7 +115,8 @@
       🧑‍🌾 牧人：每隔一陣子送來糧<br>
       🪨 投石手：朝同一排的狼丟石頭<br>
       🧱 石牆：擋在前面，很耐咬<br>
-      狼走到最左邊就守夜失敗，撐過三波就天亮。
+      🐾 腳印出現在哪一排，下一隻狼就從那排來<br>
+      第一波狼只走中間三排；狼走到最左邊就守夜失敗，撐過三波就天亮。
     </div>
     <button class="btn" id="start">開始守夜</button>
     <div id="best"></div>
@@ -148,14 +151,15 @@ const ENEMIES = {
 };
 
 // 三波。每一項是 [種類, 隻數]，gap 是隔幾秒放一隻出來
+// rows 是這一波狼會走哪幾排（第一波只走中間三排，讓新手站得住）；hpMul 是狼的血量倍數，越晚越壯
 const WAVES = [
-  { list: [['wolf', 5]],              gap: 4.0 },
-  { list: [['wolf', 6], ['fast', 2]], gap: 3.0 },
-  { list: [['wolf', 8], ['fast', 4]], gap: 2.4 },
+  { list: [['wolf', 4]],               gap: 5.0, rows: [1, 2, 3], hpMul: 1,   say: '第 1 波來了' },
+  { list: [['wolf', 7], ['fast', 3]],  gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '第 2 波來了，狼開始從兩側繞過來' },
+  { list: [['wolf', 10], ['fast', 6]], gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 2,   say: '最後一波，這群狼更壯' },
 ];
 const PREP_TIME = 18;   // 第一波來之前的準備秒數
 const WAVE_REST = 6;    // 清完一波後休息幾秒
-const START_FOOD = 125;
+const START_FOOD = 150;  // 剛好夠一開局放一個牧人＋一個投石手
 const TRICKLE = { every: 5, gives: 5 }; // 就算沒放牧人也會慢慢有糧，不會卡死
 
 // ====== 狀態 ======
@@ -171,7 +175,7 @@ function freshState() {
   return {
     food: START_FOOD, trickle: 0,
     phase: 'prep', wave: 0, timer: PREP_TIME,
-    queue: [], spawnTimer: 0, spawnedTotal: 0, killed: 0,
+    queue: [], spawnTimer: 0, spawnedTotal: 0, killed: 0, nextRow: null, marker: null,
     units: {}, enemies: [], stones: [], pops: [],
     over: false,
   };
@@ -256,17 +260,32 @@ function startWave(i) {
   // 洗牌，讓快狼混在裡面
   for (let k = S.queue.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [S.queue[k], S.queue[j]] = [S.queue[j], S.queue[k]]; }
   S.spawnTimer = 0;
-  toast(`第 ${S.wave} 波來了`);
+  toast(WAVES[i].say);
+}
+
+// 下一隻狼還沒出現，先在那一排最右邊印腳印，讓玩家有時間補防
+function foreshadow() {
+  if (S.nextRow !== null) return;
+  const rows = WAVES[S.wave - 1].rows;
+  S.nextRow = rows[Math.floor(Math.random() * rows.length)];
+  const d = document.createElement('div'); d.className = 'marker'; d.textContent = '🐾';
+  d.style.top = (S.nextRow / ROWS * 100) + '%';
+  board.appendChild(d);
+  S.marker = d;
 }
 
 function spawn(type) {
-  const e = ENEMIES[type];
-  const r = Math.floor(Math.random() * ROWS);
+  const e = ENEMIES[type], w = WAVES[S.wave - 1];
+  const r = S.nextRow ?? w.rows[Math.floor(Math.random() * w.rows.length)];
+  if (S.marker) S.marker.remove();
+  S.nextRow = null; S.marker = null;
+  const hp = Math.round(e.hp * (w.hpMul || 1));
   const d = document.createElement('div');
   d.className = 'enemy ' + (e.cls || '');
   d.innerHTML = `<div class="body">${e.ico}</div><div class="hp"><i style="width:100%"></i></div>`;
+  if (w.hpMul > 1) d.querySelector('.body').style.transform = `scale(${1 + (w.hpMul - 1) * 0.25})`;
   board.appendChild(d);
-  S.enemies.push({ type, r, x: COLS, hp: e.hp, maxHp: e.hp, el: d, biting: null });
+  S.enemies.push({ type, r, x: COLS, hp, maxHp: hp, el: d, biting: null });
   S.spawnedTotal++;
 }
 
@@ -289,6 +308,7 @@ function tick(now) {
     }
   } else if (S.phase === 'wave') {
     if (S.queue.length) {
+      foreshadow();
       S.spawnTimer -= dt;
       if (S.spawnTimer <= 0) { spawn(S.queue.shift()); S.spawnTimer = WAVES[S.wave - 1].gap; }
     } else if (!S.enemies.length) {
@@ -411,7 +431,7 @@ function reset() {
   cancelAnimationFrame(raf);
   S = freshState();
   selected = null;
-  board.querySelectorAll('.enemy, .stone, .pop').forEach(x => x.remove());
+  board.querySelectorAll('.enemy, .stone, .pop, .marker').forEach(x => x.remove());
   cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint'); });
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
   $('#result').hidden = true;
