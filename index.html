@@ -84,6 +84,11 @@
   .dialog .ref { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
   .dialog p { line-height: 1.7; font-size: 15px; text-align: left; }
   .dialog .who { color: var(--gold); }
+  #diffs { display: flex; gap: 6px; margin: 10px 0 4px; }
+  .diff { flex: 1; background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 10px; padding: 9px 0; font-size: 15px; font-family: inherit; cursor: pointer; }
+  .diff.selected { border-color: var(--gold); background: var(--card-on); }
+  #diff-hint { font-size: 12px; color: var(--muted); min-height: 16px; margin-bottom: 8px; }
+  .btn.alt { background: transparent; color: var(--muted); border: 1px solid var(--muted); margin-top: 8px; }
   .btn { display: inline-block; margin-top: 12px; padding: 12px 28px; font-size: 17px; border-radius: 10px; border: 0; background: var(--gold); color: #2b2a26; font-weight: bold; cursor: pointer; }
   .tips { font-size: 13px; color: var(--muted); text-align: left; margin-top: 10px; line-height: 1.6; }
   #best { font-size: 12px; color: var(--muted); margin-top: 8px; }
@@ -118,6 +123,12 @@
       🐾 腳印出現在哪一排，下一隻狼就從那排來<br>
       第一波狼只走中間三排；狼走到最左邊就守夜失敗，撐過三波就天亮。
     </div>
+    <div id="diffs">
+      <button class="diff" data-key="calm">寧靜夜</button>
+      <button class="diff" data-key="windy">起風夜</button>
+      <button class="diff" data-key="storm">暴風夜</button>
+    </div>
+    <div id="diff-hint"></div>
     <button class="btn" id="start">開始守夜</button>
     <div id="best"></div>
   </div>
@@ -129,6 +140,7 @@
     <h1 id="result-title"></h1>
     <p id="result-text"></p>
     <button class="btn" id="retry">再守一夜</button>
+    <button class="btn alt" id="back">換一種夜</button>
   </div>
 </div>
 
@@ -151,12 +163,33 @@ const ENEMIES = {
 };
 
 // 三波。每一項是 [種類, 隻數]，gap 是隔幾秒放一隻出來
+// 三檔難度。差別只有兩件事：牧人幾秒回一次糧、每一波的狼有多少多壯
 // rows 是這一波狼會走哪幾排（第一波只走中間三排，讓新手站得住）；hpMul 是狼的血量倍數，越晚越壯
-const WAVES = [
+const WAVE_MILD = [
   { list: [['wolf', 4]],               gap: 5.0, rows: [1, 2, 3], hpMul: 1,   say: '第 1 波來了' },
   { list: [['wolf', 7], ['fast', 3]],  gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '第 2 波來了，狼開始從兩側繞過來' },
   { list: [['wolf', 10], ['fast', 6]], gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 2,   say: '最後一波，這群狼更壯' },
 ];
+const WAVE_FIERCE = [
+  { list: [['wolf', 4]],               gap: 5.0, rows: [1, 2, 3], hpMul: 1,   say: '第 1 波來了' },
+  { list: [['wolf', 9], ['fast', 4]],  gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.6, say: '第 2 波來了，狼開始從兩側繞過來' },
+  { list: [['wolf', 12], ['fast', 8]], gap: 1.4, rows: [0, 1, 2, 3, 4], hpMul: 2.5, say: '最後一波，這群狼又多又壯' },
+];
+const DIFFS = {
+  calm:  { name: '寧靜夜', hint: '狼不多，先熟悉怎麼守',         shepherdEvery: 7,  waves: WAVE_MILD },
+  windy: { name: '起風夜', hint: '狼更多更壯，守法自己想',        shepherdEvery: 7,  waves: WAVE_FIERCE },
+  storm: { name: '暴風夜', hint: '糧來得慢，狼又多又壯', shepherdEvery: 10, waves: WAVE_FIERCE },
+};
+let diff = 'calm';
+let WAVES = DIFFS.calm.waves;
+function applyDiff(key) {
+  diff = key;
+  WAVES = DIFFS[key].waves;
+  UNITS.shepherd.every = DIFFS[key].shepherdEvery;
+  document.querySelectorAll('.diff').forEach(b => b.classList.toggle('selected', b.dataset.key === key));
+  $('#diff-hint').textContent = DIFFS[key].hint;
+  try { localStorage.setItem('sheepfold-diff', key); } catch (e) {}
+}
 const PREP_TIME = 18;   // 第一波來之前的準備秒數
 const WAVE_REST = 6;    // 清完一波後休息幾秒
 const START_FOOD = 150;  // 剛好夠一開局放一個牧人＋一個投石手
@@ -404,30 +437,32 @@ function endGame(title, text) {
 }
 function win() {
   saveBest(WAVES.length, true);
-  endGame('天亮了 🌅', '羊一隻不少。雅各走過來數了一遍，點點頭，什麼也沒說，把水袋遞給你。');
+  endGame(`天亮了 🌅`, `${DIFFS[diff].name}守過了。羊一隻不少，雅各走過來數了一遍，點點頭，什麼也沒說，把水袋遞給你。`);
 }
 function lose() {
   saveBest(S.wave, false);
   endGame('狼闖進羊圈了', `你撐到了第 ${S.wave} 波。雅各說：明晚再來，先把石牆放前面一點。`);
 }
 
-// 最高紀錄只存在這支手機裡
+// 最高紀錄只存在這支手機裡，三檔各記各的
 function saveBest(wave, cleared) {
   try {
-    const old = JSON.parse(localStorage.getItem('sheepfold-best') || '{}');
+    const all = JSON.parse(localStorage.getItem('sheepfold-best-v2') || '{}');
+    const old = all[diff] || {};
     const score = cleared ? WAVES.length + 1 : wave;
-    if (!(old.score >= score)) localStorage.setItem('sheepfold-best', JSON.stringify({ score, cleared, wave }));
+    if (!(old.score >= score)) { all[diff] = { score, cleared, wave }; localStorage.setItem('sheepfold-best-v2', JSON.stringify(all)); }
   } catch (e) {}
 }
 function showBest() {
   try {
-    const b = JSON.parse(localStorage.getItem('sheepfold-best') || 'null');
-    $('#best').textContent = !b ? '' : b.cleared ? '最高紀錄：守過整夜 ✅' : `最高紀錄：撐到第 ${b.wave} 波`;
+    const all = JSON.parse(localStorage.getItem('sheepfold-best-v2') || '{}');
+    const lines = Object.keys(DIFFS).filter(k => all[k]).map(k => `${DIFFS[k].name}：${all[k].cleared ? '守過整夜 ✅' : `撐到第 ${all[k].wave} 波`}`);
+    $('#best').textContent = lines.length ? '最高紀錄 ' + lines.join('　') : '';
   } catch (e) {}
 }
 
 // ====== 開始／重來 ======
-function reset() {
+function clearBoard() {
   cancelAnimationFrame(raf);
   S = freshState();
   selected = null;
@@ -435,6 +470,9 @@ function reset() {
   cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint'); });
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
   $('#result').hidden = true;
+}
+function reset() {
+  clearBoard();
   toast('先點一張卡，再點草地放下去');
   draw();
   last = performance.now();
@@ -442,9 +480,14 @@ function reset() {
 }
 
 buildBoard(); buildCards(); showBest();
+let savedDiff = 'calm';
+try { savedDiff = localStorage.getItem('sheepfold-diff') || 'calm'; } catch (e) {}
+applyDiff(DIFFS[savedDiff] ? savedDiff : 'calm');
 S = freshState(); draw();
+document.querySelectorAll('.diff').forEach(b => b.addEventListener('click', () => applyDiff(b.dataset.key)));
 $('#start').addEventListener('click', () => { $('#intro').hidden = true; reset(); });
 $('#retry').addEventListener('click', reset);
+$('#back').addEventListener('click', () => { clearBoard(); draw(); showBest(); $('#intro').hidden = false; });
 </script>
 </body>
 </html>
