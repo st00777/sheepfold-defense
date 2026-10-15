@@ -12,6 +12,7 @@
     --panel: #3a3831;      /* 面板 */
     --grass: #4f6b3a;      /* 草地格 */
     --grass2: #5a7a43;     /* 草地格（交錯色） */
+    --rock: #5a5650;       /* 石頭格 */
     --line: #2e3d24;
     --text: #f3ead8;
     --muted: #b9b09c;
@@ -20,6 +21,7 @@
     --ok: #7bc47f;
     --card: #4a4639;
     --card-on: #6e6447;
+    --new: #ffd98a;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
@@ -30,16 +32,20 @@
   #top { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--panel); font-size: 15px; }
   #top b { font-size: 18px; }
   #food { color: var(--gold); }
+  #sheep[hidden] { display: none; }
   #wave-info { color: var(--muted); }
 
-  /* 卡片列 */
-  #cards { display: flex; gap: 8px; padding: 8px 12px; background: var(--panel); border-top: 1px solid #000; }
-  .card { flex: 1; background: var(--card); border: 2px solid transparent; border-radius: 10px; padding: 8px 4px; text-align: center; cursor: pointer; transition: transform .08s; min-height: 64px; }
+  /* 卡片列：可以左右滑 */
+  #cards { display: flex; gap: 8px; padding: 8px 12px; background: var(--panel); border-top: 1px solid #000; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  #cards::-webkit-scrollbar { display: none; }
+  .card { flex: 0 0 68px; background: var(--card); border: 2px solid transparent; border-radius: 10px; padding: 8px 4px; text-align: center; cursor: pointer; transition: transform .08s; min-height: 64px; position: relative; }
   .card .ico { font-size: 26px; line-height: 1; }
-  .card .name { font-size: 13px; margin-top: 2px; }
+  .card .name { font-size: 12px; margin-top: 2px; white-space: nowrap; }
   .card .cost { font-size: 12px; color: var(--gold); }
   .card.selected { border-color: var(--gold); background: var(--card-on); }
   .card.poor { opacity: .45; }
+  .card.new { animation: glow 1.4s infinite alternate; }
+  @keyframes glow { from { box-shadow: 0 0 0 0 #ffd98a00; } to { box-shadow: 0 0 10px 2px var(--new); } }
   .card.shake { animation: shake .3s; }
   @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
 
@@ -49,25 +55,55 @@
     grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(5, 1fr); border: 3px solid var(--line); border-radius: 8px; overflow: hidden; }
   .cell { position: relative; background: var(--grass); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); }
   .cell.alt { background: var(--grass2); }
+  .cell.rock { background: var(--rock); }
+  .cell.rock::after { content: '🪨'; opacity: .7; font-size: .8em; }
   .cell.hint { outline: 2px dashed var(--gold); outline-offset: -4px; }
   .cell .unit { position: relative; display: flex; align-items: center; justify-content: center; width: 80%; height: 80%; border-radius: 8px; }
   .unit.shepherd { background: #3d6ea8; }
+  .unit.shepherd.elder { background: #2f5a8f; box-shadow: inset 0 0 0 2px var(--gold); }
   .unit.slinger  { background: #a8553d; }
+  .unit.sling    { background: #8a3f2e; }
+  .unit.hireling { background: #7d7a6a; }
+  .unit.archer   { background: #6b4e2e; }
   .unit.wall     { background: #777; }
-  .unit .hp, .enemy .hp { position: absolute; left: 10%; right: 10%; bottom: 2px; height: 3px; background: #0006; }
+  .unit.tower    { background: #5c5c66; }
+  .unit.dog      { background: transparent; opacity: .35; font-size: .6em; }
+  .unit.scorpion, .unit.thorns { background: transparent; }
+  .unit.brazier  { background: #6e3a1e; }
+  .unit.horn     { background: #7a6a2a; }
+  .unit.healer   { background: #3d8a7a; }
+  .unit.catapult { background: #5a4a3a; }
+  .unit .hp, .enemy .hp, .dog-run .hp { position: absolute; left: 10%; right: 10%; bottom: 2px; height: 3px; background: #0006; }
   .hp > i { display: block; height: 100%; background: var(--ok); }
-  .unit.hurt { animation: hurt .2s; }
-  @keyframes hurt { 50% { filter: brightness(1.8); } }
+  .unit.fear { filter: grayscale(.8); }
+  .unit .badge { position: absolute; top: -4px; right: -4px; font-size: 11px; background: #000a; border-radius: 8px; padding: 0 4px; }
 
-  /* 敵人與石頭用絕對定位，位置用百分比，不用算像素 */
-  .enemy { position: absolute; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; }
-  .enemy .body { width: 70%; height: 70%; border-radius: 50%; background: #5b5b66; display: flex; align-items: center; justify-content: center; }
+  /* 敵人、狗、石頭用絕對定位，位置用百分比 */
+  .enemy, .dog-run, .mark { position: absolute; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; }
+  .enemy .body { width: 70%; height: 70%; border-radius: 50%; background: #5b5b66; display: flex; align-items: center; justify-content: center; position: relative; }
   .enemy.fast .body { background: #8a4b6b; }
+  .enemy.alpha .body { background: #3b2b4b; box-shadow: 0 0 0 2px #c9a0dc; }
+  .enemy.big .body { background: #4a3a2a; }
+  .enemy.human .body { background: #4a4a3a; border-radius: 30%; }
+  .enemy.small .body { width: 50%; height: 50%; background: #6a5a3a; }
+  .enemy.dig .body { background: #5a4a2a; }
+  .enemy.underground { opacity: 0; }
+  .enemy.fly { align-items: flex-start; }
+  .enemy.fly .body { background: transparent; }
+  .enemy.carry .body::after { content: '🐑'; position: absolute; right: -8px; bottom: -4px; font-size: .55em; }
   .enemy .hp > i { background: var(--danger); }
-  .marker { position: absolute; right: 2px; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(14px, 4.5vw, 26px); opacity: .85; pointer-events: none; animation: blink .8s infinite alternate; }
+  .enemy .st { position: absolute; top: 0; left: 50%; transform: translateX(-50%); font-size: .45em; line-height: 1; white-space: nowrap; }
+  .dog-run .body { width: 70%; height: 70%; border-radius: 50%; background: #c9a24a; display: flex; align-items: center; justify-content: center; position: relative; }
+  .mark { right: 2px; font-size: clamp(14px, 4.5vw, 26px); opacity: .85; animation: blink .8s infinite alternate; }
   @keyframes blink { from { opacity: .35; } to { opacity: .95; } }
-  .stone { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #e9e4d0; pointer-events: none; }
+  .shot { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #e9e4d0; pointer-events: none; }
+  .shot.arrow { width: 18px; height: 3px; border-radius: 2px; background: #d8c8a0; }
+  .shot.sling { width: 14px; height: 14px; background: #d0d0d0; }
+  .shot.lob { width: 14px; height: 14px; background: #a9a9a9; }
+  .shot.burn { background: #ff8a3d; box-shadow: 0 0 6px #ff8a3d; }
   .pop { position: absolute; color: var(--gold); font-weight: bold; font-size: 14px; pointer-events: none; animation: pop 1s forwards; }
+  .fx { position: absolute; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(16px, 5vw, 30px); pointer-events: none; animation: pop 1.1s forwards; }
+  .fx.stay { animation: blink .6s infinite alternate; }
   @keyframes pop { to { transform: translateY(-24px); opacity: 0; } }
 
   /* 底部進度條 */
@@ -75,29 +111,46 @@
   #bar { height: 8px; background: #0006; border-radius: 4px; overflow: hidden; }
   #bar > i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .3s; }
   #toast { text-align: center; font-size: 13px; color: var(--muted); min-height: 18px; margin-top: 6px; }
+  #toast.tip { color: var(--new); }
 
   /* 蓋在上面的對話／結果畫面 */
-  .overlay { position: fixed; inset: 0; background: #000a; display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
+  .overlay { position: fixed; inset: 0; background: #000a; display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 10; overflow-y: auto; }
   .overlay[hidden] { display: none; }
-  .dialog { background: var(--panel); border-radius: 14px; padding: 22px 20px; max-width: 420px; width: 100%; text-align: center; }
+  .dialog { background: var(--panel); border-radius: 14px; padding: 22px 20px; max-width: 420px; width: 100%; text-align: center; margin: auto; }
   .dialog h1 { margin: 0 0 6px; font-size: 24px; }
   .dialog .ref { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
   .dialog p { line-height: 1.7; font-size: 15px; text-align: left; }
   .dialog .who { color: var(--gold); }
+  .dialog .verse { background: #0004; border-left: 3px solid var(--gold); padding: 8px 10px; border-radius: 4px; }
   #diffs { display: flex; gap: 6px; margin: 10px 0 4px; }
   .diff { flex: 1; background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 10px; padding: 9px 0; font-size: 15px; font-family: inherit; cursor: pointer; }
   .diff.selected { border-color: var(--gold); background: var(--card-on); }
   #diff-hint { font-size: 12px; color: var(--muted); min-height: 16px; margin-bottom: 8px; }
   .btn.alt { background: transparent; color: var(--muted); border: 1px solid var(--muted); margin-top: 8px; }
-  .btn { display: inline-block; margin-top: 12px; padding: 12px 28px; font-size: 17px; border-radius: 10px; border: 0; background: var(--gold); color: #2b2a26; font-weight: bold; cursor: pointer; }
+  .btn { display: inline-block; margin-top: 12px; padding: 12px 28px; font-size: 17px; border-radius: 10px; border: 0; background: var(--gold); color: #2b2a26; font-weight: bold; cursor: pointer; font-family: inherit; }
+  .btn[hidden] { display: none; }
   .tips { font-size: 13px; color: var(--muted); text-align: left; margin-top: 10px; line-height: 1.6; }
+  .tips .new { color: var(--new); }
   #best { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+  /* 關卡選單 */
+  .lv { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 10px; padding: 10px 12px; margin-top: 8px; text-align: left; cursor: pointer; }
+  .lv.locked { opacity: .45; cursor: default; }
+  .lv .n { font-size: 20px; width: 28px; text-align: center; color: var(--gold); }
+  .lv .t { flex: 1; }
+  .lv .t b { display: block; font-size: 15px; }
+  .lv .t span { font-size: 12px; color: var(--muted); }
+  .lv .s { font-size: 12px; color: var(--ok); white-space: nowrap; }
+  #psalm { text-align: left; font-size: 15px; line-height: 1.9; margin-top: 10px; }
+  #psalm div { opacity: 0; transition: opacity 1.2s; }
+  #psalm div.on { opacity: 1; }
 </style>
 </head>
 <body>
 
 <div id="top">
   <span>🌾 糧 <b id="food">0</b></span>
+  <span id="sheep" hidden>🐑 <b id="sheep-n">3</b></span>
   <span id="wave-info">準備中</span>
 </div>
 
@@ -110,19 +163,22 @@
   <div id="toast">先點一張卡，再點草地放下去</div>
 </div>
 
-<!-- 開場 -->
-<div class="overlay" id="intro">
+<!-- 關卡選單 -->
+<div class="overlay" id="levels">
   <div class="dialog">
     <h1>羊圈守夜</h1>
-    <div class="ref">取材：創世記 31 章，雅各替拉班看守羊群</div>
-    <p><span class="who">雅各：</span>這群羊是拉班交給我的，二十年來我沒少過一隻。今晚換你守夜，狼從東邊來，擋住牠們，天亮前羊一隻都不能少。</p>
-    <div class="tips">
-      🧑‍🌾 牧人：每隔一陣子送來糧<br>
-      🪨 投石手：朝同一排的狼丟石頭<br>
-      🧱 石牆：擋在前面，很耐咬<br>
-      🐾 腳印出現在哪一排，下一隻狼就從那排來<br>
-      第一波狼只走中間三排；狼走到最左邊就守夜失敗，撐過三波就天亮。
-    </div>
+    <div class="ref">受託守夜的無名牧人。每一夜都是聖經裡牧人真的守過的夜。</div>
+    <div id="lv-list"></div>
+  </div>
+</div>
+
+<!-- 開場 -->
+<div class="overlay" id="intro" hidden>
+  <div class="dialog">
+    <h1 id="intro-title"></h1>
+    <div class="ref" id="intro-ref"></div>
+    <p id="intro-text"></p>
+    <div class="tips" id="intro-tips"></div>
     <div id="diffs">
       <button class="diff" data-key="calm">寧靜夜</button>
       <button class="diff" data-key="windy">起風夜</button>
@@ -130,6 +186,7 @@
     </div>
     <div id="diff-hint"></div>
     <button class="btn" id="start">開始守夜</button>
+    <button class="btn alt" id="intro-back">回關卡</button>
     <div id="best"></div>
   </div>
 </div>
@@ -139,358 +196,323 @@
   <div class="dialog">
     <h1 id="result-title"></h1>
     <p id="result-text"></p>
+    <div id="psalm"></div>
+    <button class="btn" id="next" hidden>下一夜</button>
     <button class="btn" id="retry">再守一夜</button>
-    <button class="btn alt" id="back">換一種夜</button>
+    <button class="btn alt" id="back">回關卡</button>
   </div>
 </div>
 
+<script src="data.js?v=3"></script>
+<script src="engine.js?v=3"></script>
 <script>
 'use strict';
-// ====== 基本設定 ======
-const ROWS = 5, COLS = 7;
-
-// 可放置的單位。cost 是要花的糧，hp 是能被咬幾下
-const UNITS = {
-  shepherd: { name: '牧人',   ico: '🧑‍🌾', cost: 50,  hp: 60,  every: 7, gives: 25 },
-  slinger:  { name: '投石手', ico: '🪨',   cost: 100, hp: 60,  every: 1.3, dmg: 20 },
-  wall:     { name: '石牆',   ico: '🧱',   cost: 50,  hp: 300 },
-};
-
-// 敵人種類。speed 是每秒走幾格，bite 是每秒咬掉多少血
-const ENEMIES = {
-  wolf: { ico: '🐺', hp: 60, speed: 0.22, bite: 12 },
-  fast: { ico: '🐺', hp: 40, speed: 0.40, bite: 10, cls: 'fast' },
-};
-
-// 三波。每一項是 [種類, 隻數]，gap 是隔幾秒放一隻出來
-// 三檔難度。差別只有兩件事：牧人幾秒回一次糧、每一波的狼有多少多壯
-// rows 是這一波狼會走哪幾排（第一波只走中間三排，讓新手站得住）；hpMul 是狼的血量倍數，越晚越壯
-const WAVE_MILD = [
-  { list: [['wolf', 4]],               gap: 5.0, rows: [1, 2, 3], hpMul: 1,   say: '第 1 波來了' },
-  { list: [['wolf', 7], ['fast', 3]],  gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '第 2 波來了，狼開始從兩側繞過來' },
-  { list: [['wolf', 10], ['fast', 6]], gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 2,   say: '最後一波，這群狼更壯' },
-];
-const WAVE_FIERCE = [
-  { list: [['wolf', 4]],               gap: 5.0, rows: [1, 2, 3], hpMul: 1,   say: '第 1 波來了' },
-  { list: [['wolf', 9], ['fast', 4]],  gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.6, say: '第 2 波來了，狼開始從兩側繞過來' },
-  { list: [['wolf', 12], ['fast', 8]], gap: 1.4, rows: [0, 1, 2, 3, 4], hpMul: 2.5, say: '最後一波，這群狼又多又壯' },
-];
-const DIFFS = {
-  calm:  { name: '寧靜夜', hint: '狼不多，先熟悉怎麼守',         shepherdEvery: 7,  waves: WAVE_MILD },
-  windy: { name: '起風夜', hint: '狼更多更壯，守法自己想',        shepherdEvery: 7,  waves: WAVE_FIERCE },
-  storm: { name: '暴風夜', hint: '糧來得慢，狼又多又壯', shepherdEvery: 10, waves: WAVE_FIERCE },
-};
-let diff = 'calm';
-let WAVES = DIFFS.calm.waves;
-function applyDiff(key) {
-  diff = key;
-  WAVES = DIFFS[key].waves;
-  UNITS.shepherd.every = DIFFS[key].shepherdEvery;
-  document.querySelectorAll('.diff').forEach(b => b.classList.toggle('selected', b.dataset.key === key));
-  $('#diff-hint').textContent = DIFFS[key].hint;
-  try { localStorage.setItem('sheepfold-diff', key); } catch (e) {}
-}
-const PREP_TIME = 18;   // 第一波來之前的準備秒數
-const WAVE_REST = 6;    // 清完一波後休息幾秒
-const FORESHADOW_LEAD = 3; // 倒數剩幾秒時，先印出下一波第一隻狼的腳印
-const START_FOOD = 150;  // 剛好夠一開局放一個牧人＋一個投石手
-const TRICKLE = { every: 5, gives: 5 }; // 就算沒放牧人也會慢慢有糧，不會卡死
-
-// ====== 狀態 ======
-let S;           // 這一局的所有狀態
-let selected = null;
-let last = 0, raf = 0;
-
+// ROWS、COLS、UNITS、ENEMIES、DIFFS、LEVELS 由 data.js 直接提供
 const $ = s => document.querySelector(s);
 const board = $('#board');
 const cells = [];
+let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf = 0;
+const els = new Map();   // 引擎物件 id → 畫面元素
+let markerEl = null, moundEls = new Map();
+let toastTimer = 0;
 
-function freshState() {
-  return {
-    food: START_FOOD, trickle: 0,
-    phase: 'prep', wave: 0, timer: PREP_TIME,
-    queue: [], spawnTimer: 0, spawnedTotal: 0, killed: 0, nextRow: null, marker: null,
-    units: {}, enemies: [], stones: [], pops: [],
-    over: false,
-  };
+// ====== 進度（只存在這支手機） ======
+const PKEY = 'sheepfold-progress-v3';
+function loadProgress() {
+  let p = { cleared: {}, best: {} };
+  try { p = Object.assign(p, JSON.parse(localStorage.getItem(PKEY) || '{}')); } catch (e) {}
+  // 舊版只有第一關的紀錄，搬過來
+  try {
+    const old = JSON.parse(localStorage.getItem('sheepfold-best-v2') || 'null');
+    if (old && !p.migrated) { for (const k in old) { p.best['1:' + k] = old[k]; if (old[k].cleared) (p.cleared[1] = p.cleared[1] || {})[k] = true; } p.migrated = true; saveProgress(p); }
+  } catch (e) {}
+  return p;
 }
+let P = loadProgress();
+function saveProgress(p) { try { localStorage.setItem(PKEY, JSON.stringify(p || P)); } catch (e) {} }
+const unlockAll = /[?&]all/.test(location.search);
+function unlocked(id) { return id === 1 || unlockAll || !!P.cleared[id - 1]; }
 
 // ====== 畫面建立 ======
 function buildBoard() {
-  board.innerHTML = '';
+  board.innerHTML = ''; cells.length = 0;
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     const d = document.createElement('div');
     d.className = 'cell' + ((r + c) % 2 ? ' alt' : '');
     d.dataset.r = r; d.dataset.c = c;
     d.addEventListener('click', () => tapCell(r, c));
-    board.appendChild(d);
-    cells.push(d);
+    board.appendChild(d); cells.push(d);
   }
 }
-
 function buildCards() {
-  const wrap = $('#cards');
-  wrap.innerHTML = '';
-  for (const key in UNITS) {
+  const wrap = $('#cards'); wrap.innerHTML = '';
+  for (const key of level.units) {
     const u = UNITS[key];
     const d = document.createElement('div');
-    d.className = 'card'; d.dataset.key = key;
+    d.className = 'card' + (level.fresh.includes(key) ? ' new' : ''); d.dataset.key = key;
     d.innerHTML = `<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
     d.addEventListener('click', () => tapCard(key, d));
     wrap.appendChild(d);
   }
 }
+function buildLevels() {
+  const list = $('#lv-list'); list.innerHTML = '';
+  for (const L of LEVELS) {
+    const ok = unlocked(L.id);
+    const d = document.createElement('div');
+    d.className = 'lv' + (ok ? '' : ' locked');
+    const done = P.cleared[L.id] ? Object.keys(P.cleared[L.id]).map(k => DIFFS[k].name.slice(0, 2)).join('・') + ' ✅' : '';
+    d.innerHTML = `<div class="n">${ok ? L.id : '🔒'}</div><div class="t"><b>${L.name}</b><span>${ok ? L.ref.replace('取材：', '') : '守過上一夜就會開'}</span></div><div class="s">${done}</div>`;
+    if (ok) d.addEventListener('click', () => openIntro(L));
+    list.appendChild(d);
+  }
+}
+function openIntro(L) {
+  level = L;
+  $('#intro-title').textContent = L.title;
+  $('#intro-ref').textContent = L.ref;
+  const t = $('#intro-text');
+  t.innerHTML = L.speaker ? `<span class="who">${L.speaker}：</span>${L.intro}` : `<div class="verse">${L.intro}</div>`;
+  $('#intro-tips').innerHTML = L.fresh.map(k => `<div class="new">${UNITS[k].ico} ${UNITS[k].name}：${UNITS[k].desc}</div>`).join('') + (L.tips || []).map(x => `<div>${x}</div>`).join('');
+  applyDiff(diff);
+  showBest();
+  $('#levels').hidden = true; $('#intro').hidden = false;
+}
+function applyDiff(key) {
+  diff = key;
+  document.querySelectorAll('.diff').forEach(b => b.classList.toggle('selected', b.dataset.key === key));
+  $('#diff-hint').textContent = DIFFS[key].hint;
+  try { localStorage.setItem('sheepfold-diff', key); } catch (e) {}
+}
+function showBest() {
+  const lines = Object.keys(DIFFS).filter(k => P.best[level.id + ':' + k]).map(k => { const b = P.best[level.id + ':' + k]; return `${DIFFS[k].name}：${b.cleared ? '守過整夜 ✅' : `撐到第 ${b.wave} 波`}`; });
+  $('#best').textContent = lines.length ? '最高紀錄 ' + lines.join('　') : '';
+}
 
-function toast(msg) { $('#toast').textContent = msg; }
+function toast(msg, tip) {
+  const t = $('#toast'); t.textContent = msg; t.classList.toggle('tip', !!tip);
+  clearTimeout(toastTimer);
+  if (tip) toastTimer = setTimeout(() => t.classList.remove('tip'), 5000);
+}
 
 // ====== 操作 ======
 function tapCard(key, el) {
-  if (S.over) return;
+  if (!G || G.over) return;
   const u = UNITS[key];
-  if (S.food < u.cost) {
+  if (G.food < u.cost) {
     el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
-    toast(`糧不夠，${u.name}要 ${u.cost} 糧`);
-    return;
+    toast(`糧不夠，${u.name}要 ${u.cost} 糧`); return;
   }
   selected = (selected === key) ? null : key;
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.key === selected));
-  cells.forEach(c => c.classList.toggle('hint', !!selected && !S.units[c.dataset.r + ',' + c.dataset.c]));
-  toast(selected ? `點一格草地放下${u.name}` : '先點一張卡，再點草地放下去');
+  cells.forEach(c => c.classList.toggle('hint', !!selected && !G.units[c.dataset.r + ',' + c.dataset.c] && !G.rocks.has(c.dataset.r + ',' + c.dataset.c)));
+  toast(selected ? (u.kind === 'instant' ? `點狼群中間，${u.name}就打破在那裡` : `點一格草地放下${u.name}`) : '先點一張卡，再點草地放下去');
 }
-
 function tapCell(r, c) {
-  if (S.over || !selected) { if (!S.over && !selected) toast('先點一張卡'); return; }
-  const key = r + ',' + c;
-  if (S.units[key]) { toast('這格已經有人了'); return; }
-  const u = UNITS[selected];
-  if (S.food < u.cost) { toast('糧不夠'); return; }
-  S.food -= u.cost;
-  S.units[key] = { type: selected, r, c, hp: u.hp, maxHp: u.hp, timer: u.every ? u.every * 0.6 : 0 };
-  renderUnit(r, c);
-  const name = u.name;
+  if (!G || G.over) return;
+  if (!selected) { const res = Engine.tapUnit(G, r, c); flushEvents(); if (res.msg) toast(res.msg); return; }
+  const res = Engine.place(G, r, c, selected);
+  flushEvents();
+  if (!res.ok) { toast(res.msg || ''); return; }
   selected = null;
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
   cells.forEach(x => x.classList.remove('hint'));
-  toast(`${name}就位`);
+  toast(res.msg);
 }
 
+// ====== 畫單位 ======
 function renderUnit(r, c) {
   const cell = cells[r * COLS + c];
-  const u = S.units[r + ',' + c];
+  const u = G.units[r + ',' + c];
   cell.innerHTML = '';
   if (!u) return;
+  const def = UNITS[u.type];
   const d = document.createElement('div');
-  d.className = 'unit ' + u.type;
-  d.innerHTML = `${UNITS[u.type].ico}<div class="hp"><i style="width:${u.hp / u.maxHp * 100}%"></i></div>`;
+  d.className = 'unit ' + u.type + (u.elder ? ' elder' : '') + (u.fear > 0 ? ' fear' : '');
+  const ico = def.kind === 'dog' ? '🦴' : def.ico;
+  const bar = def.kind === 'floor' && def.uses ? `<div class="badge">${u.uses}</div>` : (u.maxHp > 1 && def.kind !== 'dog') ? `<div class="hp"><i style="width:${u.hp / u.maxHp * 100}%"></i></div>` : '';
+  d.innerHTML = `${ico}${bar}`;
   cell.appendChild(d);
 }
 
-// ====== 波次 ======
-function startWave(i) {
-  S.wave = i + 1;
-  S.phase = 'wave';
-  S.queue = [];
-  for (const [type, n] of WAVES[i].list) for (let k = 0; k < n; k++) S.queue.push(type);
-  // 洗牌，讓快狼混在裡面
-  for (let k = S.queue.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [S.queue[k], S.queue[j]] = [S.queue[j], S.queue[k]]; }
-  S.spawnTimer = 0;
-  toast(WAVES[i].say);
+// ====== 畫面上的一次性效果 ======
+const FX = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', howl: '嗷！', roar: '吼！', emerge: '💨', vault: '↷', grab: '🐑', splash: '💥', dodge: '閃', bark: '汪！', enrage: '怒！' };
+function fx(kind, r, x) {
+  if (kind === 'mound') { const d = spawnFx('🕳️', r, x, true); moundEls.set(r + ':' + x, d); return; }
+  if (kind === 'emerge') { for (const [k, d] of moundEls) if (k.startsWith(r + ':')) { d.remove(); moundEls.delete(k); } }
+  spawnFx(FX[kind] || '✨', r, x);
 }
-
-// 下一隻狼還沒出現，先在那一排最右邊印腳印，讓玩家有時間補防。i 是波次索引（0 起算）
-function foreshadow(i) {
-  if (S.nextRow !== null) return;
-  const rows = WAVES[i].rows;
-  S.nextRow = rows[Math.floor(Math.random() * rows.length)];
-  const d = document.createElement('div'); d.className = 'marker'; d.textContent = '🐾';
-  d.style.top = (S.nextRow / ROWS * 100) + '%';
-  board.appendChild(d);
-  S.marker = d;
+function spawnFx(text, r, x, stay) {
+  const d = document.createElement('div'); d.className = 'fx' + (stay ? ' stay' : ''); d.textContent = text;
+  d.style.left = (x / COLS * 100) + '%'; d.style.top = (r / ROWS * 100) + '%';
+  board.appendChild(d); if (!stay) setTimeout(() => d.remove(), 1100);
+  return d;
 }
-
-function spawn(type) {
-  const e = ENEMIES[type], w = WAVES[S.wave - 1];
-  const r = S.nextRow ?? w.rows[Math.floor(Math.random() * w.rows.length)];
-  if (S.marker) S.marker.remove();
-  S.nextRow = null; S.marker = null;
-  const hp = Math.round(e.hp * (w.hpMul || 1));
-  const d = document.createElement('div');
-  d.className = 'enemy ' + (e.cls || '');
-  d.innerHTML = `<div class="body">${e.ico}</div><div class="hp"><i style="width:100%"></i></div>`;
-  if (w.hpMul > 1) d.querySelector('.body').style.transform = `scale(${1 + (w.hpMul - 1) * 0.25})`;
-  board.appendChild(d);
-  S.enemies.push({ type, r, x: COLS, hp, maxHp: hp, el: d, biting: null });
-  S.spawnedTotal++;
-}
-
-// ====== 每一幀 ======
-function tick(now) {
-  raf = requestAnimationFrame(tick);
-  let dt = Math.min(0.05, (now - last) / 1000); last = now;
-  if (S.over) return;
-
-  // 糧慢慢來
-  S.trickle += dt;
-  if (S.trickle >= TRICKLE.every) { S.trickle -= TRICKLE.every; S.food += TRICKLE.gives; }
-
-  // 波次節奏
-  if (S.phase === 'prep' || S.phase === 'rest') {
-    S.timer -= dt;
-    // 倒數快結束就先印腳印，波次一開始第一隻狼就從那排來
-    if (S.wave < WAVES.length && S.timer <= FORESHADOW_LEAD) foreshadow(S.wave);
-    if (S.timer <= 0) {
-      if (S.wave >= WAVES.length) return win();
-      startWave(S.wave);
-    }
-  } else if (S.phase === 'wave') {
-    if (S.queue.length) {
-      foreshadow(S.wave - 1);
-      S.spawnTimer -= dt;
-      if (S.spawnTimer <= 0) { spawn(S.queue.shift()); S.spawnTimer = WAVES[S.wave - 1].gap; }
-    } else if (!S.enemies.length) {
-      S.phase = 'rest'; S.timer = WAVE_REST;
-      toast(S.wave >= WAVES.length ? '最後一隻狼跑了……' : `第 ${S.wave} 波擋住了，喘口氣`);
-    }
-  }
-
-  // 單位做事：牧人送糧、投石手丟石頭
-  for (const key in S.units) {
-    const u = S.units[key], def = UNITS[u.type];
-    if (!def.every) continue;
-    u.timer -= dt;
-    if (u.timer > 0) continue;
-    if (u.type === 'shepherd') {
-      u.timer = def.every; S.food += def.gives; pop(u.r, u.c, `+${def.gives}`);
-    } else if (u.type === 'slinger') {
-      const target = S.enemies.some(e => e.r === u.r && e.x > u.c);
-      if (target) {
-        u.timer = def.every;
-        const d = document.createElement('div'); d.className = 'stone'; board.appendChild(d);
-        S.stones.push({ r: u.r, x: u.c + 0.6, dmg: def.dmg, el: d });
-      }
-    }
-  }
-
-  // 石頭飛
-  for (const s of S.stones) {
-    s.x += 6 * dt;
-    const hit = S.enemies.find(e => e.r === s.r && Math.abs(e.x + 0.5 - s.x) < 0.35);
-    if (hit) { hit.hp -= s.dmg; s.dead = true; }
-    if (s.x > COLS + 1) s.dead = true;
-  }
-
-  // 狼走路、咬東西
-  for (const e of S.enemies) {
-    const def = ENEMIES[e.type];
-    // 前面那一格有沒有單位擋著
-    const frontCol = Math.floor(e.x + 0.3);
-    const blocker = S.units[e.r + ',' + frontCol];
-    if (blocker && e.x <= frontCol + 0.6) {
-      blocker.hp -= def.bite * dt;
-      e.biting = blocker;
-      if (blocker.hp <= 0) { delete S.units[e.r + ',' + frontCol]; renderUnit(e.r, frontCol); e.biting = null; }
-      else if (Math.random() < dt * 4) renderUnit(e.r, frontCol);
-    } else {
-      e.biting = null;
-      e.x -= def.speed * dt;
-    }
-    if (e.x < -0.6) return lose();
-  }
-
-  // 清掉死掉的
-  S.enemies = S.enemies.filter(e => { if (e.hp <= 0) { e.el.remove(); S.killed++; return false; } return true; });
-  S.stones = S.stones.filter(s => { if (s.dead) { s.el.remove(); return false; } return true; });
-
-  draw();
-}
-
 function pop(r, c, text) {
   const d = document.createElement('div'); d.className = 'pop'; d.textContent = text;
   d.style.left = ((c + 0.3) / COLS * 100) + '%'; d.style.top = ((r + 0.2) / ROWS * 100) + '%';
   board.appendChild(d); setTimeout(() => d.remove(), 1000);
 }
+function setMarker(r, type) {
+  if (markerEl) { markerEl.remove(); markerEl = null; }
+  if (r === null || r === undefined) return;
+  const d = document.createElement('div'); d.className = 'mark';
+  d.textContent = (type && type !== 'wolf' && type !== 'fast') ? ENEMIES[type].ico : '🐾';
+  d.style.top = (r / ROWS * 100) + '%';
+  board.appendChild(d); markerEl = d;
+}
 
+// 把引擎這一步發生的事畫出來
+function flushEvents() {
+  for (const e of G.events) {
+    switch (e.t) {
+      case 'toast': toast(e.msg); break;
+      case 'callout': toast(`${ENEMIES[e.type].ico} ${e.tip}`, true); break;
+      case 'pop': pop(e.r, e.c, e.text); break;
+      case 'unit': renderUnit(e.r, e.c); break;
+      case 'fx': fx(e.kind, e.r, e.x); break;
+      case 'marker': setMarker(e.r, e.type); break;
+      case 'sheep': $('#sheep-n').textContent = G.sheep; break;
+      case 'win': onWin(); break;
+      case 'lose': onLose(e.reason); break;
+    }
+  }
+  G.events.length = 0;
+}
+
+// ====== 每一幀 ======
+function tick(now) {
+  raf = requestAnimationFrame(tick);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  Engine.step(G, dt);
+  flushEvents();
+  draw();
+}
+
+function statusText(e) {
+  let s = '';
+  if (e.st.burn) s += '🔥'; if (e.st.poison) s += '☠️'; if (e.st.slow) s += '🐌'; if (e.st.stun || e.st.distract) s += '💫'; if (e.st.panic) s += '😱'; if (e.st.howl) s += '💨'; if (e.enraged) s += '😡';
+  return s;
+}
 function draw() {
-  $('#food').textContent = Math.floor(S.food);
-  const t = Math.ceil(S.timer);
+  $('#food').textContent = Math.floor(G.food);
+  const t = Math.ceil(G.timer), n = G.waves.length;
   $('#wave-info').textContent =
-    S.phase === 'prep' ? `第 1 波 ${t} 秒後來` :
-    S.phase === 'rest' ? (S.wave >= WAVES.length ? '天快亮了' : `第 ${S.wave + 1} 波 ${t} 秒後來`) :
-    `第 ${S.wave} / ${WAVES.length} 波`;
-  for (const e of S.enemies) {
-    e.el.style.left = (e.x / COLS * 100) + '%';
-    e.el.style.top = (e.r / ROWS * 100) + '%';
-    e.el.querySelector('.hp > i').style.width = (e.hp / e.maxHp * 100) + '%';
+    G.phase === 'prep' ? `第 1 波 ${t} 秒後來` :
+    G.phase === 'rest' ? (G.wave >= n ? '天快亮了' : `第 ${G.wave + 1} 波 ${t} 秒後來`) :
+    `第 ${G.wave} / ${n} 波`;
+
+  const alive = new Set();
+  for (const e of G.enemies) {
+    alive.add(e.id);
+    let el = els.get(e.id);
+    if (!el) {
+      const def = ENEMIES[e.type];
+      el = document.createElement('div'); el.className = 'enemy ' + (def.cls || '');
+      el.innerHTML = `<div class="body">${def.ico}<div class="st"></div></div><div class="hp"><i style="width:100%"></i></div>`;
+      const w = G.waves[G.wave - 1];
+      if (w && w.hpMul > 1.2) el.querySelector('.body').style.transform = `scale(${1 + (w.hpMul - 1) * 0.2})`;
+      board.appendChild(el); els.set(e.id, el);
+    }
+    el.style.left = (e.x / COLS * 100) + '%';
+    el.style.top = (e.r / ROWS * 100) + '%';
+    el.classList.toggle('underground', !!e.underground);
+    el.classList.toggle('carry', !!e.carrying);
+    el.querySelector('.hp > i').style.width = (Math.max(0, e.hp) / e.maxHp * 100) + '%';
+    const st = el.querySelector('.st'); const txt = statusText(e); if (st.textContent !== txt) st.textContent = txt;
   }
-  for (const s of S.stones) {
-    s.el.style.left = `calc(${s.x / COLS * 100}% - 5px)`;
-    s.el.style.top = `calc(${(s.r + 0.5) / ROWS * 100}% - 5px)`;
+  for (const s of G.shots) {
+    alive.add(s.id);
+    let el = els.get(s.id);
+    if (!el) { el = document.createElement('div'); el.className = 'shot ' + s.kind; board.appendChild(el); els.set(s.id, el); }
+    el.classList.toggle('burn', !!s.burn);
+    const lift = s.kind === 'lob' ? Math.sin(Math.min(1, s.t) * Math.PI) * 0.6 : 0;
+    el.style.left = `calc(${s.x / COLS * 100}% - 6px)`;
+    el.style.top = `calc(${(s.r + 0.5 - lift) / ROWS * 100}% - 6px)`;
   }
-  const total = WAVES.reduce((n, w) => n + w.list.reduce((m, [, k]) => m + k, 0), 0);
-  $('#bar > i').style.width = (S.killed / total * 100) + '%';
-  document.querySelectorAll('.card').forEach(c => c.classList.toggle('poor', S.food < UNITS[c.dataset.key].cost));
+  for (const k in G.units) {
+    const u = G.units[k]; if (u.type !== 'dog') continue;
+    alive.add(u.id);
+    let el = els.get(u.id);
+    if (!el) { el = document.createElement('div'); el.className = 'dog-run'; el.innerHTML = `<div class="body">🐕</div><div class="hp"><i style="width:100%"></i></div>`; board.appendChild(el); els.set(u.id, el); }
+    el.style.left = (u.x / COLS * 100) + '%'; el.style.top = (u.r / ROWS * 100) + '%';
+    el.querySelector('.hp > i').style.width = (Math.max(0, u.hp) / u.maxHp * 100) + '%';
+  }
+  for (const [id, el] of els) if (!alive.has(id)) { el.remove(); els.delete(id); }
+
+  $('#bar > i').style.width = (G.killed / G.total * 100) + '%';
+  document.querySelectorAll('.card').forEach(c => c.classList.toggle('poor', G.food < UNITS[c.dataset.key].cost));
 }
 
 // ====== 勝負 ======
 function endGame(title, text) {
-  S.over = true;
   $('#result-title').textContent = title;
   $('#result-text').textContent = text;
+  $('#psalm').innerHTML = '';
   $('#result').hidden = false;
 }
-function win() {
-  saveBest(WAVES.length, true);
-  endGame(`天亮了 🌅`, `${DIFFS[diff].name}守過了。羊一隻不少，雅各走過來數了一遍，點點頭，什麼也沒說，把水袋遞給你。`);
+function recordBest(cleared) {
+  const k = level.id + ':' + diff;
+  const score = cleared ? G.waves.length + 1 : G.wave;
+  const old = P.best[k] || {};
+  if (!(old.score >= score)) P.best[k] = { score, cleared, wave: G.wave };
+  if (cleared) (P.cleared[level.id] = P.cleared[level.id] || {})[diff] = true;
+  saveProgress();
 }
-function lose() {
-  saveBest(S.wave, false);
-  endGame('狼闖進羊圈了', `你撐到了第 ${S.wave} 波。雅各說：明晚再來，先把石牆放前面一點。`);
+function onWin() {
+  recordBest(true);
+  const next = LEVELS.find(l => l.id === level.id + 1);
+  endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${level.outroWin}`);
+  $('#next').hidden = !next;
+  if (level.psalm) {
+    const box = $('#psalm');
+    level.psalm.forEach((line, i) => { const d = document.createElement('div'); d.textContent = line; box.appendChild(d); setTimeout(() => d.classList.add('on'), 600 + i * 1500); });
+  }
 }
-
-// 最高紀錄只存在這支手機裡，三檔各記各的
-function saveBest(wave, cleared) {
-  try {
-    const all = JSON.parse(localStorage.getItem('sheepfold-best-v2') || '{}');
-    const old = all[diff] || {};
-    const score = cleared ? WAVES.length + 1 : wave;
-    if (!(old.score >= score)) { all[diff] = { score, cleared, wave }; localStorage.setItem('sheepfold-best-v2', JSON.stringify(all)); }
-  } catch (e) {}
-}
-function showBest() {
-  try {
-    const all = JSON.parse(localStorage.getItem('sheepfold-best-v2') || '{}');
-    const lines = Object.keys(DIFFS).filter(k => all[k]).map(k => `${DIFFS[k].name}：${all[k].cleared ? '守過整夜 ✅' : `撐到第 ${all[k].wave} 波`}`);
-    $('#best').textContent = lines.length ? '最高紀錄 ' + lines.join('　') : '';
-  } catch (e) {}
+function onLose(reason) {
+  recordBest(false);
+  const titles = { wolf: '狼闖進羊圈了', bird: '鷙鳥飛進羊圈了', sheep: '羊被偷光了' };
+  const text = (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
+  endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`);
+  $('#next').hidden = true;
 }
 
 // ====== 開始／重來 ======
 function clearBoard() {
   cancelAnimationFrame(raf);
-  S = freshState();
+  for (const [, el] of els) el.remove(); els.clear();
+  board.querySelectorAll('.pop, .fx, .mark').forEach(x => x.remove()); moundEls.clear(); markerEl = null;
   selected = null;
-  board.querySelectorAll('.enemy, .stone, .pop, .marker').forEach(x => x.remove());
-  cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint'); });
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
   $('#result').hidden = true;
 }
-function reset() {
+function startGame() {
   clearBoard();
+  G = Engine.create(level.id, diff);
+  buildCards();
+  cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint'); c.classList.toggle('rock', G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
+  $('#sheep').hidden = !level.sheep; $('#sheep-n').textContent = G.sheep;
   toast('先點一張卡，再點草地放下去');
   draw();
   last = performance.now();
   raf = requestAnimationFrame(tick);
 }
+function backToLevels() {
+  clearBoard();
+  if (G) G.over = true;
+  buildLevels();
+  $('#intro').hidden = true; $('#result').hidden = true; $('#levels').hidden = false;
+}
 
-buildBoard(); buildCards(); showBest();
-let savedDiff = 'calm';
-try { savedDiff = localStorage.getItem('sheepfold-diff') || 'calm'; } catch (e) {}
-applyDiff(DIFFS[savedDiff] ? savedDiff : 'calm');
-S = freshState(); draw();
+buildBoard(); buildLevels();
+try { diff = localStorage.getItem('sheepfold-diff') || 'calm'; } catch (e) {}
+if (!DIFFS[diff]) diff = 'calm';
 document.querySelectorAll('.diff').forEach(b => b.addEventListener('click', () => applyDiff(b.dataset.key)));
-$('#start').addEventListener('click', () => { $('#intro').hidden = true; reset(); });
-$('#retry').addEventListener('click', reset);
-$('#back').addEventListener('click', () => { clearBoard(); draw(); showBest(); $('#intro').hidden = false; });
+$('#start').addEventListener('click', () => { $('#intro').hidden = true; startGame(); });
+$('#intro-back').addEventListener('click', backToLevels);
+$('#retry').addEventListener('click', startGame);
+$('#back').addEventListener('click', backToLevels);
+$('#next').addEventListener('click', () => { const nx = LEVELS.find(l => l.id === level.id + 1); clearBoard(); if (nx) openIntro(nx); else backToLevels(); });
 </script>
 </body>
 </html>
