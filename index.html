@@ -238,6 +238,7 @@ let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf =
 const els = new Map();   // 引擎物件 id → 畫面元素
 let markerEl = null, moundEls = new Map();
 let toastTimer = 0;
+let cardEls = [], lastFood = -1;
 
 // ====== 進度（只存在這支手機） ======
 const PKEY = 'sheepfold-progress-v3';
@@ -283,6 +284,7 @@ function buildCards() {
     d.addEventListener('click', () => tapCard(key, d));
     wrap.appendChild(d); lastG = g;
   }
+  cardEls = [...wrap.querySelectorAll('.card')]; lastFood = -1;
 }
 function buildLevels() {
   const list = $('#lv-list'); list.innerHTML = '';
@@ -321,6 +323,10 @@ function showBest() {
 // 新卡閃光只到玩家第一次點選那張卡為止
 function seenCard(key) { try { return (JSON.parse(localStorage.getItem('sheepfold-seen-cards') || '[]')).includes(key); } catch (e) { return false; } }
 function markSeen(key) { try { const a = JSON.parse(localStorage.getItem('sheepfold-seen-cards') || '[]'); if (!a.includes(key)) { a.push(key); localStorage.setItem('sheepfold-seen-cards', JSON.stringify(a)); } } catch (e) {} }
+
+// 敵人第一次出現的弱點提示只跳一次，之後不再打擾
+function seenEnemy(t) { try { return (JSON.parse(localStorage.getItem('sheepfold-seen-enemies') || '[]')).includes(t); } catch (e) { return false; } }
+function markSeenEnemy(t) { try { const a = JSON.parse(localStorage.getItem('sheepfold-seen-enemies') || '[]'); if (!a.includes(t)) { a.push(t); localStorage.setItem('sheepfold-seen-enemies', JSON.stringify(a)); } } catch (e) {} }
 
 function toast(msg, tip) {
   const t = $('#toast'); t.textContent = msg; t.classList.toggle('tip', !!tip);
@@ -372,9 +378,9 @@ function renderUnit(r, c) {
 
 // ====== 畫面上的一次性效果 ======
 const FX = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', vault: '↷', grab: '🐑', splash: '💥', enrage: '😡' };
-function fx(kind, r, x) {
-  if (kind === 'mound') { const d = spawnFx('🕳️', r, x, true); moundEls.set(r + ':' + x, d); return; }
-  if (kind === 'emerge') { for (const [k, d] of moundEls) if (k.startsWith(r + ':')) { d.remove(); moundEls.delete(k); } }
+function fx(kind, r, x, id) {
+  if (kind === 'mound') { const d = spawnFx('🕳️', r, x, true); moundEls.set(id, d); return; }
+  if (kind === 'emerge') { const d = moundEls.get(id); if (d) { d.remove(); moundEls.delete(id); } }
   if (kind === 'howl' || kind === 'roar') { ripple(r, x, kind === 'roar' ? 'var(--gold)' : '#c9a0dc'); return; }
   if (kind === 'bark') return;                      // 狗咬住狼已經看得到，不飄字
   if (kind === 'dodge') { flashDodge(r, x); return; } // 狐狸閃避：殘影，不飄字
@@ -417,10 +423,10 @@ function flushEvents() {
   for (const e of G.events) {
     switch (e.t) {
       case 'toast': toast(e.msg); break;
-      case 'callout': toast(`${ENEMIES[e.type].ico} ${e.tip}`, true); break;
+      case 'callout': if (!seenEnemy(e.type)) { toast(`${ENEMIES[e.type].ico} ${e.tip}`, true); markSeenEnemy(e.type); } break;
       case 'pop': pop(e.r, e.c, e.text); break;
       case 'unit': renderUnit(e.r, e.c); break;
-      case 'fx': fx(e.kind, e.r, e.x); break;
+      case 'fx': fx(e.kind, e.r, e.x, e.id); break;
       case 'marker': setMarker(e.r, e.type); break;
       case 'sheep': $('#sheep-n').textContent = G.sheep; break;
       case 'win': onWin(); break;
@@ -493,7 +499,8 @@ function draw() {
   for (const [id, el] of els) if (!alive.has(id)) { el.remove(); els.delete(id); }
 
   $('#bar > i').style.width = (G.killed / G.total * 100) + '%';
-  document.querySelectorAll('.card').forEach(c => c.classList.toggle('poor', G.food < UNITS[c.dataset.key].cost));
+  const f = Math.floor(G.food);
+  if (f !== lastFood) { lastFood = f; for (const c of cardEls) c.classList.toggle('poor', f < UNITS[c.dataset.key].cost); }
 }
 
 // ====== 勝負 ======

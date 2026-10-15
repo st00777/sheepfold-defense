@@ -114,11 +114,18 @@
   }
 
   // ====== 波次 ======
+  // 這一波的出場順序在預告前就決定好，預告圖示才會跟真正第一隻一致
+  function buildQueue(G, i) {
+    if (G.builtWave === i) return G.built;
+    const w = G.waves[i], q = [];
+    for (const [type, n] of w.list) for (let k = 0; k < n; k++) q.push(type);
+    if (!w.ordered) for (let k = q.length - 1; k > 0; k--) { const j = Math.floor(G.rng() * (k + 1)); [q[k], q[j]] = [q[j], q[k]]; }
+    G.builtWave = i; G.built = q;
+    return q;
+  }
   function startWave(G, i) {
     const w = G.waves[i];
-    G.wave = i + 1; G.phase = 'wave'; G.queue = [];
-    for (const [type, n] of w.list) for (let k = 0; k < n; k++) G.queue.push(type);
-    if (!w.ordered) for (let k = G.queue.length - 1; k > 0; k--) { const j = Math.floor(G.rng() * (k + 1)); [G.queue[k], G.queue[j]] = [G.queue[j], G.queue[k]]; }
+    G.wave = i + 1; G.phase = 'wave'; G.queue = buildQueue(G, i).slice();
     G.spawnTimer = 0;
     ev(G, { t: 'toast', msg: w.say });
   }
@@ -127,7 +134,7 @@
   function foreshadow(G, i) {
     if (G.nextRow !== null) return;
     const w = G.waves[i];
-    const type = G.queue.length ? G.queue[0] : w.list[0][0];
+    const type = G.phase === 'wave' ? G.queue[0] : buildQueue(G, i)[0];
     let rows = w.rows;
     // 鷙鳥專挑「有牆沒射手」的排，教玩家牆擋不住天上的
     if (type === 'bird') {
@@ -222,8 +229,8 @@
     G.enemies = G.enemies.filter(e => {
       if (e.hp <= 0 || e.dead) {
         release(G, e);
-        if (e.carrying) { ev(G, { t: 'toast', msg: '追上了，羊抱回來了 🐑' }); }
-        if (!e.dead) G.killed++;
+        if (e.carrying && !e.dead) ev(G, { t: 'toast', msg: '追上了，羊抱回來了 🐑' });
+        G.killed++; // 逃走的偷羊人也算這一波結束了，進度條才會走滿
         ev(G, { t: 'die', e });
         return false;
       }
@@ -241,10 +248,12 @@
 
   // 單位做事
   function unitsAct(G, dt) {
+    const byRow = []; for (let r = 0; r < ROWS; r++) byRow.push([]);
+    for (const e of G.enemies) if (targetable(e)) byRow[e.r].push(e);
     for (const k in G.units) {
       const u = G.units[k], def = UNITS[u.type];
       if (u.fear > 0) { u.fear -= dt; continue; }
-      const inRow = G.enemies.filter(e => e.r === u.r && targetable(e));
+      const inRow = byRow[u.r];
 
       if (def.kind === 'producer') {
         u.timer -= dt;
@@ -277,10 +286,10 @@
           if (Math.abs(e.x - u.c) >= 0.5) continue;
           if (def.poison && !u.stung.has(e.id)) {
             u.stung.add(e.id); e.st.poison = def.poison; u.uses--;
-            ev(G, { t: 'fx', kind: 'sting', r: e.r, x: e.x });
+            ev(G, { t: 'fx', kind: 'sting', r: e.r, x: e.x }); ev(G, { t: 'unit', r: u.r, c: u.c });
             if (u.uses <= 0) { u.hp = 0; }
           }
-          if (def.slow) { e.st.slow = 0.15; hurt(G, e, def.dps * dt); u.hp -= def.wear * dt; if (u.hp <= 0) break; }
+          if (def.slow) { e.st.slow = 0.15; hurt(G, e, def.dps * dt); u.hp -= def.wear * dt; if (G.rng() < dt * 3) ev(G, { t: 'unit', r: u.r, c: u.c }); if (u.hp <= 0) break; }
         }
         if (u.hp <= 0) ev(G, { t: 'unit', r: u.r, c: u.c });
       } else if (def.kind === 'support') {
@@ -291,9 +300,10 @@
             u.timer = def.every;
             for (const k2 in G.units) { const v = G.units[k2]; if (v === u || Math.abs(v.r - u.r) > 1 || Math.abs(v.c - u.c) > 1) continue; if (v.hp < v.maxHp && v.maxHp > 1) { v.hp = Math.min(v.maxHp, v.hp + def.heal); ev(G, { t: 'unit', r: v.r, c: v.c }); } }
           } else if (def.push) {
-            if (!inRow.length) continue;
+            const ground = inRow.filter(e => !ENEMIES[e.type].flying);
+            if (!ground.length) continue;
             u.timer = def.every;
-            for (const e of inRow) { if (ENEMIES[e.type].flying) continue; e.x = Math.min(COLS + 0.2, e.x + def.push); e.st.stun = def.stun; release(G, e); }
+            for (const e of ground) { e.x = Math.min(COLS + 0.2, e.x + def.push); e.st.stun = def.stun; release(G, e); }
             ev(G, { t: 'fx', kind: 'horn', r: u.r, x: u.c });
             ev(G, { t: 'toast', msg: '角聲一響，那排的狼退了一步' });
           }
@@ -388,9 +398,9 @@
 
       // 鑽地：到了位置才冒出來；快到前先出土堆
       if (e.underground) {
-        if (!e.mound && e.x - (e.emergeX + 0.5) < 0.7) { e.mound = true; ev(G, { t: 'fx', kind: 'mound', r: e.r, x: e.emergeX }); }
-        if (e.x <= e.emergeX + 0.5) { e.underground = false; ev(G, { t: 'fx', kind: 'emerge', r: e.r, x: e.x }); }
-        else { e.x -= def.digSpeed * dt; continue; }
+        if (!e.mound && e.x - (e.emergeX + 0.5) < 0.7) { e.mound = true; ev(G, { t: 'fx', kind: 'mound', r: e.r, x: e.emergeX, id: e.id }); }
+        if (e.x <= e.emergeX + 0.5) { e.underground = false; ev(G, { t: 'fx', kind: 'emerge', r: e.r, x: e.x, id: e.id }); }
+        else { e.x -= speedOf(e) * dt; continue; }
       }
 
       // 驚慌：往右跑，不咬
