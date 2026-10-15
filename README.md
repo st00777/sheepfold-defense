@@ -18,4 +18,5 @@
 - `sim/simulate.js` 勝率模擬：`node sim/simulate.js [關|all] [calm|windy|storm|all] [局數] [good|basic]`
 - `docs/roster.md` 單位／敵人／關卡定案；`docs/level-design.md` 每關新鮮感與教學順序
 
-開發時在網址後加 `?all` 可解鎖全部關卡。
+## 開發者模式
+網址加 `?all` 解鎖全部關卡；加 `?dev`（或遊戲中連點左上角「糧」五下）打開開發者列：速度 1×／2×／4×／8×、暫停、+500 糧、全卡（這一局 15 張卡都能用）、下一波、清場、「放敵人」選一種後點任一格就放一隻。調數值的流程：改 `data.js` → `node sim/simulate.js` 看勝率 → 開發者模式實際放敵人看手感。

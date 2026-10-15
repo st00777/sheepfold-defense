@@ -151,16 +151,21 @@
   }
 
   function spawn(G, type) {
-    const def = ENEMIES[type], w = G.waves[G.wave - 1];
+    const w = G.waves[G.wave - 1];
     const r = G.nextRow ?? w.rows[Math.floor(G.rng() * w.rows.length)];
     G.nextRow = null; G.nextType = null;
     ev(G, { t: 'marker', r: null });
-    const hp = Math.round(def.hp * (w.hpMul || 1));
-    const e = { id: G.nextId++, type, r, x: COLS, hp, maxHp: hp, st: {}, heldBy: null, biting: null,
+    spawnAt(G, type, r, COLS, w.hpMul || 1);
+    G.spawnedTotal++;
+  }
+  // 在指定位置放一隻敵人（波次用，開發者模式也用）
+  function spawnAt(G, type, r, x, hpMul) {
+    const def = ENEMIES[type];
+    const hp = Math.round(def.hp * (hpMul || 1));
+    const e = { id: G.nextId++, type, r, x, hp, maxHp: hp, st: {}, heldBy: null, biting: null,
       underground: !!def.digs, vaulted: false, vaulting: 0, carrying: false, enraged: false, abilityT: def.howl ? 3 : def.roar ? 4 : 0, dead: false };
     if (def.digs) { e.emergeX = 2 + Math.floor(G.rng() * 3); e.mound = false; }
     G.enemies.push(e);
-    G.spawnedTotal++;
     ev(G, { t: 'spawn', e });
     if (!G.seen.has(type)) { G.seen.add(type); if (def.tip) ev(G, { t: 'callout', type, tip: def.tip }); }
   }
@@ -453,6 +458,15 @@
   function win(G) { G.over = true; G.result = { win: true }; ev(G, { t: 'win' }); }
   function lose(G, reason) { G.over = true; G.result = { win: false, reason }; ev(G, { t: 'lose', reason }); }
 
-  const Engine = { create, place, tapUnit, step, canAfford, levelById, scaleWaves };
+  // ====== 開發者模式 ======
+  const dev = {
+    spawn(G, type, r, c) { if (G.over || !ENEMIES[type]) return; const w = G.waves[G.wave - 1]; spawnAt(G, type, r, c, w ? w.hpMul : 1); G.total++; },
+    clear(G) { for (const e of G.enemies) { release(G, e); e.dead = true; } G.total -= G.enemies.length; G.enemies = []; G.queue = []; G.nextRow = null; G.nextType = null; ev(G, { t: 'marker', r: null }); if (G.phase === 'wave') { G.phase = 'rest'; G.timer = WAVE_REST; } },
+    nextWave(G) { if (G.over) return; if (G.phase === 'wave') { dev.clear(G); } G.timer = Math.min(G.timer, 0.5); },
+    food(G, n) { G.food += n; },
+    allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; },
+  };
+
+  const Engine = { create, place, tapUnit, step, canAfford, levelById, scaleWaves, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);

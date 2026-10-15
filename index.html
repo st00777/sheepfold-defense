@@ -129,6 +129,13 @@
   .fx.stay { animation: blink .6s infinite alternate; }
   @keyframes pop { to { transform: translateY(-24px); opacity: 0; } }
 
+  /* 開發者模式列 */
+  #dev { display: none; flex-wrap: wrap; gap: 6px; padding: 6px 12px; background: #1f1e1a; border-top: 1px solid #000; font-size: 12px; align-items: center; }
+  #dev.on { display: flex; }
+  #dev button, #dev select { font: inherit; font-size: 12px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 6px; padding: 4px 8px; }
+  #dev button.on { background: var(--gold); color: #2b2a26; }
+  #dev .lab { color: var(--muted); }
+
   /* 底部進度條 */
   #bottom { padding: 8px 12px 14px; background: var(--panel); }
   #bar { height: 8px; background: #0006; border-radius: 4px; overflow: hidden; }
@@ -178,6 +185,18 @@
 </div>
 
 <div id="cards-wrap"><div id="cards"></div></div>
+
+<div id="dev">
+  <span class="lab">速度</span>
+  <button data-speed="1" class="on">1×</button><button data-speed="2">2×</button><button data-speed="4">4×</button><button data-speed="8">8×</button>
+  <button id="dev-pause">暫停</button>
+  <button id="dev-food">+500 糧</button>
+  <button id="dev-all">全卡</button>
+  <button id="dev-next">下一波</button>
+  <button id="dev-clear">清場</button>
+  <span class="lab">放敵人</span>
+  <select id="dev-enemy"><option value="">（關）</option></select>
+</div>
 
 <div id="board-wrap"><div id="board"></div></div>
 
@@ -239,6 +258,8 @@ const els = new Map();   // 引擎物件 id → 畫面元素
 let markerEl = null, moundEls = new Map();
 let toastTimer = 0;
 let cardEls = [], lastFood = -1;
+// 開發者模式：網址加 ?dev，或連點左上角「糧」五下
+let devOn = /[?&]dev/.test(location.search), speed = 1, paused = false, devEnemy = '', foodTaps = 0;
 
 // ====== 進度（只存在這支手機） ======
 const PKEY = 'sheepfold-progress-v3';
@@ -270,14 +291,15 @@ function buildBoard() {
 }
 function buildCards() {
   const wrap = $('#cards'); wrap.innerHTML = '';
+  const L = G ? G.level : level; // 開發者「全卡」會換掉這一局的 level
   // 固定分組：產糧｜射手（含狗）｜牆｜鋪地｜一次性／輔助；組首留空隙
   const GROUP = { producer: 0, shooter: 1, dog: 1, blocker: 2, floor: 3, instant: 4, support: 4 };
-  const keys = [...level.units].sort((a, b) => GROUP[UNITS[a].kind] - GROUP[UNITS[b].kind] || level.units.indexOf(a) - level.units.indexOf(b));
+  const keys = [...L.units].sort((a, b) => GROUP[UNITS[a].kind] - GROUP[UNITS[b].kind] || L.units.indexOf(a) - L.units.indexOf(b));
   let lastG = -1;
   for (const key of keys) {
     const u = UNITS[key], g = GROUP[u.kind];
     const d = document.createElement('div');
-    const fresh = level.fresh.includes(key) && !seenCard(key);
+    const fresh = L.fresh.includes(key) && !seenCard(key);
     d.className = 'card' + (fresh ? ' new' : '') + (g !== lastG && lastG >= 0 ? ' group-start' : ''); d.dataset.key = key;
     d.style.setProperty('--u', `var(--u-${key})`);
     d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag">新</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
@@ -350,6 +372,7 @@ function tapCard(key, el) {
 }
 function tapCell(r, c) {
   if (!G || G.over) return;
+  if (devOn && devEnemy) { Engine.dev.spawn(G, devEnemy, r, c); flushEvents(); draw(); return; }
   if (!selected) { const res = Engine.tapUnit(G, r, c); flushEvents(); if (res.msg) toast(res.msg); return; }
   const res = Engine.place(G, r, c, selected);
   flushEvents();
@@ -440,8 +463,9 @@ function flushEvents() {
 function tick(now) {
   raf = requestAnimationFrame(tick);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  Engine.step(G, dt);
-  flushEvents();
+  if (paused) return;
+  // 加速時分成小步跑，數值行為才跟 1× 一樣
+  for (let i = 0; i < speed; i++) { Engine.step(G, dt); flushEvents(); if (G.over) break; }
   draw();
 }
 
@@ -562,6 +586,25 @@ function backToLevels() {
   buildLevels();
   $('#intro').hidden = true; $('#result').hidden = true; $('#levels').hidden = false;
 }
+
+// ====== 開發者面板 ======
+function setDev(on) {
+  devOn = on; $('#dev').classList.toggle('on', on);
+  if (on) toast('開發者模式開了：可加速、加糧、任意格放敵人');
+}
+function buildDevEnemies() {
+  const sel = $('#dev-enemy');
+  for (const k in ENEMIES) { const o = document.createElement('option'); o.value = k; o.textContent = ENEMIES[k].ico + ' ' + ENEMIES[k].name; sel.appendChild(o); }
+  sel.addEventListener('change', () => { devEnemy = sel.value; if (devEnemy) { selected = null; document.querySelectorAll('.card').forEach(x => x.classList.remove('selected')); cells.forEach(x => x.classList.remove('hint')); toast(`點任一格，放一隻${ENEMIES[devEnemy].name}`); } });
+}
+document.querySelectorAll('#dev [data-speed]').forEach(b => b.addEventListener('click', () => { speed = Number(b.dataset.speed); document.querySelectorAll('#dev [data-speed]').forEach(x => x.classList.toggle('on', x === b)); }));
+$('#dev-pause').addEventListener('click', () => { paused = !paused; $('#dev-pause').classList.toggle('on', paused); $('#dev-pause').textContent = paused ? '繼續' : '暫停'; });
+$('#dev-food').addEventListener('click', () => { if (G) { Engine.dev.food(G, 500); draw(); } });
+$('#dev-all').addEventListener('click', () => { if (G) { Engine.dev.allCards(G); buildCards(); toast('這一局全部的卡都能用'); } });
+$('#dev-next').addEventListener('click', () => { if (G) { Engine.dev.nextWave(G); flushEvents(); draw(); } });
+$('#dev-clear').addEventListener('click', () => { if (G) { Engine.dev.clear(G); flushEvents(); draw(); } });
+$('#top span:first-child').addEventListener('click', () => { foodTaps++; if (foodTaps >= 5) { foodTaps = 0; setDev(!devOn); } });
+buildDevEnemies(); setDev(devOn);
 
 buildBoard(); buildLevels();
 try { diff = localStorage.getItem('sheepfold-diff') || 'calm'; } catch (e) {}
