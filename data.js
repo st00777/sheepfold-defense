@@ -43,6 +43,7 @@ const ELDER_COST = 75;
 const REPAIR_COST = 25, REPAIR_HP = 120, REPAIR_CD = 8; // 修補一次要隔 8 秒，不能一直點
 const MAX_CARDS = 8;      // 一關最多帶幾張卡上場，超過就要點兵
 const MIN_CARDS = 4;      // 點兵至少要帶幾張（只帶牧人等於沒得打）
+const SELL_RATE = 0.5;    // 鏟子拆掉單位退幾成糧（含升老牧人花的）
 // 預設帶卡的先後：這關新開的一定帶、牧人一定帶，其餘依這個順序補滿
 const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'tower', 'archer', 'brazier', 'horn', 'catapult', 'healer', 'jar', 'scorpion', 'thorns', 'hireling'];
 
@@ -106,7 +107,7 @@ const LEVELS = [
     speaker: '雅各', diffScale: 1,
     intro: '這群羊是拉班交給我的，二十年來我沒少過一隻。今晚換你守夜，狼從東邊來，擋住牠們，天亮前羊一隻都不能少。',
     units: ['shepherd', 'slinger', 'wall'], fresh: ['shepherd', 'slinger', 'wall'],
-    tips: ['🐾 腳印出現在哪一排，下一隻狼就從那排來', '第一波狼只走中間三排；狼走到最左邊就守夜失敗，撐過三波就天亮'],
+    tips: ['🐾 腳印出現在哪一排，下一隻狼就從那排來', '第一波狼只走中間三排；狼走到最左邊就守夜失敗，撐過三波就天亮', '⛏️ 放錯位置可以用鏟子拆掉，退一半糧'],
     waves: [
       { list: [['wolf', 4]],               gap: 5.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波來了' },
       { list: [['wolf', 7], ['fast', 3]],  gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '第 2 波來了，狼開始從兩側繞過來', hint: '下一波會從兩側繞過來，每排都要有人' },
@@ -220,5 +221,5 @@ const LEVELS = [
   },
 ];
 
-const DATA = { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
+const DATA = { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
 if (typeof module !== 'undefined') module.exports = DATA; else window.DATA = DATA;

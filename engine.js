@@ -4,7 +4,7 @@
 'use strict';
 (function (root) {
   const D = (typeof module !== 'undefined') ? require('./data.js') : root.DATA;
-  const { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE } = D;
+  const { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE } = D;
 
   const SHOT_SPEED = { stone: 6, arrow: 9, sling: 7 };
   const THICK_MUL = 0.35; // 厚皮敵人吃石子、箭的比例
@@ -115,6 +115,18 @@
       return { ok: true, msg: `${def.name}修補了` };
     }
     return { ok: false, msg: def.kind === 'producer' ? '已經是老牧人了' : def.kind === 'blocker' ? '牆還好好的' : '這格已經有人了' };
+  }
+
+  // 鏟子：拆掉自己放的單位，退一半糧（含升老牧人花的）
+  function sell(G, r, c) {
+    if (G.over) return { ok: false };
+    const u = G.units[key(r, c)];
+    if (!u) return { ok: false, msg: '這格沒東西可拆' };
+    const def = UNITS[u.type];
+    const back = Math.round((def.cost + (u.elder ? ELDER_COST : 0)) * SELL_RATE);
+    removeUnit(G, u); G.food += back;
+    ev(G, { t: 'pop', r, c, text: `+${back}` });
+    return { ok: true, msg: `${def.name}拆了，退 ${back} 糧` };
   }
 
   function useInstant(G, r, c, k) {
@@ -484,6 +496,6 @@
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; },
   };
 
-  const Engine = { create, place, tapUnit, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, dev };
+  const Engine = { create, place, tapUnit, sell, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
