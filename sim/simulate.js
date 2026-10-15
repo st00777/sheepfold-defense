@@ -4,7 +4,7 @@
 const path = require('path');
 const D = require(path.join(__dirname, '..', 'data.js'));
 const E = require(path.join(__dirname, '..', 'engine.js'));
-const { ROWS, COLS, UNITS, ENEMIES, LEVELS } = D;
+const { ROWS, COLS, UNITS, ENEMIES, LEVELS, MAX_CARDS } = D;
 
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
@@ -93,6 +93,7 @@ function decide(G, skill) {
 
 function play(levelId, diff, seed, skill) {
   const G = E.create(levelId, diff, mulberry32(seed));
+  if (G.level.units.length > MAX_CARDS) E.applyPick(G, E.defaultPick(G.level)); // 跟玩家一樣只帶 8 張
   const dt = 1 / 30; let acc = 0;
   while (!G.over && G.time < 900) {
     E.step(G, dt); G.events.length = 0;

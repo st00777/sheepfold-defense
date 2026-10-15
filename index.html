@@ -79,6 +79,9 @@
   .hp > i { display: block; height: 100%; background: var(--ok); }
   .unit.fear { filter: grayscale(.8); }
   .unit .badge { position: absolute; top: -4px; right: -4px; font-size: 11px; background: #000a; border-radius: 8px; padding: 0 4px; }
+  /* 可以升級／修補的提示角標：糧夠了才出現 */
+  .unit .up { position: absolute; top: -7px; left: -7px; font-size: 10px; line-height: 1.4; background: var(--gold); color: #2b2a26; border-radius: 8px; padding: 0 4px; white-space: nowrap; animation: bob .7s 4 alternate; }
+  @keyframes bob { to { transform: translateY(-3px); } }
 
   /* 敵人、狗、石頭用絕對定位，位置用百分比 */
   .enemy, .dog-run, .mark { position: absolute; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; }
@@ -159,6 +162,7 @@
   .btn.alt { background: transparent; color: var(--muted); border: 1px solid var(--muted); margin-top: 8px; }
   .btn { display: inline-block; margin-top: 12px; padding: 12px 28px; font-size: 17px; border-radius: 10px; border: 0; background: var(--gold); color: #2b2a26; font-weight: bold; cursor: pointer; font-family: inherit; }
   .btn[hidden] { display: none; }
+  .btn:disabled { opacity: .4; cursor: default; }
   .tips { font-size: 13px; color: var(--muted); text-align: left; margin-top: 10px; line-height: 1.6; }
   .tips .new { color: var(--new); }
   #best { font-size: 12px; color: var(--muted); margin-top: 8px; }
@@ -174,6 +178,30 @@
   #psalm { text-align: left; font-size: 15px; line-height: 1.9; margin-top: 10px; }
   #psalm div { opacity: 0; transition: opacity 1.2s; }
   #psalm div.on { opacity: 1; }
+
+  /* 點兵與圖鑑 */
+  .dialog.roster { max-width: 460px; }
+  .tabs { display: flex; gap: 6px; margin: 8px 0 10px; }
+  .tab { flex: 1; background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 10px; padding: 8px 0; font-size: 15px; font-family: inherit; cursor: pointer; }
+  .tab.selected { border-color: var(--gold); background: var(--card-on); }
+  #roster-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 40vh; overflow-y: auto; padding: 2px; }
+  .rc { position: relative; background: var(--card); border: 2px solid transparent; border-radius: 10px; padding: 8px 4px; text-align: center; cursor: pointer; }
+  .rc .dot { position: absolute; left: 5px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--u, #888); }
+  .rc .tag { position: absolute; right: 4px; top: 3px; font-size: 10px; color: #2b2a26; background: var(--new); border-radius: 6px; padding: 0 4px; }
+  .rc .ico { font-size: 26px; line-height: 1; }
+  .rc .name { font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rc .cost { font-size: 11px; color: var(--gold); }
+  .rc.on { border-color: var(--gold); background: var(--card-on); }
+  .rc.off { opacity: .45; }
+  .rc.locked { opacity: .35; cursor: default; }
+  .rc.focus { outline: 2px solid var(--text); outline-offset: 1px; }
+  .rc.on::after { content: '✓'; position: absolute; right: 4px; bottom: 2px; font-size: 11px; color: var(--gold); }
+  #roster-count { font-size: 12px; color: var(--muted); margin-top: 8px; min-height: 16px; }
+  #roster-detail { text-align: left; background: #0004; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.6; height: 122px; overflow-y: auto; }
+  #roster-detail b { color: var(--gold); }
+  #roster-detail .ref { margin: 0; }
+  #roster-detail .num { color: var(--muted); font-size: 12px; }
+  #roster-detail .new { color: var(--new); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -211,6 +239,7 @@
     <h1>羊圈守夜</h1>
     <div class="ref">受託守夜的無名牧人。每一夜都是聖經裡牧人真的守過的夜。</div>
     <div id="lv-list"></div>
+    <button class="btn alt" id="levels-codex">圖鑑</button>
   </div>
 </div>
 
@@ -227,9 +256,25 @@
       <button class="diff" data-key="storm">暴風夜</button>
     </div>
     <div id="diff-hint"></div>
+    <div class="tips" id="intro-loadout"></div>
     <button class="btn" id="start">開始守夜</button>
+    <button class="btn alt" id="intro-roster">點兵</button>
     <button class="btn alt" id="intro-back">回關卡</button>
     <div id="best"></div>
+  </div>
+</div>
+
+<!-- 點兵與圖鑑 -->
+<div class="overlay" id="roster" hidden>
+  <div class="dialog roster">
+    <h1 id="roster-title">今晚帶誰上場</h1>
+    <div class="ref" id="roster-sub"></div>
+    <div class="tabs"><button class="tab selected" data-tab="units">我方</button><button class="tab" data-tab="enemies">敵方</button></div>
+    <div id="roster-grid"></div>
+    <div id="roster-count"></div>
+    <div id="roster-detail">點一個看說明</div>
+    <button class="btn" id="roster-go">開始守夜</button>
+    <button class="btn alt" id="roster-back">回上一頁</button>
   </div>
 </div>
 
@@ -245,8 +290,8 @@
   </div>
 </div>
 
-<script src="data.js?v=3"></script>
-<script src="engine.js?v=3"></script>
+<script src="data.js?v=4"></script>
+<script src="engine.js?v=4"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、DIFFS、LEVELS 由 data.js 直接提供
@@ -293,8 +338,7 @@ function buildCards() {
   const wrap = $('#cards'); wrap.innerHTML = '';
   const L = G ? G.level : level; // 開發者「全卡」會換掉這一局的 level
   // 固定分組：產糧｜射手（含狗）｜牆｜鋪地｜一次性／輔助；組首留空隙
-  const GROUP = { producer: 0, shooter: 1, dog: 1, blocker: 2, floor: 3, instant: 4, support: 4 };
-  const keys = [...L.units].sort((a, b) => GROUP[UNITS[a].kind] - GROUP[UNITS[b].kind] || L.units.indexOf(a) - L.units.indexOf(b));
+  const keys = sortUnits(L.units);
   let lastG = -1;
   for (const key of keys) {
     const u = UNITS[key], g = GROUP[u.kind];
@@ -329,6 +373,9 @@ function openIntro(L) {
   $('#intro-tips').innerHTML = L.fresh.map(k => `<div class="new">${UNITS[k].ico} ${UNITS[k].name}：${UNITS[k].desc}</div>`).join('') + (L.tips || []).map(x => `<div>${x}</div>`).join('');
   applyDiff(diff);
   showBest();
+  const lo = pickedFor(L);
+  $('#intro-loadout').innerHTML = lo ? `今晚上場：${lo.map(k => UNITS[k].ico).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「點兵」可換</span>` : '';
+  $('#intro-roster').textContent = lo ? '點兵' : '圖鑑';
   $('#levels').hidden = true; $('#intro').hidden = false;
 }
 function applyDiff(key) {
@@ -443,8 +490,10 @@ function setMarker(r, type) {
 
 // 把引擎這一步發生的事畫出來
 function flushEvents() {
+  const spawned = [];
   for (const e of G.events) {
     switch (e.t) {
+      case 'spawn': spawned.push(e.e.type); break;
       case 'toast': toast(e.msg); break;
       case 'callout': if (!seenEnemy(e.type)) { toast(`${ENEMIES[e.type].ico} ${e.tip}`, true); markSeenEnemy(e.type); } break;
       case 'pop': pop(e.r, e.c, e.text); break;
@@ -457,6 +506,7 @@ function flushEvents() {
     }
   }
   G.events.length = 0;
+  for (const t of spawned) markSeenEnemy(t);
 }
 
 // ====== 每一幀 ======
@@ -525,6 +575,18 @@ function draw() {
   $('#bar > i').style.width = (G.killed / G.total * 100) + '%';
   const f = Math.floor(G.food);
   if (f !== lastFood) { lastFood = f; for (const c of cardEls) c.classList.toggle('poor', f < UNITS[c.dataset.key].cost); }
+  // 牧人可升級／石牆可修補：糧夠了才掛角標，點一下就知道
+  for (const k in G.units) {
+    const u = G.units[k], def = UNITS[u.type];
+    let up = '';
+    if (def.kind === 'producer' && !u.elder && f >= ELDER_COST) up = '升級';
+    else if (def.kind === 'blocker' && u.hp < u.maxHp * 0.7 && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) up = '修補';
+    const el = cells[u.r * COLS + u.c].firstChild; if (!el) continue;
+    let b = el.querySelector('.up');
+    if (up && !b) { b = document.createElement('div'); b.className = 'up'; el.appendChild(b); }
+    if (b && b.textContent !== up) b.textContent = up;
+    if (!up && b) b.remove();
+  }
 }
 
 // ====== 勝負 ======
@@ -572,6 +634,8 @@ function clearBoard() {
 function startGame() {
   clearBoard();
   G = Engine.create(level.id, diff);
+  const lo = pickedFor(level);
+  if (lo) Engine.applyPick(G, lo); // 只帶點兵選的卡
   buildCards();
   cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint'); c.classList.toggle('rock', G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
   $('#sheep').hidden = !level.sheep; $('#sheep-n').textContent = G.sheep;
@@ -586,6 +650,122 @@ function backToLevels() {
   buildLevels();
   $('#intro').hidden = true; $('#result').hidden = true; $('#levels').hidden = false;
 }
+
+
+// ====== 點兵與圖鑑 ======
+// 一關的卡超過 MAX_CARDS 張就要點兵；帶哪幾張存在這支手機，每關各存一份
+const LKEY = 'sheepfold-loadout';
+const sessionPick = {};   // 這次開著的頁面裡各關選好的名單；localStorage 寫不進去也照用
+const GROUP = { producer: 0, shooter: 1, dog: 1, blocker: 2, floor: 3, instant: 4, support: 4 }; // 卡片固定分組
+const sortUnits = keys => [...keys].sort((a, b) => GROUP[UNITS[a].kind] - GROUP[UNITS[b].kind] || keys.indexOf(a) - keys.indexOf(b));
+function loadLoadouts() { try { return JSON.parse(localStorage.getItem(LKEY) || '{}') || {}; } catch (e) { return {}; } }
+function saveLoadout(id, keys) { sessionPick[id] = keys; try { const a = loadLoadouts(); a[id] = keys; localStorage.setItem(LKEY, JSON.stringify(a)); } catch (e) {} }
+// 這一關實際上場的卡；卡不超過上限就回 null（全帶）
+function pickedFor(L) {
+  if (L.units.length <= MAX_CARDS) return null;
+  const s = sessionPick[L.id] || loadLoadouts()[L.id];
+  return Engine.validPick(L, s) ? s : Engine.defaultPick(L);
+}
+// 玩家有沒有為這一關點過兵（存檔失效也算沒點過，開始前會再問一次）
+const hasLoadout = L => Engine.validPick(L, sessionPick[L.id] || loadLoadouts()[L.id]);
+
+const roster = { mode: 'view', tab: 'units', picked: new Set(), focus: null, units: [], from: 'levels' };
+// mode 'pick'＝這一關要點兵；'view'＝從關卡選單看圖鑑（所有已開放的單位）
+function openRoster(mode, from) {
+  roster.mode = mode; roster.tab = 'units'; roster.focus = null; roster.from = from || 'levels';
+  if (mode === 'pick') {
+    roster.units = sortUnits(level.units);
+    roster.picked = new Set(pickedFor(level) || level.units);
+    $('#roster-title').textContent = '今晚帶誰上場';
+    $('#roster-sub').textContent = `營火邊點名，今晚一起守夜的夥伴。${level.units.length} 張卡只能帶 ${MAX_CARDS} 張`;
+  } else {
+    const all = [];
+    for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k);
+    roster.units = sortUnits(all); roster.picked = new Set();
+    $('#roster-title').textContent = '圖鑑';
+    $('#roster-sub').textContent = '守過的夜裡遇見的人、狗和野獸';
+  }
+  $('#roster-go').hidden = mode !== 'pick';
+  $('#roster-back').textContent = roster.from === 'intro' ? '回開場' : '回關卡';
+  renderRoster();
+  $('#levels').hidden = true; $('#intro').hidden = true; $('#roster').hidden = false;
+}
+function renderRoster() {
+  const grid = $('#roster-grid'); grid.innerHTML = '';
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('selected', b.dataset.tab === roster.tab));
+  if (roster.tab === 'units') {
+    for (const k of roster.units) {
+      const u = UNITS[k], d = document.createElement('div');
+      const fresh = roster.mode === 'pick' && level.fresh.includes(k);
+      d.className = 'rc' + (roster.mode === 'pick' ? (roster.picked.has(k) ? ' on' : ' off') : '') + (roster.focus === k ? ' focus' : '');
+      d.style.setProperty('--u', `var(--u-${k})`);
+      d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag">新</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
+      d.addEventListener('click', () => tapRoster(k));
+      grid.appendChild(d);
+    }
+    const n = roster.picked.size;
+    $('#roster-count').textContent = roster.mode === 'pick' ? (n < MIN_CARDS ? `已選 ${n} 張，至少要帶 ${MIN_CARDS} 張` : `已選 ${n} / ${MAX_CARDS} 張`) : `已開放 ${roster.units.length} 種`;
+    $('#roster-go').disabled = roster.mode === 'pick' && n < MIN_CARDS;
+  } else {
+    let seen = 0;
+    for (const k in ENEMIES) {
+      const e = ENEMIES[k], ok = seenEnemy(k), d = document.createElement('div');
+      if (ok) seen++;
+      d.className = 'rc' + (ok ? '' : ' locked') + (roster.focus === k ? ' focus' : '');
+      d.innerHTML = `<div class="ico">${ok ? e.ico : '❓'}</div><div class="name">${ok ? e.name : '還沒遇過'}</div>`;
+      if (ok) d.addEventListener('click', () => { roster.focus = k; renderRoster(); });
+      grid.appendChild(d);
+    }
+    $('#roster-count').textContent = `遇過 ${seen} / ${Object.keys(ENEMIES).length} 種`;
+  }
+  renderRosterDetail();
+}
+function tapRoster(k) {
+  roster.focus = k;
+  if (roster.mode === 'pick' && k !== 'shepherd') {   // 點一下就選／取消，說明區跟著顯示這張；牧人一定帶
+    if (roster.picked.has(k)) roster.picked.delete(k);
+    else if (roster.picked.size < MAX_CARDS) roster.picked.add(k);
+    else { renderRoster(); $('#roster-count').textContent = `最多帶 ${MAX_CARDS} 張，先點掉一張`; return; }
+  }
+  renderRoster();
+}
+// 白話數字：每個單位一句
+function unitNums(k) {
+  const u = UNITS[k], s = [];
+  if (u.hp > 1) s.push(`耐咬 ${u.hp}`);
+  if (u.kind === 'producer') s.push(`每 ${u.every} 秒送 ${u.gives} 糧，老牧人每 ${(u.every * ELDER_MUL).toFixed(1)} 秒（升級 ${ELDER_COST} 糧）`);
+  if (u.kind === 'shooter') s.push(`每 ${u.every} 秒打 ${u.dmg}${u.range ? `，只打 ${u.range} 格內` : ''}${u.splash ? '，落點附近一起掉血' : ''}`);
+  if (u.kind === 'blocker') s.push(`修補一次 ${REPAIR_COST} 糧回 ${REPAIR_HP}`);
+  if (u.kind === 'dog') s.push(`咬住後每秒 ${u.dps}`);
+  if (u.poison) s.push(`${u.uses} 次，中毒 ${STATUS.poison.t} 秒每秒掉 ${STATUS.poison.dps}、咬合變弱`);
+  if (u.slow) s.push(`踩上速度減半、每秒掉 ${u.dps}`);
+  if (u.kind === 'instant') s.push(`九格內各 ${u.dmg}，嚇退 ${u.panic} 秒`);
+  if (u.push) s.push(`每 ${u.every} 秒一次，愣住 ${u.stun} 秒`);
+  if (u.heal) s.push(`周圍每秒回 ${u.heal}`);
+  return s.join('・');
+}
+function enemyNums(k) {
+  const e = ENEMIES[k], sp = e.speed >= 0.35 ? '跑得快' : e.speed <= 0.15 ? '走得慢' : '普通速度';
+  return `血 ${e.hp}・${e.bite ? `咬 ${e.bite}/秒` : '不咬人'}・${sp}${e.thick ? '・厚皮，石子和箭只打四成' : ''}`;
+}
+function renderRosterDetail() {
+  const box = $('#roster-detail'), k = roster.focus;
+  if (!k) { box.innerHTML = roster.mode === 'pick' ? '點一下選或取消，說明會顯示在這裡' : '點一個看說明'; return; }
+  if (roster.tab === 'units') {
+    const u = UNITS[k];
+    const fresh = roster.mode === 'pick' && level.fresh.includes(k);
+    const note = roster.mode !== 'pick' ? '' : k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : fresh ? '<br><span class="new">這一夜新開的卡，建議帶上</span>' : '';
+    box.innerHTML = `<b>${u.ico} ${u.name}</b>　<span class="num">🌾 ${u.cost}</span><br>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${u.ref}</div>`;
+  } else {
+    const e = ENEMIES[k];
+    box.innerHTML = `<b>${e.ico} ${e.name}</b><br>${e.tip || '最普通的一隻，走到最左邊就守夜失敗'}<br><span class="num">${enemyNums(k)}</span>`;
+  }
+}
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { roster.tab = b.dataset.tab; roster.focus = null; renderRoster(); }));
+$('#roster-go').addEventListener('click', () => { if (roster.picked.size < MIN_CARDS) return; saveLoadout(level.id, sortUnits([...roster.picked])); $('#roster').hidden = true; startGame(); });
+$('#roster-back').addEventListener('click', () => { $('#roster').hidden = true; if (roster.from === 'intro') $('#intro').hidden = false; else $('#levels').hidden = false; });
+$('#intro-roster').addEventListener('click', () => openRoster(pickedFor(level) ? 'pick' : 'view', 'intro'));
+$('#levels-codex').addEventListener('click', () => openRoster('view', 'levels'));
 
 // ====== 開發者面板 ======
 function setDev(on) {
@@ -610,7 +790,7 @@ buildBoard(); buildLevels();
 try { diff = localStorage.getItem('sheepfold-diff') || 'calm'; } catch (e) {}
 if (!DIFFS[diff]) diff = 'calm';
 document.querySelectorAll('.diff').forEach(b => b.addEventListener('click', () => applyDiff(b.dataset.key)));
-$('#start').addEventListener('click', () => { $('#intro').hidden = true; startGame(); });
+$('#start').addEventListener('click', () => { if (pickedFor(level) && !hasLoadout(level)) { openRoster('pick', 'intro'); return; } $('#intro').hidden = true; startGame(); });
 $('#intro-back').addEventListener('click', backToLevels);
 $('#retry').addEventListener('click', startGame);
 $('#back').addEventListener('click', backToLevels);

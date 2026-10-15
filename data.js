@@ -23,10 +23,10 @@ const UNITS = {
               desc: '又高又厚，賊翻不過去', ref: '賽 5:2' },
   archer:   { name: '弓箭手',   ico: '🏹',   cost: 125, hp: 60,  kind: 'shooter', every: 1.8, dmg: 26, shot: 'arrow', pierce: true, falloff: 0.8,
               desc: '一箭穿過整排，每穿一隻傷害變小', ref: '創 21:20' },
-  scorpion: { name: '蠍窩',     ico: '🦂',   cost: 50,  hp: 1,   kind: 'floor', uses: 5, poison: 8,
-              desc: '鋪在地上，踩過的狼中毒，五次用完', ref: '申 8:15' },
-  thorns:   { name: '荊棘',     ico: '🌿',   cost: 75,  hp: 150, kind: 'floor', slow: 0.5, dps: 6, wear: 10,
-              desc: '鋪在地上，踩上的狼變慢又掉血，會被踩爛', ref: '何 2:6' },
+  scorpion: { name: '蠍窩',     ico: '🦂',   cost: 50,  hp: 1,   kind: 'floor', uses: 8, poison: 8,
+              desc: '鋪在地上，踩過的狼中毒，八次用完。專治小狐狸和冒出來的野狗', ref: '申 8:15' },
+  thorns:   { name: '荊棘',     ico: '🌿',   cost: 75,  hp: 150, kind: 'floor', slow: 0.5, dps: 6, wear: 3,
+              desc: '鋪在地上，踩上的狼變慢又掉血，踩久了會爛。放在射手前面最划算', ref: '何 2:6' },
   brazier:  { name: '火盆',     ico: '🔥',   cost: 75,  hp: 100, kind: 'support', ignite: true,
               desc: '石子箭矢穿過它會變火，燒著的狼會把火傳給隔壁', ref: '路 2:8' },
   jar:      { name: '瓦瓶火把', ico: '🏺',   cost: 100, hp: 0,   kind: 'instant', dmg: 30, panic: 2.5,
@@ -41,6 +41,10 @@ const UNITS = {
 const ELDER_MUL = 0.6;    // 老牧人送糧間隔倍數
 const ELDER_COST = 75;
 const REPAIR_COST = 25, REPAIR_HP = 120, REPAIR_CD = 8; // 修補一次要隔 8 秒，不能一直點
+const MAX_CARDS = 8;      // 一關最多帶幾張卡上場，超過就要點兵
+const MIN_CARDS = 4;      // 點兵至少要帶幾張（只帶牧人等於沒得打）
+// 預設帶卡的先後：這關新開的一定帶、牧人一定帶，其餘依這個順序補滿
+const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'tower', 'archer', 'brazier', 'horn', 'catapult', 'healer', 'jar', 'scorpion', 'thorns', 'hireling'];
 
 // ====== 敵人 ======
 // 特殊欄位：flying 飛的／dodge 閃避率／digs 鑽地／vaults 翻牆／steals 偷羊／enrage 狂暴／howl 嚎叫秒數／roar 咆哮秒數
@@ -63,7 +67,7 @@ const ENEMIES = {
   locust:  { name: '蝗群',   ico: '🦗', hp: 8,   speed: 0.30, bite: 2,  cls: 'swarm',
              tip: '蝗蟲一隊一隊來，一箭可以穿好幾隻' },
   digger:  { name: '野狗',   ico: '🐕‍🦺', hp: 80, speed: 0.22, bite: 12, cls: 'dig', digs: true, digSpeed: 0.35,
-             tip: '野狗從地底鑽到中間才冒出來，前排的牆擋不到' },
+             tip: '野狗從地底鑽過前排的牆。土堆就是牠冒出來的地方，在土堆左邊放東西' },
   bird:    { name: '鷙鳥',   ico: '🦅', hp: 50,  speed: 0.20, bite: 0,  cls: 'fly', flying: true,
              tip: '鷙鳥飛過牆和狗，只有石子、箭、機弦打得到' },
 };
@@ -71,7 +75,7 @@ const ENEMIES = {
 // ====== 狀態效果（秒數與強度） ======
 const STATUS = {
   burn:   { t: 5,   dps: 4 },        // 燃燒：每秒掉血，碰到隔壁沒燒的會傳火
-  poison: { t: 8,   dps: 3, biteMul: 0.6 },
+  poison: { t: 8,   dps: 4, biteMul: 0.6 },
   slow:   { mul: 0.5 },
   howl:   { t: 5,   mul: 1.5 },
   fear:   { t: 3 },                  // 掛在我方單位
@@ -155,7 +159,7 @@ const LEVELS = [
     waves: [
       { list: [['wolf', 5]],                             gap: 4.5, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['locust', 18]],                          gap: 0.6, rows: [1, 3],          hpMul: 1,   say: '蝗群來了', hint: '聽，像風一樣的聲音。蝗蟲一隊一隊來，一箭能穿好幾隻' },
-      { list: [['digger', 1], ['wolf', 6], ['digger', 2]], gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.4, ordered: true, say: '地在動', hint: '野狗會從地底鑽到中間才冒出來，中段要有人' },
+      { list: [['digger', 1], ['wolf', 6], ['digger', 2]], gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.4, ordered: true, say: '地在動', hint: '野狗會從地底鑽到中間才冒出來。一冒出土堆就在它左邊放牆或狗' },
       { list: [['locust', 20], ['wolf', 7], ['digger', 3], ['fast', 4]], gap: 1.2, rows: [0, 1, 2, 3, 4], hpMul: 1.7, say: '最後一波，全來了', hint: '最後一波什麼都有，弓箭手和蠍窩一起上' },
     ],
     outroWin: '天亮了。摩西領著羊群往山那邊去，那山叫何烈山。（出 3:1）',
@@ -216,5 +220,5 @@ const LEVELS = [
   },
 ];
 
-const DATA = { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
+const DATA = { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
 if (typeof module !== 'undefined') module.exports = DATA; else window.DATA = DATA;

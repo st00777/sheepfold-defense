@@ -4,7 +4,7 @@
 'use strict';
 (function (root) {
   const D = (typeof module !== 'undefined') ? require('./data.js') : root.DATA;
-  const { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE } = D;
+  const { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE } = D;
 
   const SHOT_SPEED = { stone: 6, arrow: 9, sling: 7 };
   const THICK_MUL = 0.35; // 厚皮敵人吃石子、箭的比例
@@ -14,6 +14,20 @@
   function shepherdEvery(G) { const sc = G.level.diffScale ?? 0.6; return UNITS.shepherd.every + (DIFFS[G.diff].shepherdEvery - UNITS.shepherd.every) * sc; }
 
   function levelById(id) { return LEVELS.find(l => l.id === id) || LEVELS[0]; }
+
+  // ====== 點兵 ======
+  // 這一關卡太多時預設帶哪幾張：牧人與新開的卡一定帶，其餘照 PICK_ORDER 補到上限
+  function defaultPick(level) {
+    const p = ['shepherd', ...level.fresh.filter(k => k !== 'shepherd')];
+    for (const k of PICK_ORDER) if (p.length < MAX_CARDS && level.units.includes(k) && !p.includes(k)) p.push(k);
+    return p;
+  }
+  // 存起來的名單還能不能用（關卡改過卡、少了牧人、太少、太多、重複都不算）
+  function validPick(level, s) {
+    return Array.isArray(s) && s.length >= MIN_CARDS && s.length <= MAX_CARDS && new Set(s).size === s.length && s.includes('shepherd') && s.every(k => level.units.includes(k));
+  }
+  // 讓這一局只用名單上的卡
+  function applyPick(G, keys) { G.level = { ...G.level, units: keys, fresh: G.level.fresh.filter(k => keys.includes(k)) }; }
 
   // 把關卡的波次依難度換算（只動第二波起）
   function scaleWaves(level, diff) {
@@ -75,6 +89,9 @@
     if (k === 'horn') u.timer = 6; // 剛放下不會馬上吹
     G.units[key(r, c)] = u;
     ev(G, { t: 'unit', r, c });
+    // 第一次放牧人／石牆，順便教「再點一下」
+    if (def.kind === 'producer' && !G.taughtElder) { G.taughtElder = true; return { ok: true, msg: `牧人就位。糧夠 ${ELDER_COST} 時再點牧人一下，升老牧人送糧更快` }; }
+    if (def.kind === 'blocker' && !G.taughtRepair) { G.taughtRepair = true; return { ok: true, msg: `${def.name}就位。被咬壞時點它一下，花 ${REPAIR_COST} 糧修補` }; }
     return { ok: true, msg: `${def.name}就位` };
   }
 
@@ -164,9 +181,10 @@
     const hp = Math.round(def.hp * (hpMul || 1));
     const e = { id: G.nextId++, type, r, x, hp, maxHp: hp, st: {}, heldBy: null, biting: null,
       underground: !!def.digs, vaulted: false, vaulting: 0, carrying: false, enraged: false, abilityT: def.howl ? 3 : def.roar ? 4 : 0, dead: false };
-    if (def.digs) { e.emergeX = 2 + Math.floor(G.rng() * 3); e.mound = false; }
     G.enemies.push(e);
     ev(G, { t: 'spawn', e });
+    // 野狗：一出生就把土堆印在牠要冒出來的格子，玩家才有時間在旁邊放東西
+    if (def.digs) { e.emergeX = Math.max(1, Math.min(2 + Math.floor(G.rng() * 3), Math.floor(x) - 1)); e.mound = true; ev(G, { t: 'fx', kind: 'mound', r, x: e.emergeX, id: e.id }); }
     if (!G.seen.has(type)) { G.seen.add(type); if (def.tip) ev(G, { t: 'callout', type, tip: def.tip }); }
   }
 
@@ -403,7 +421,6 @@
 
       // 鑽地：到了位置才冒出來；快到前先出土堆
       if (e.underground) {
-        if (!e.mound && e.x - (e.emergeX + 0.5) < 0.7) { e.mound = true; ev(G, { t: 'fx', kind: 'mound', r: e.r, x: e.emergeX, id: e.id }); }
         if (e.x <= e.emergeX + 0.5) { e.underground = false; ev(G, { t: 'fx', kind: 'emerge', r: e.r, x: e.x, id: e.id }); }
         else { e.x -= speedOf(e) * dt; continue; }
       }
@@ -467,6 +484,6 @@
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; },
   };
 
-  const Engine = { create, place, tapUnit, step, canAfford, levelById, scaleWaves, dev };
+  const Engine = { create, place, tapUnit, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
