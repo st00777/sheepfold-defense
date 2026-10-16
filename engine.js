@@ -59,7 +59,7 @@
       nextRow: null, nextType: null,
       units: {}, enemies: [], shots: [], fx: [],
       sheep: level.sheep || 0, sheepLost: 0,
-      over: false, result: null, events: [], seen: new Set(), started: false,
+      over: false, result: null, events: [], seen: new Set(), started: false, holdWaves: false, // holdWaves：教學中先不放狼
       nextId: 1, time: 0,
     };
     return G;
@@ -85,7 +85,7 @@
     if (def.kind === 'instant') { useInstant(G, r, c, k); return { ok: true, msg: `${def.name}打破了` }; }
     const u = { id: G.nextId++, type: k, r, c, hp: def.hp, maxHp: def.hp, timer: def.every ? def.every * 0.6 : 0, fear: 0, elder: false };
     if (def.kind === 'dog') { u.x = c; u.holding = null; }
-    if (def.kind === 'floor') { u.uses = def.uses || Infinity; u.stung = new Set(); }
+    if (def.kind === 'floor') { u.uses = def.uses || 0; u.stung = new Set(); }
     if (k === 'horn') u.timer = 6; // 剛放下不會馬上吹
     G.units[key(r, c)] = u;
     ev(G, { t: 'unit', r, c });
@@ -107,6 +107,15 @@
       ev(G, { t: 'unit', r, c }); ev(G, { t: 'pop', r, c, text: '老牧人' });
       return { ok: true, msg: '升成老牧人了，送糧更快' };
     }
+    // 通用升級排在修補前：目前只有荊棘有 upgrade；日後若牆也能升級，受傷時要先修補再升級，這裡要調順序
+    if (def.upgrade && !u.upgraded) {
+      const up = def.upgrade;
+      if (G.level.id < up.from) return { ok: false, msg: `第 ${up.from} 夜起才學會${up.name}` };
+      if (G.food < up.cost) return { ok: false, msg: `${up.name}要 ${up.cost} 糧` };
+      G.food -= up.cost; u.upgraded = true; if (up.uses) u.uses = up.uses;
+      ev(G, { t: 'unit', r, c }); ev(G, { t: 'pop', r, c, text: up.name });
+      return { ok: true, msg: `${up.name}好了，${up.desc}` };
+    }
     if (def.kind === 'blocker' && u.hp < u.maxHp) {
       if (G.food < REPAIR_COST) return { ok: false, msg: `修補要 ${REPAIR_COST} 糧` };
       if (u.repairAt && G.time < u.repairAt) return { ok: false, msg: '剛修過，等一下再修' };
@@ -114,7 +123,7 @@
       ev(G, { t: 'unit', r, c }); ev(G, { t: 'pop', r, c, text: '修好了' });
       return { ok: true, msg: `${def.name}修補了` };
     }
-    return { ok: false, msg: def.kind === 'producer' ? '已經是老牧人了' : def.kind === 'blocker' ? '牆還好好的' : '這格已經有人了' };
+    return { ok: false, msg: def.kind === 'producer' ? '已經是老牧人了' : def.kind === 'blocker' ? '牆還好好的' : u.upgraded ? '已經升級過了' : '這格已經有人了' };
   }
 
   // 鏟子：拆掉自己放的單位，退一半糧（含升老牧人花的）
@@ -123,7 +132,7 @@
     const u = G.units[key(r, c)];
     if (!u) return { ok: false, msg: '這格沒東西可拆' };
     const def = UNITS[u.type];
-    const back = Math.round((def.cost + (u.elder ? ELDER_COST : 0)) * SELL_RATE);
+    const back = Math.round((def.cost + (u.elder ? ELDER_COST : 0) + (u.upgraded ? def.upgrade.cost : 0)) * SELL_RATE);
     removeUnit(G, u); G.food += back;
     ev(G, { t: 'pop', r, c, text: `+${back}` });
     return { ok: true, msg: `${def.name}拆了，退 ${back} 糧` };
@@ -240,7 +249,9 @@
     if (G.trickle >= TRICKLE.every) { G.trickle -= TRICKLE.every; G.food += TRICKLE.gives; }
 
     // 波次節奏
-    if (G.phase === 'prep' || G.phase === 'rest') {
+    if (G.holdWaves) {
+      // 教學中：糧照來、倒數不走
+    } else if (G.phase === 'prep' || G.phase === 'rest') {
       G.timer -= dt;
       if (G.wave < G.waves.length && G.timer <= FORESHADOW_LEAD) foreshadow(G, G.wave);
       if (G.timer <= 0) {
@@ -325,15 +336,16 @@
       } else if (def.kind === 'dog') {
         dogAct(G, u, def, dt);
       } else if (def.kind === 'floor') {
+        const eff = u.upgraded ? { ...def, ...def.upgrade } : def;
         for (const e of G.enemies) {
           if (e.r !== u.r || !targetable(e) || ENEMIES[e.type].flying) continue;
           if (Math.abs(e.x - u.c) >= 0.5) continue;
-          if (def.poison && !u.stung.has(e.id)) {
-            u.stung.add(e.id); e.st.poison = def.poison; u.uses--;
+          if (eff.poison && u.uses > 0 && !u.stung.has(e.id)) {
+            u.stung.add(e.id); e.st.poison = eff.poison; u.uses--;
             ev(G, { t: 'fx', kind: 'sting', r: e.r, x: e.x }); ev(G, { t: 'unit', r: u.r, c: u.c });
-            if (u.uses <= 0) { u.hp = 0; }
+            if (u.uses <= 0 && !eff.slow) { u.hp = 0; } // 純陷阱用完就沒了；荊棘撒完蠍子還在
           }
-          if (def.slow) { e.st.slow = 0.15; hurt(G, e, def.dps * dt); u.hp -= def.wear * dt; if (G.rng() < dt * 3) ev(G, { t: 'unit', r: u.r, c: u.c }); if (u.hp <= 0) break; }
+          if (eff.slow) { e.st.slow = 0.15; hurt(G, e, def.dps * dt); u.hp -= def.wear * dt; if (G.rng() < dt * 3) ev(G, { t: 'unit', r: u.r, c: u.c }); if (u.hp <= 0) break; }
         }
         if (u.hp <= 0) ev(G, { t: 'unit', r: u.r, c: u.c });
       } else if (def.kind === 'support') {
@@ -507,7 +519,7 @@
   const dev = {
     spawn(G, type, r, c) { if (G.over || !ENEMIES[type]) return; const w = G.waves[G.wave - 1]; spawnAt(G, type, r, c, w ? w.hpMul : 1); G.total++; },
     clear(G) { for (const e of G.enemies) { release(G, e); e.dead = true; } G.total -= G.enemies.length; G.enemies = []; G.queue = []; G.nextRow = null; G.nextType = null; ev(G, { t: 'marker', r: null }); if (G.phase === 'wave') { G.phase = 'rest'; G.timer = WAVE_REST; } },
-    nextWave(G) { if (G.over) return; G.started = true; if (G.phase === 'wave') { dev.clear(G); } G.timer = Math.min(G.timer, 0.5); },
+    nextWave(G) { if (G.over) return; G.started = true; G.holdWaves = false; if (G.phase === 'wave') { dev.clear(G); } G.timer = Math.min(G.timer, 0.5); },
     food(G, n) { G.food += n; },
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; },
   };

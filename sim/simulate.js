@@ -66,10 +66,12 @@ function decide(G, skill) {
     if (big && !hasSling && can('sling')) { if (tryPlace(G, r, freeCell(G, r, 2), 'sling')) return; }
     if (!hasDog && can('dog') && [...types].some(t => ['alpha', 'lion', 'bear', 'fox', 'rustler', 'thief'].includes(t))) { if (tryPlace(G, r, freeCell(G, r, 3), 'dog')) return; }
     if (needArcher && !has(G, r, u => u.type === 'archer') && can('archer')) { if (tryPlace(G, r, freeCell(G, r, 2), 'archer')) return; }
-    if (types.has('digger') && can('scorpion')) {
+    if (types.has('digger') && can('thorns')) {
       const dg = es.find(e => e.type === 'digger' && e.underground);
-      if (dg && !G.units[key(r, dg.emergeX)] && tryPlace(G, r, dg.emergeX, 'scorpion')) return;
+      if (dg && !G.units[key(r, dg.emergeX)] && tryPlace(G, r, dg.emergeX, 'thorns')) return;
     }
+    // 荊棘學會撒蠍子就升級
+    for (let c = 0; c < COLS; c++) { const u = G.units[key(r, c)]; if (u && u.type === 'thorns' && !u.upgraded && G.level.id >= UNITS.thorns.upgrade.from && G.food >= UNITS.thorns.upgrade.cost + 50) { E.tapUnit(G, r, c); return; } }
     if (types.has('bear') && can('thorns') && !has(G, r, u => u.type === 'thorns')) { if (tryPlace(G, r, freeCell(G, r, 4), 'thorns')) return; }
     if (es.length >= 4 && can('horn') && !has(G, r, u => u.type === 'horn')) { if (tryPlace(G, r, freeCell(G, r, 2), 'horn')) return; }
     if (es.length >= 4 && can('catapult') && !has(G, r, u => u.type === 'catapult')) { if (tryPlace(G, r, freeCell(G, r, 1), 'catapult')) return; }

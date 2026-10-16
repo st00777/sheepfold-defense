@@ -6,6 +6,7 @@ const ROWS = 5, COLS = 7;
 
 // ====== 我方單位 ======
 // kind：producer 產糧／shooter 射手／blocker 牆／dog 牧羊犬／floor 鋪地／instant 一次性／support 輔助
+// upgrade：放下後「再點一下」花糧升級，欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）
 const UNITS = {
   shepherd: { name: '牧人',     ico: '🧑‍🌾', cost: 50,  hp: 60,  kind: 'producer', every: 7,   gives: 25,
               desc: '定時產糧。再點一下升級成老牧人，產糧更快', ref: '創 31:40' },
@@ -23,10 +24,10 @@ const UNITS = {
               desc: '高血量防線，賊也翻不過', ref: '賽 5:2' },
   archer:   { name: '弓箭手',   ico: '🏹',   cost: 125, hp: 60,  kind: 'shooter', every: 1.8, dmg: 26, shot: 'arrow', pierce: true, falloff: 0.8,
               desc: '箭矢穿透整排，每穿一隻傷害降低', ref: '創 21:20' },
-  scorpion: { name: '蠍窩',     ico: '🦂',   cost: 50,  hp: 1,   kind: 'floor', uses: 8, poison: 8,
-              desc: '鋪地施毒，可觸發 8 次。專治狐狸和冒出來的野狗', ref: '申 8:15' },
   thorns:   { name: '荊棘',     ico: '🌿',   cost: 75,  hp: 150, kind: 'floor', slow: 0.5, dps: 6, wear: 3,
-              desc: '鋪地減速並持續傷害，踩久會損壞。放在射手前面最划算', ref: '何 2:6' },
+              desc: '鋪地減速並持續傷害，踩久會損壞。放在射手前面最划算；第 5 夜起再點一下撒蠍子', ref: '何 2:6',
+              // 升級：再點一下花糧撒蠍子進去，踩入的敵人中毒（from＝第幾夜起學會）
+              upgrade: { name: '荊棘蠍窩', ico: '🦂', cost: 50, from: 5, poison: 8, uses: 8, desc: '撒蠍子進荊棘，踩入的敵人中毒，可觸發 8 次', ref: '申 8:15' } },
   brazier:  { name: '火盆',     ico: '🔥',   cost: 75,  hp: 100, kind: 'support', ignite: true,
               desc: '點燃穿過的石子與箭矢，燃燒會傳給隔壁敵人', ref: '路 2:8' },
   jar:      { name: '瓦瓶火把', ico: '🏺',   cost: 100, hp: 0,   kind: 'instant', dmg: 30, panic: 2.5,
@@ -45,7 +46,7 @@ const MAX_CARDS = 8;      // 一關最多帶幾張卡上場，超過就要點兵
 const MIN_CARDS = 4;      // 點兵至少要帶幾張（只帶牧人等於沒得打）
 const SELL_RATE = 0.5;    // 鏟子拆掉單位退幾成糧（含升老牧人花的）
 // 預設帶卡的先後：這關新開的一定帶、牧人一定帶，其餘依這個順序補滿
-const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'tower', 'archer', 'brazier', 'horn', 'catapult', 'healer', 'jar', 'scorpion', 'thorns', 'hireling'];
+const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'tower', 'archer', 'brazier', 'horn', 'catapult', 'healer', 'jar', 'thorns', 'hireling'];
 
 // ====== 敵人 ======
 // 特殊欄位：flying 飛的／dodge 閃避率／digs 鑽地／vaults 翻牆／steals 偷羊／enrage 狂暴／howl 嚎叫秒數／roar 咆哮秒數
@@ -65,7 +66,7 @@ const ENEMIES = {
   rustler: { name: '偷羊人', ico: '🧔', hp: 90,  speed: 0.30, bite: 4,  cls: 'human light', steals: true, fleeSpeed: 0.45, prio: 5,
              tip: '不攻擊，走到底就抱羊逃跑。派牧羊犬追捕救羊' },
   fox:     { name: '小狐狸', ico: '🦊', hp: 30,  speed: 0.35, bite: 6,  cls: 'small', dodge: 0.7, prio: 3,
-             tip: '十顆石子閃掉七顆。改用牧羊犬、荊棘或蠍窩' },
+             tip: '十顆石子閃掉七顆。改用牧羊犬或荊棘' },
   locust:  { name: '蝗群',   ico: '🦗', hp: 8,   speed: 0.30, bite: 2,  cls: 'swarm',
              tip: '成群出現，用弓箭手穿透，一箭打多隻' },
   digger:  { name: '野狗',   ico: '🐕‍🦺', hp: 80, speed: 0.22, bite: 12, cls: 'dig', digs: true, digSpeed: 0.35,
@@ -155,14 +156,14 @@ const LEVELS = [
     id: 4, name: '何烈山下', title: '大而可怕的曠野', ref: '取材：出埃及記 3:1、申命記 8:15',
     speaker: '摩西',
     intro: '葉忒羅的羊今晚在這曠野過夜。這曠野大而可怕，有火蛇、蠍子，地上盡是石頭。你守東邊，我守西邊。',
-    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'scorpion'], fresh: ['archer', 'scorpion'],
+    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns'], fresh: ['archer', 'thorns'],
     tips: ['🪨 有石頭的格子不能放東西'],
     rocks: [[0, 3], [2, 2], [3, 5], [4, 1]],
     waves: [
       { list: [['wolf', 5]],                             gap: 4.5, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['locust', 18]],                          gap: 0.6, rows: [1, 3],          hpMul: 1,   say: '蝗群來了', hint: '聽，像風一樣的聲音。蝗群來了，用弓箭手穿透，一箭打多隻' },
       { list: [['digger', 1], ['wolf', 6], ['digger', 2]], gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.4, ordered: true, say: '地在動', hint: '野狗會鑽地繞過前排。土堆出現後，在它左邊放牆或狗' },
-      { list: [['locust', 20], ['wolf', 7], ['digger', 3], ['fast', 4]], gap: 1.2, rows: [0, 1, 2, 3, 4], hpMul: 1.7, say: '最後一波，全來了', hint: '最後一波全來了，弓箭手穿透、蠍窩施毒' },
+      { list: [['locust', 20], ['wolf', 7], ['digger', 3], ['fast', 4]], gap: 1.2, rows: [0, 1, 2, 3, 4], hpMul: 1.7, say: '最後一波，全來了', hint: '最後一波全來了，弓箭手穿透、荊棘減速' },
     ],
     outroWin: '天亮了。摩西領著羊群往山那邊去，那山叫何烈山。（出 3:1）',
     outroLose: { wolf: '摩西說：這曠野大而可怕。地底來的，前排石牆攔不住，中間也得有人守。' },
@@ -171,8 +172,8 @@ const LEVELS = [
     id: 5, name: '提哥亞的牧人', title: '誰不懼怕', ref: '取材：阿摩司書 1:1、3:8、5:19',
     speaker: '阿摩司',
     intro: '我是牧人，又是修理桑樹的，不是先知的門徒。獅子吼叫，誰不懼怕？今晚天上也要看著，鷙鳥會飛過牆。火盆給你，石子穿過火就會燒。',
-    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'scorpion', 'thorns', 'brazier'], fresh: ['thorns', 'brazier'],
-    tips: ['🔥 火盆要放在射手前面，石子穿過才會變火', '🦅 鷙鳥飛過牆和狗，只有投射攻擊打得到'],
+    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier'], fresh: ['brazier'],
+    tips: ['🦂 荊棘學會新招：放下後再點一下花 50 糧撒蠍子，踩入的敵人中毒', '🔥 火盆要放在射手前面，石子穿過才會變火', '🦅 鷙鳥飛過牆和狗，只有投射攻擊打得到'],
     waves: [
       { list: [['wolf', 6]],                                  gap: 4.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['bird', 1], ['wolf', 6], ['bird', 2]],        gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, ordered: true, say: '天上有東西', hint: '抬頭。鷙鳥會飛過牆，每排都要有射手' },
@@ -186,7 +187,7 @@ const LEVELS = [
     id: 6, name: '基甸的三百人', title: '瓶子、火把、角', ref: '取材：士師記 7 章',
     speaker: '基甸',
     intro: '三百人對一大群，多如蝗蟲。瓶子、火把、角，各人站在自己的地方。天亮前就見分曉。',
-    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'scorpion', 'thorns', 'brazier', 'jar', 'horn'], fresh: ['jar', 'horn'],
+    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn'], fresh: ['jar', 'horn'],
     tips: ['⏱ 今晚準備時間較短，先放產糧和防線'],
     prep: 12,
     waves: [
@@ -202,7 +203,7 @@ const LEVELS = [
     id: 7, name: '尋找我的羊', title: '最後一夜', ref: '取材：以西結書 34 章、詩篇 23 篇',
     speaker: null,
     intro: '「牧人在羊群四散的日子怎樣尋找他的羊，我必照樣尋找我的羊。」「失喪的，我必尋找；被逐的，我必領回；受傷的，我必纏裹；有病的，我必醫治。」（結 34:12、16）這是最後一夜。',
-    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'scorpion', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult'], fresh: ['healer', 'catapult'],
+    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult'], fresh: ['healer', 'catapult'],
     tips: ['🦁 今晚共五波，最後一波有兩隻獅子'],
     sheep: 3,
     waves: [

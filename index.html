@@ -24,7 +24,7 @@
     --new: #ffd98a;
     /* 我方單位底色：卡片左上角的小色塊與場上色一致 */
     --u-shepherd: #3d6ea8; --u-slinger: #a8553d; --u-sling: #8a3f2e; --u-hireling: #7d7a6a; --u-archer: #6b4e2e;
-    --u-wall: #777; --u-tower: #5c5c66; --u-dog: #c9a24a; --u-scorpion: #6a7a3a; --u-thorns: #4a7a3a;
+    --u-wall: #777; --u-tower: #5c5c66; --u-dog: #c9a24a; --u-thorns: #4a7a3a;
     --u-brazier: #6e3a1e; --u-jar: #8a5a2e; --u-horn: #7a6a2a; --u-healer: #3d8a7a; --u-catapult: #5a4a3a;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -64,6 +64,12 @@
   .card.new { animation: glow 1.4s infinite alternate; }
   @keyframes glow { from { box-shadow: 0 0 0 0 #ffd98a00; } to { box-shadow: 0 0 10px 2px var(--new); } }
   .card.shake { animation: shake .3s; }
+  /* 教學：沒輪到的卡壓暗、要放的格子亮金框 */
+  .card.dim { opacity: .25; pointer-events: none; }
+  .cell.teach { outline: 3px solid var(--gold); outline-offset: -5px; animation: teach .9s infinite alternate; }
+  @keyframes teach { from { box-shadow: inset 0 0 0 0 #e6b84a00; } to { box-shadow: inset 0 0 18px 4px #e6b84a77; } }
+  #tut-skip { display: none; margin: 6px auto 0; font: inherit; font-size: 12px; background: transparent; color: var(--muted); border: 1px solid var(--muted); border-radius: 6px; padding: 3px 10px; }
+  #tut-skip.on { display: block; }
   @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
 
   /* 棋盤 */
@@ -79,7 +85,8 @@
   .unit { background: var(--u, #888); }
   .unit.shepherd.elder { filter: brightness(.85); box-shadow: inset 0 0 0 2px var(--gold); }
   .unit.dog      { background: transparent; opacity: .35; font-size: .6em; }
-  .unit.scorpion, .unit.thorns { background: #f3ead822; border: 2px dashed #f3ead866; border-radius: 50%; }
+  .unit.thorns { background: #f3ead822; border: 2px dashed #f3ead866; border-radius: 50%; }
+  .unit.thorns.upgraded { border-color: #c9d46a; }
   .unit .hp.thick { height: 5px; }
   .unit .hp, .enemy .hp, .dog-run .hp { position: absolute; left: 10%; right: 10%; bottom: 2px; height: 3px; background: #0006; }
   .hp > i { display: block; height: 100%; background: var(--ok); }
@@ -239,6 +246,7 @@
 <div id="bottom">
   <div id="bar"><i></i></div>
   <div id="toast">先點一張卡，再點草地放下去</div>
+  <button id="tut-skip">我會了，跳過教學</button>
 </div>
 
 <!-- 關卡選單 -->
@@ -420,6 +428,7 @@ function toast(msg, tip) {
 // ====== 操作 ======
 function tapCard(key, el) {
   if (!G || G.over) return;
+  if (tut.on && (tut.waiting || key !== TUT_STEPS[tut.step].card)) { toast(tut.waiting ? TUT_STEPS[tut.step].wait : TUT_STEPS[tut.step].say, true); return; }
   const u = UNITS[key];
   if (G.food < u.cost) {
     el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
@@ -432,7 +441,7 @@ function tapCard(key, el) {
   toast(selected ? (u.kind === 'instant' ? `點敵人密集處，${u.name}就打破在那裡，範圍傷害並嚇退` : `點一格草地放下${u.name}`) : '先點一張卡，再點草地放下去');
 }
 function tapShovel() {
-  if (!G || G.over) return;
+  if (!G || G.over || tut.on) return;
   selected = (selected === 'shovel') ? null : 'shovel';
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.key === selected));
   cells.forEach(c => { const on = selected === 'shovel' && !!G.units[c.dataset.r + ',' + c.dataset.c]; c.classList.toggle('hint', on); c.classList.toggle('sell', on); });
@@ -447,11 +456,13 @@ function tapCell(r, c) {
   if (!G || G.over) return;
   if (devOn && devEnemy) { Engine.dev.spawn(G, devEnemy, r, c); flushEvents(); draw(); return; }
   if (selected === 'shovel') { const res = Engine.sell(G, r, c); flushEvents(); if (res.ok) clearSelection(); toast(res.msg || ''); return; }
-  if (!selected) { const res = Engine.tapUnit(G, r, c); flushEvents(); if (res.msg) toast(res.msg); return; }
+  if (!selected) { if (tut.on) { toast(tut.waiting ? TUT_STEPS[tut.step].wait : TUT_STEPS[tut.step].say, true); return; } const res = Engine.tapUnit(G, r, c); flushEvents(); if (res.msg) toast(res.msg); return; }
+  if (tut.on) { const [tr, tc] = TUT_STEPS[tut.step].cell; if (r !== tr || c !== tc) { toast('放在亮著的那一格', true); return; } }
   const res = Engine.place(G, r, c, selected);
   flushEvents();
   if (!res.ok) { toast(res.msg || ''); return; }
   clearSelection();
+  if (tut.on) { tutAdvance(); return; }
   toast(res.msg);
 }
 
@@ -463,10 +474,11 @@ function renderUnit(r, c) {
   if (!u) return;
   const def = UNITS[u.type];
   const d = document.createElement('div');
-  d.className = 'unit ' + u.type + (u.elder ? ' elder' : '') + (u.fear > 0 ? ' fear' : '');
+  d.className = 'unit ' + u.type + (u.elder ? ' elder' : '') + (u.upgraded ? ' upgraded' : '') + (u.fear > 0 ? ' fear' : '');
   d.style.setProperty('--u', `var(--u-${u.type})`);
   const ico = def.kind === 'dog' ? '🦴' : def.ico;
-  const bar = def.kind === 'floor' && def.uses ? `<div class="badge">${u.uses}</div>` : (u.maxHp > 1 && def.kind !== 'dog') ? `<div class="hp"><i style="width:${u.hp / u.maxHp * 100}%"></i></div>` : '';
+  const sting = u.upgraded && def.upgrade.uses ? `<div class="badge">${def.upgrade.ico}${u.uses}</div>` : '';
+  const bar = sting + ((u.maxHp > 1 && def.kind !== 'dog') ? `<div class="hp"><i style="width:${u.hp / u.maxHp * 100}%"></i></div>` : '');
   d.innerHTML = `${ico}${bar}`;
   cell.appendChild(d);
 }
@@ -554,6 +566,7 @@ function draw() {
   $('#food').textContent = Math.floor(G.food);
   const t = Math.ceil(G.timer), n = G.waves.length;
   $('#wave-info').textContent =
+    G.holdWaves ? '照著提示做' :
     G.phase === 'prep' ? (G.started ? `第 1 波 ${t} 秒後來` : '放下第一個單位才開始倒數') :
     G.phase === 'rest' ? (G.wave >= n ? '天快亮了' : `第 ${G.wave + 1} 波 ${t} 秒後來`) :
     `第 ${G.wave} / ${n} 波`;
@@ -601,12 +614,14 @@ function draw() {
   $('#bar > i').style.width = (G.killed / G.total * 100) + '%';
   const f = Math.floor(G.food);
   if (f !== lastFood) { lastFood = f; for (const c of cardEls) c.classList.toggle('poor', f < UNITS[c.dataset.key].cost); }
+  if (tut.on && tut.waiting && f >= TUT_STEPS[tut.step].need) tutShow();
   // 牧人可升級／石牆可修補：糧夠了才掛角標，點一下就知道
   for (const k in G.units) {
     const u = G.units[k], def = UNITS[u.type];
     let up = '';
     if (def.kind === 'producer' && !u.elder && f >= ELDER_COST) up = '升級';
     else if (def.kind === 'blocker' && u.hp < u.maxHp * 0.7 && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) up = '修補';
+    else if (def.upgrade && !u.upgraded && G.level.id >= def.upgrade.from && f >= def.upgrade.cost) up = '升級';
     const el = cells[u.r * COLS + u.c].firstChild; if (!el) continue;
     let b = el.querySelector('.up');
     if (up && !b) { b = document.createElement('div'); b.className = 'up'; el.appendChild(b); }
@@ -655,6 +670,7 @@ function clearBoard() {
   board.querySelectorAll('.pop, .fx, .mark').forEach(x => x.remove()); moundEls.clear(); markerEl = null;
   selected = null;
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
+  tut.on = false; $('#tut-skip').classList.remove('on');
   $('#result').hidden = true;
 }
 function startGame() {
@@ -663,10 +679,11 @@ function startGame() {
   const lo = pickedFor(level);
   if (lo) Engine.applyPick(G, lo); // 只帶點兵選的卡
   buildCards();
-  cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint'); c.classList.toggle('rock', G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
+  cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint', 'sell', 'teach'); c.classList.toggle('rock', G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
   $('#sheep').hidden = !level.sheep; $('#sheep-n').textContent = G.sheep;
   toast('先點一張卡，再點草地放下去');
   draw();
+  if (level.id === 1 && (!tutDone() || /[?&]tut/.test(location.search))) tutStart();
   last = performance.now();
   raf = requestAnimationFrame(tick);
 }
@@ -765,6 +782,7 @@ function unitNums(k) {
   if (u.kind === 'dog') s.push(`一般目標每秒傷害 ${u.dps}；賊、偷羊人、狐狸、野狗每秒 ${u.hunt}；受傷回窩休息 ${u.rest} 秒回滿`);
   if (u.poison) s.push(`可觸發 ${u.uses} 次；中毒 ${STATUS.poison.t} 秒，每秒傷害 ${STATUS.poison.dps}，並降低敵人攻擊`);
   if (u.slow) s.push(`踩上移動速度減半，每秒傷害 ${u.dps}`);
+  if (u.upgrade) s.push(`第 ${u.upgrade.from} 夜起可升級${u.upgrade.name}（${u.upgrade.cost} 糧）：${u.upgrade.desc}，中毒 ${STATUS.poison.t} 秒每秒傷害 ${STATUS.poison.dps}`);
   if (u.kind === 'instant') s.push(`九格內每個敵人傷害 ${u.dmg}，嚇退 ${u.panic} 秒`);
   if (u.push) s.push(`冷卻 ${u.every} 秒，暈眩 ${u.stun} 秒`);
   if (u.heal) s.push(`周圍夥伴每秒回復 ${u.heal} 血量`);
@@ -781,7 +799,7 @@ function renderRosterDetail() {
     const u = UNITS[k];
     const fresh = roster.mode === 'pick' && level.fresh.includes(k);
     const note = roster.mode !== 'pick' ? '' : k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : fresh ? '<br><span class="new">這一夜新開的卡，建議帶上</span>' : '';
-    box.innerHTML = `<b>${u.ico} ${u.name}</b>　<span class="num">🌾 ${u.cost}</span><br>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${u.ref}</div>`;
+    box.innerHTML = `<b>${u.ico} ${u.name}</b>　<span class="num">🌾 ${u.cost}</span><br>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${u.ref}${u.upgrade ? '・升級 ' + u.upgrade.ref : ''}</div>`;
   } else {
     const e = ENEMIES[k];
     box.innerHTML = `<b>${e.ico} ${e.name}</b><br>${e.tip || '最普通的一隻，走到最左邊就闖進羊圈'}<br><span class="num">${enemyNums(k)}</span>`;
@@ -792,6 +810,38 @@ $('#roster-go').addEventListener('click', () => { if (roster.picked.size < MIN_C
 $('#roster-back').addEventListener('click', () => { $('#roster').hidden = true; if (roster.from === 'intro') $('#intro').hidden = false; else $('#levels').hidden = false; });
 $('#intro-roster').addEventListener('click', () => openRoster(pickedFor(level) ? 'pick' : 'view', 'intro'));
 $('#levels-codex').addEventListener('click', () => openRoster('view', 'levels'));
+
+// ====== 第 1 關手把手（只教一次；網址加 ?tut 可重看） ======
+const TKEY = 'sheepfold-tutorial-done';
+const TUT_STEPS = [
+  { card: 'shepherd', cell: [2, 0], say: '先點「牧人」卡，再點亮著的格子。牧人會產糧' },
+  { card: 'slinger',  cell: [2, 1], need: 100, wait: '牧人會送糧來，等糧到 100', say: '點「投石手」，放在牧人右邊。他朝這一排丟石頭' },
+  { card: 'wall',     cell: [2, 4], need: 50,  wait: '再等一下，糧到 50',       say: '點「石牆」，放在前面擋路。狼會先咬牆' },
+];
+const tut = { on: false, step: 0, waiting: false };
+function tutDone() { try { return localStorage.getItem(TKEY) === '1'; } catch (e) { return false; } }
+function tutStart() { tut.on = true; tut.step = 0; G.holdWaves = true; $('#tut-skip').classList.add('on'); tutShow(); }
+function tutShow() {
+  const st = TUT_STEPS[tut.step], ready = !st.need || G.food >= st.need;
+  tut.waiting = !ready;
+  document.querySelectorAll('#cards .card').forEach(c => c.classList.toggle('dim', !ready || c.dataset.key !== st.card));
+  cells.forEach(c => c.classList.toggle('teach', ready && +c.dataset.r === st.cell[0] && +c.dataset.c === st.cell[1]));
+  toast(ready ? st.say : st.wait, true);
+}
+function tutAdvance() {
+  tut.step++;
+  if (tut.step >= TUT_STEPS.length) return tutEnd('做得好。狼要來了，腳印出現在哪一排，狼就從那排來');
+  tutShow();
+}
+function tutEnd(msg) {
+  tut.on = false; if (G) G.holdWaves = false;
+  document.querySelectorAll('#cards .card').forEach(c => c.classList.remove('dim'));
+  cells.forEach(c => c.classList.remove('teach'));
+  $('#tut-skip').classList.remove('on');
+  try { localStorage.setItem(TKEY, '1'); } catch (e) {}
+  if (msg) toast(msg, true);
+}
+$('#tut-skip').addEventListener('click', () => tutEnd('好，自己來。狼要來了'));
 
 // ====== 開發者面板 ======
 function setDev(on) {
