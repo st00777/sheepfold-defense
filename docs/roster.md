@@ -34,7 +34,8 @@
 ## 暫停與檢查點（2026-10-16 James 拍板）
 
 - 暫停：#pause-btn 或 visibilitychange→hidden 都蓋 #pause 層；`paused` 與開發者列共用。原本切背景 rAF 停＋dt 上限 0.05 就等於暫停，差在回來會先看到暫停畫面。
-- 檢查點：引擎每清完一波發 `waveclear`，畫面層存 `Engine.snapshot(G)`（levelId／diff／wave／food／sheep／units 的 type,r,c,hp,elder,upgraded,uses）到 localStorage `sheepfold-checkpoint`。開場頁有同關檢查點就顯示「繼續上次」，`Engine.restore` 用 makeUnit 重放單位、phase=rest、timer=WAVE_REST+4、killed 依已清波數算；不存敵人與投射物。贏／輸／重新開始會清；中途回關卡保留（玩家多半是想晚點回來）。
+- 檢查點：引擎每清完一波發 `waveclear`，畫面層存 `Engine.snapshot(G)`（levelId／diff／wave／food／sheep／sheepLost／seen／units 的 type,r,c,hp,elder,upgraded,uses,cd＝修補冷卻剩幾秒）到 localStorage `sheepfold-checkpoint`。開場頁用 `Engine.checkSnapshot(snap, levelId)` 驗過才顯示「繼續上次」（關卡、難度、波數 ≥1、糧為非負數、每個單位種類存在且座標在棋盤內）；驗不過就清掉並在開場頁寫「存檔讀不出來」。`Engine.restore` 再多驗難度要跟這一局相同、波數小於總波數，用 makeUnit 重放單位、老牧人節奏套 ELDER_MUL、phase=rest、timer=WAVE_REST+4、killed 依已清波數算；不存敵人與投射物。
+- 2026-10-16 code review 後補的規則：贏／輸／重新開始**同一關**才清（開別關不動別關的存檔）；開過開發者面板（`devUsed`）的那一局不存；「繼續上次」走跟「開始守夜」一樣的點兵檢查，難度只套這一局不寫回 `sheepfold-diff`；還原半途丟例外會整個重建新局。測試在 `sim/checkpoint.test.js`（`node --test sim/checkpoint.test.js`；不要給整個 sim/ 目錄，simulate.js 不是測試）。
 
 ## 第 1 關手把手教學（2026-10-16 James 拍板）
 

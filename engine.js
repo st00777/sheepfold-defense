@@ -104,21 +104,34 @@
 
   // ====== 檢查點：每清完一波存一次，只存場上單位與糧，不存敵人，所以永遠從下一波的開頭接 ======
   function snapshot(G) {
-    return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep,
-      units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded, uses: u.uses })) };
+    return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep, sheepLost: G.sheepLost, seen: [...G.seen],
+      units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded, uses: u.uses,
+        cd: u.repairAt ? Math.max(0, Math.round((u.repairAt - G.time) * 10) / 10) : 0 })) };
+  }
+  // 存檔長得對不對：關卡、難度、波數、糧、每個單位的種類與座標都要在範圍內（localStorage 可能被改壞或版本變了）
+  const isInt = (n, lo, hi) => Number.isInteger(n) && n >= lo && n <= hi;
+  function checkSnapshot(snap, levelId) {
+    if (!snap || typeof snap !== 'object' || snap.levelId !== levelId) return false;
+    if (!DIFFS[snap.diff] || !isInt(snap.wave, 1, 99) || !Number.isFinite(snap.food) || snap.food < 0) return false;
+    if (!Array.isArray(snap.units) || snap.units.length > ROWS * COLS) return false;
+    return snap.units.every(s => s && UNITS[s.type] && isInt(s.r, 0, ROWS - 1) && isInt(s.c, 0, COLS - 1));
   }
   function restore(G, snap) {
-    if (!snap || snap.levelId !== G.levelId || !Array.isArray(snap.units)) return false;
+    if (!checkSnapshot(snap, G.levelId) || snap.diff !== G.diff || snap.wave >= G.waves.length) return false;
     for (const s of snap.units) {
-      if (!UNITS[s.type] || G.units[key(s.r, s.c)] || G.rocks.has(key(s.r, s.c))) continue;
+      if (G.units[key(s.r, s.c)] || G.rocks.has(key(s.r, s.c))) continue;
+      const def = UNITS[s.type];
       const u = makeUnit(G, s.r, s.c, s.type);
-      if (s.elder) u.elder = true;
-      if (s.upgraded && UNITS[s.type].upgrade) u.upgraded = true;
+      if (s.elder && def.every) { u.elder = true; u.timer = Math.min(u.timer, def.every * ELDER_MUL); }
+      if (s.upgraded && def.upgrade) u.upgraded = true;
       if (typeof s.uses === 'number') u.uses = s.uses;
-      u.hp = Math.min(u.maxHp, Math.max(1, s.hp || u.maxHp));
+      if (typeof s.cd === 'number' && s.cd > 0) u.repairAt = G.time + s.cd;
+      u.hp = Math.min(u.maxHp, Math.max(1, Number.isFinite(s.hp) ? s.hp : u.maxHp));
     }
-    G.food = Math.max(0, snap.food || 0); if (G.level.sheep) G.sheep = Math.max(1, snap.sheep || G.sheep);
-    G.wave = Math.max(0, Math.min(snap.wave || 0, G.waves.length - 1));
+    G.food = Math.max(0, snap.food); if (G.level.sheep) G.sheep = Math.max(1, Math.min(G.level.sheep, snap.sheep || G.sheep));
+    G.sheepLost = Number.isInteger(snap.sheepLost) ? snap.sheepLost : 0;
+    if (Array.isArray(snap.seen)) for (const t of snap.seen) if (ENEMIES[t]) G.seen.add(t);
+    G.wave = snap.wave;
     G.phase = 'rest'; G.timer = WAVE_REST + 4; G.started = true; G.taughtElder = G.taughtRepair = true;
     G.killed = G.waves.slice(0, G.wave).reduce((n, w) => n + w.list.reduce((m, [, k]) => m + k, 0), 0);
     return true;
@@ -554,6 +567,6 @@
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; },
   };
 
-  const Engine = { create, place, tapUnit, sell, snapshot, restore, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, dev };
+  const Engine = { create, place, tapUnit, sell, snapshot, checkSnapshot, restore, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
