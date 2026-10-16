@@ -56,6 +56,10 @@
   .card.selected { border-color: var(--gold); background: var(--card-on); }
   .card.poor { opacity: .45; }
   .card.shovel { background: #3f3b31; }
+  .card.once, .rc.once { border-style: dashed; border-color: #f3ead855; }
+  .card.once.selected, .rc.once.on { border-color: var(--gold); }
+  .tag.once { background: #f3ead8cc; }
+  .new .tag.once { right: 30px; }
   .cell.hint.sell { outline-color: var(--danger); }
   .card.new { animation: glow 1.4s infinite alternate; }
   @keyframes glow { from { box-shadow: 0 0 0 0 #ffd98a00; } to { box-shadow: 0 0 10px 2px var(--new); } }
@@ -260,7 +264,7 @@
     <div id="diff-hint"></div>
     <div class="tips" id="intro-loadout"></div>
     <button class="btn" id="start">開始守夜</button>
-    <button class="btn alt" id="intro-roster">點兵</button>
+    <button class="btn alt" id="intro-roster">隊伍</button>
     <button class="btn alt" id="intro-back">回關卡</button>
     <div id="best"></div>
   </div>
@@ -269,7 +273,7 @@
 <!-- 點兵與圖鑑 -->
 <div class="overlay" id="roster" hidden>
   <div class="dialog roster">
-    <h1 id="roster-title">今晚帶誰上場</h1>
+    <h1 id="roster-title">今晚的隊伍</h1>
     <div class="ref" id="roster-sub"></div>
     <div class="tabs"><button class="tab selected" data-tab="units">我方</button><button class="tab" data-tab="enemies">敵方</button></div>
     <div id="roster-grid"></div>
@@ -346,9 +350,9 @@ function buildCards() {
     const u = UNITS[key], g = GROUP[u.kind];
     const d = document.createElement('div');
     const fresh = L.fresh.includes(key) && !seenCard(key);
-    d.className = 'card' + (fresh ? ' new' : '') + (g !== lastG && lastG >= 0 ? ' group-start' : ''); d.dataset.key = key;
+    d.className = 'card' + (fresh ? ' new' : '') + (u.kind === 'instant' ? ' once' : '') + (g !== lastG && lastG >= 0 ? ' group-start' : ''); d.dataset.key = key;
     d.style.setProperty('--u', `var(--u-${key})`);
-    d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag">新</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
+    d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag fresh">新</div>' : ''}${u.kind === 'instant' ? '<div class="tag once">一次</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
     d.addEventListener('click', () => tapCard(key, d));
     wrap.appendChild(d); lastG = g;
   }
@@ -382,8 +386,8 @@ function openIntro(L) {
   applyDiff(diff);
   showBest();
   const lo = pickedFor(L);
-  $('#intro-loadout').innerHTML = lo ? `今晚上場：${lo.map(k => UNITS[k].ico).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「點兵」可換</span>` : '';
-  $('#intro-roster').textContent = lo ? '點兵' : '圖鑑';
+  $('#intro-loadout').innerHTML = lo ? `今晚上場：${lo.map(k => UNITS[k].ico).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「隊伍」可換</span>` : '';
+  $('#intro-roster').textContent = lo ? '隊伍' : '圖鑑';
   $('#levels').hidden = true; $('#intro').hidden = false;
 }
 function applyDiff(key) {
@@ -420,7 +424,7 @@ function tapCard(key, el) {
     toast(`糧不夠，${u.name}要 ${u.cost} 糧`); return;
   }
   selected = (selected === key) ? null : key;
-  if (el.classList.contains('new')) { el.classList.remove('new'); const t = el.querySelector('.tag'); if (t) t.remove(); markSeen(key); }
+  if (el.classList.contains('new')) { el.classList.remove('new'); const t = el.querySelector('.tag.fresh'); if (t) t.remove(); markSeen(key); }
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.key === selected));
   cells.forEach(c => { c.classList.remove('sell'); c.classList.toggle('hint', !!selected && !G.units[c.dataset.r + ',' + c.dataset.c] && !G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
   toast(selected ? (u.kind === 'instant' ? `點狼群中間，${u.name}就打破在那裡` : `點一格草地放下${u.name}`) : '先點一張卡，再點草地放下去');
@@ -548,7 +552,7 @@ function draw() {
   $('#food').textContent = Math.floor(G.food);
   const t = Math.ceil(G.timer), n = G.waves.length;
   $('#wave-info').textContent =
-    G.phase === 'prep' ? `第 1 波 ${t} 秒後來` :
+    G.phase === 'prep' ? (G.started ? `第 1 波 ${t} 秒後來` : '放下第一個單位才開始倒數') :
     G.phase === 'rest' ? (G.wave >= n ? '天快亮了' : `第 ${G.wave + 1} 波 ${t} 秒後來`) :
     `第 ${G.wave} / ${n} 波`;
 
@@ -695,7 +699,7 @@ function openRoster(mode, from) {
   if (mode === 'pick') {
     roster.units = sortUnits(level.units);
     roster.picked = new Set(pickedFor(level) || level.units);
-    $('#roster-title').textContent = '今晚帶誰上場';
+    $('#roster-title').textContent = '今晚的隊伍';
     $('#roster-sub').textContent = `營火邊點名，今晚一起守夜的夥伴。${level.units.length} 張卡只能帶 ${MAX_CARDS} 張`;
   } else {
     const all = [];
@@ -716,9 +720,9 @@ function renderRoster() {
     for (const k of roster.units) {
       const u = UNITS[k], d = document.createElement('div');
       const fresh = roster.mode === 'pick' && level.fresh.includes(k);
-      d.className = 'rc' + (roster.mode === 'pick' ? (roster.picked.has(k) ? ' on' : ' off') : '') + (roster.focus === k ? ' focus' : '');
+      d.className = 'rc' + (roster.mode === 'pick' ? (roster.picked.has(k) ? ' on' : ' off') : '') + (u.kind === 'instant' ? ' once' : '') + (roster.focus === k ? ' focus' : '');
       d.style.setProperty('--u', `var(--u-${k})`);
-      d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag">新</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
+      d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag fresh">新</div>' : ''}${u.kind === 'instant' ? '<div class="tag once">一次</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
       d.addEventListener('click', () => tapRoster(k));
       grid.appendChild(d);
     }

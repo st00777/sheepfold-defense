@@ -59,7 +59,7 @@
       nextRow: null, nextType: null,
       units: {}, enemies: [], shots: [], fx: [],
       sheep: level.sheep || 0, sheepLost: 0,
-      over: false, result: null, events: [], seen: new Set(),
+      over: false, result: null, events: [], seen: new Set(), started: false,
       nextId: 1, time: 0,
     };
     return G;
@@ -230,6 +230,8 @@
   function step(G, dt) {
     if (G.over) return;
     G.time += dt;
+    // 放下第一個單位才開始倒數（新手還在看說明時不被吃掉準備時間）；糧也等到那時才滴
+    if (!G.started) { if (Object.keys(G.units).length) G.started = true; else return; }
 
     // 糧慢慢來
     G.trickle += dt;
@@ -491,7 +493,7 @@
   const dev = {
     spawn(G, type, r, c) { if (G.over || !ENEMIES[type]) return; const w = G.waves[G.wave - 1]; spawnAt(G, type, r, c, w ? w.hpMul : 1); G.total++; },
     clear(G) { for (const e of G.enemies) { release(G, e); e.dead = true; } G.total -= G.enemies.length; G.enemies = []; G.queue = []; G.nextRow = null; G.nextType = null; ev(G, { t: 'marker', r: null }); if (G.phase === 'wave') { G.phase = 'rest'; G.timer = WAVE_REST; } },
-    nextWave(G) { if (G.over) return; if (G.phase === 'wave') { dev.clear(G); } G.timer = Math.min(G.timer, 0.5); },
+    nextWave(G) { if (G.over) return; G.started = true; if (G.phase === 'wave') { dev.clear(G); } G.timer = Math.min(G.timer, 0.5); },
     food(G, n) { G.food += n; },
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; },
   };
