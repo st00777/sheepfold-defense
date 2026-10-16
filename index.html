@@ -236,8 +236,7 @@
   @media (prefers-reduced-motion: reduce) {
     .card.new::after, .cell.teach::before, .mark, .fx.stay, .unit .up { animation: none; }
     .card.new::after, .cell.teach::before { opacity: .8; }
-    .pop, .fx { animation-name: fadeOut; }
-    .fx.stay { animation: none; }
+    .pop, .fx { animation-name: fadeOut; animation-duration: .5s; }
     .dialog { transition: opacity 200ms; }
     .card:active, .btn:active, .diff:active, .tab:active, .lv:active, .rc:active, #pause-btn:active, #tut-skip:active { transform: none; }
   }
@@ -355,6 +354,8 @@ const SHAKE = [{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)', 
 function shake(el) { if (el.animate) el.animate(SHAKE, 300); }
 document.addEventListener('touchstart', () => {}, { passive: true }); // iOS 要有這個 :active 才會亮
 const board = $('#board');
+const boardSize = { w: 0, h: 0 }; // 棋盤大小變了才量一次，畫投射物時直接用，不每幀量
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { boardSize.w = board.clientWidth; boardSize.h = board.clientHeight; }).observe(board);
 const cells = [];
 let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf = 0;
 const els = new Map();   // 引擎物件 id → 畫面元素
@@ -440,7 +441,7 @@ function openIntro(L) {
   const t = $('#intro-text');
   t.innerHTML = L.speaker ? `<span class="who">${L.speaker}：</span>${L.intro}` : `<div class="verse">${L.intro}</div>`;
   $('#intro-tips').innerHTML = L.fresh.map(k => `<div class="new">${UNITS[k].ico} ${UNITS[k].name}：${UNITS[k].desc}</div>`).join('') + (L.tips || []).map(x => `<div>${x}</div>`).join('');
-  applyDiff(diff);
+  applyDiff(savedDiff()); // 回開場頁一律用平常的預設難度（續玩那一局可能臨時換過）
   showBest();
   const lo = pickedFor(L);
   const extra = unlockedUnits().length - L.units.length; // 玩家手上比這一夜多出幾張卡
@@ -448,13 +449,14 @@ function openIntro(L) {
     ? `今晚上場：${lo.map(k => UNITS[k].ico).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「隊伍」可換</span>`
     : `今晚上場：${L.units.map(k => UNITS[k].ico).join(' ')}${extra > 0 ? `　<span class="new">這一夜只有這 ${L.units.length} 位，後來認識的夥伴要到後面的夜才會同行，不能帶回來</span>` : ''}`;
   $('#intro-roster').textContent = lo ? '隊伍' : '圖鑑';
-  const cp = loadCheckpoint(), mine = !!(cp && cp.levelId === L.id), hasCp = mine && Engine.checkSnapshot(cp, L.id);
-  if (mine && !hasCp) clearCheckpoint(); // 壞掉或舊版的存檔：清掉，並告訴玩家
+  const cp = loadCheckpoint(L.id), mine = !!cp, hasCp = mine && Engine.checkSnapshot(cp, L.id);
+  if (mine && !hasCp) clearCheckpoint(L.id); // 壞掉或舊版的存檔：清掉，並告訴玩家
   $('#resume-line').hidden = !mine; $('#resume-cp').hidden = !hasCp;
   if (mine) $('#resume-text').textContent = hasCp ? `上次${DIFFS[cp.diff].name}守到第 ${cp.wave} 波，場上的人都還在。` : CP_BROKEN;
   $('#start').textContent = hasCp ? '重新開始' : '開始守夜';
   $('#levels').hidden = true; $('#intro').hidden = false;
 }
+function savedDiff() { try { const k = localStorage.getItem('sheepfold-diff'); return DIFFS[k] ? k : diff; } catch (e) { return diff; } }
 function applyDiff(key, save = true) {
   diff = key;
   document.querySelectorAll('.diff').forEach(b => b.classList.toggle('selected', b.dataset.key === key));
@@ -574,7 +576,7 @@ function setMarker(r, type) {
   if (r === null || r === undefined) return;
   const d = document.createElement('div'); d.className = 'mark';
   const special = type && type !== 'wolf' && type !== 'fast';
-  if (special) { const boss = ['alpha', 'bear', 'lion'].includes(type); d.classList.add('special'); if (boss) d.classList.add('boss'); d.innerHTML = `<span>${ENEMIES[type].ico}</span>`; }
+  if (special) { const boss = !!ENEMIES[type].boss; d.classList.add('special'); if (boss) d.classList.add('boss'); d.innerHTML = `<span>${ENEMIES[type].ico}</span>`; }
   else d.textContent = '🐾';
   d.style.top = (r / ROWS * 100) + '%';
   board.appendChild(d); markerEl = d;
@@ -619,7 +621,7 @@ function statusText(e) {
   return list.slice(0, 2).join('');
 }
 function draw() {
-  const bw = board.clientWidth, bh = board.clientHeight; // 先讀尺寸再改畫面，避免讀寫交錯
+  const bw = boardSize.w || board.clientWidth, bh = boardSize.h || board.clientHeight; // 尺寸由 ResizeObserver 記著；還沒量到才現讀
   setText($('#food'), String(Math.floor(G.food)));
   const t = Math.ceil(G.timer), n = G.waves.length;
   setText($('#wave-info'),
@@ -672,11 +674,7 @@ function draw() {
   if (tut.on && tut.waiting && f >= TUT_STEPS[tut.step].need) tutShow();
   // 牧人可升級／石牆可修補：糧夠了才掛角標，點一下就知道
   for (const k in G.units) {
-    const u = G.units[k], def = UNITS[u.type];
-    let up = '';
-    if (def.kind === 'producer' && !u.elder && f >= ELDER_COST) up = '升級';
-    else if (def.kind === 'blocker' && u.hp < u.maxHp * 0.7 && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) up = '修補';
-    else if (def.upgrade && !u.upgraded && G.level.id >= def.upgrade.from && f >= def.upgrade.cost) up = '升級';
+    const u = G.units[k], up = Engine.tapHint(G, u); // 規則在引擎，這裡只畫
     const el = cells[u.r * COLS + u.c].firstChild; if (!el) continue;
     let b = el.querySelector('.up');
     if (up && !b) { b = document.createElement('div'); b.className = 'up'; el.appendChild(b); }
@@ -701,7 +699,7 @@ function recordBest(cleared) {
   saveProgress();
 }
 function onWin() {
-  recordBest(true); clearCheckpoint();
+  recordBest(true); clearCheckpoint(level.id);
   const next = LEVELS.find(l => l.id === level.id + 1);
   endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${level.outroWin}`);
   $('#next').hidden = !next;
@@ -711,7 +709,7 @@ function onWin() {
   }
 }
 function onLose(reason) {
-  recordBest(false); clearCheckpoint();
+  recordBest(false); clearCheckpoint(level.id);
   const titles = { wolf: '狼闖進羊圈了', bird: '鷙鳥飛進羊圈了', sheep: '羊被偷光了' };
   const text = (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
   endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`);
@@ -731,6 +729,7 @@ function clearBoard() {
 function startGame(fromCp) {
   clearBoard();
   devUsed = devOn;
+  if (fromCp) applyDiff(fromCp.diff, false); // 續玩用存檔那一夜的難度，只套用這一局；回開場頁會換回平常的預設
   const fresh = () => { G = Engine.create(level.id, diff); const lo = pickedFor(level); if (lo) Engine.applyPick(G, lo); }; // 只帶點兵選的卡
   fresh();
   let resumed = false, broken = false;
@@ -738,15 +737,14 @@ function startGame(fromCp) {
     try { resumed = Engine.restore(G, fromCp); } catch (e) { resumed = false; }
     if (!resumed) { broken = true; fresh(); } // 還原到一半壞掉就整個重建，不留半套
   }
-  // 重新開始「同一關」才丟掉舊檢查點；別關的進度不動
-  const cp = loadCheckpoint();
-  if (!resumed && cp && cp.levelId === level.id) clearCheckpoint();
+  // 重新開始「同一關」才丟掉舊檢查點（每關各一份，別關不動）；開著開發者面板這局不會存，舊檔一併清掉免得之後重打
+  if (!resumed || devUsed) clearCheckpoint(level.id);
   buildCards();
   cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint', 'sell', 'teach'); c.classList.toggle('rock', G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
   $('#sheep').hidden = !level.sheep; $('#sheep-n').textContent = G.sheep;
   for (const k in G.units) renderUnit(G.units[k].r, G.units[k].c);
   for (let i = G.events.length - 1; i >= 0; i--) if (G.events[i].t === 'unit') G.events.splice(i, 1); // 單位已直接畫了，其餘事件留給第一幀
-  toast(resumed ? `從第 ${G.wave + 1} 波繼續，場上的人都還在` : broken ? CP_BROKEN : '先點一張卡，再點草地放下去');
+  toast(resumed ? `從第 ${G.wave + 1} 波繼續，場上的人都還在${devUsed ? '；開著開發者模式，這局不存檔' : ''}` : broken ? CP_BROKEN : '先點一張卡，再點草地放下去');
   draw();
   if (!resumed && level.id === 1 && (!tutDone() || /[?&]tut/.test(location.search))) tutStart();
   last = performance.now();
@@ -857,7 +855,7 @@ function unitNums(k) {
   return s.join('・');
 }
 function enemyNums(k) {
-  const e = ENEMIES[k], sp = e.speed >= 0.35 ? '快' : e.speed <= 0.15 ? '慢' : '普通';
+  const e = ENEMIES[k], sp = e.speed >= SPEED_FAST ? '快' : e.speed <= SPEED_SLOW ? '慢' : '普通';
   return `血量 ${e.hp}・${e.bite ? `每秒傷害 ${e.bite}` : '不攻擊'}・移動速度 ${sp}${e.thick ? '・厚皮：石子與箭矢傷害降至四成' : ''}`;
 }
 function renderRosterDetail() {
@@ -930,17 +928,25 @@ $('#resume-btn').addEventListener('click', resumeGame);
 $('#pause-back').addEventListener('click', () => { resumeGame(); backToLevels(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
 
-// 檢查點：每清完一波存一次（單一欄位，只留最後一次）；守完、輸了、回關卡、重新開始都清掉
-const CKEY = 'sheepfold-checkpoint';
-function loadCheckpoint() { try { const c = JSON.parse(localStorage.getItem(CKEY) || 'null'); return c && typeof c === 'object' ? c : null; } catch (e) { return null; } }
-function saveCheckpoint(snap) { try { localStorage.setItem(CKEY, JSON.stringify(snap)); } catch (e) {} }
-function clearCheckpoint() { try { localStorage.removeItem(CKEY); } catch (e) {} }
+// 檢查點：每清完一波存一次，每關各存一份（去玩別關不會蓋掉）；守完、輸了、重新開始同一關只清自己這關的
+const CKEY = id => `sheepfold-checkpoint-${id}`;
+function loadCheckpoint(id) { try { const c = JSON.parse(localStorage.getItem(CKEY(id)) || 'null'); return c && typeof c === 'object' ? c : null; } catch (e) { return null; } }
+function saveCheckpoint(snap) { try { localStorage.setItem(CKEY(snap.levelId), JSON.stringify(snap)); } catch (e) {} }
+function clearCheckpoint(id) { try { localStorage.removeItem(CKEY(id)); } catch (e) {} }
+// 舊版只有一份存檔：搬到那一關自己的欄位，不讓玩家的進度不見
+try { const old = JSON.parse(localStorage.getItem('sheepfold-checkpoint') || 'null'); if (old && old.levelId && !localStorage.getItem(CKEY(old.levelId))) localStorage.setItem(CKEY(old.levelId), JSON.stringify(old)); localStorage.removeItem('sheepfold-checkpoint'); } catch (e) {}
+// 續玩前要點兵：存檔裡場上的單位一定勾著，其餘照預設補滿，卡列和棋盤才對得上
+function prepickFromCp(cp) {
+  const s = new Set(['shepherd']);
+  for (const u of cp.units) if (level.units.includes(u.type)) s.add(u.type);
+  for (const k of pickedFor(level)) if (s.size < MAX_CARDS) s.add(k);
+  roster.picked = s; renderRoster();
+}
 $('#resume-cp').addEventListener('click', () => {
-  const cp = loadCheckpoint();
-  if (!Engine.checkSnapshot(cp, level.id)) { clearCheckpoint(); openIntro(level); $('#resume-line').hidden = false; $('#resume-text').textContent = CP_BROKEN; return; }
-  applyDiff(cp.diff, false); // 只套用這一局，不改玩家平常的預設難度
-  if (pickedFor(level) && !hasLoadout(level)) { openRoster('pick', 'intro'); pendingCp = cp; return; } // 跟「開始守夜」一樣先點兵
-  $('#intro').hidden = true; startGame(cp);
+  const cp = loadCheckpoint(level.id);
+  if (!Engine.checkSnapshot(cp, level.id)) { openIntro(level); return; } // 壞檔交給開場頁：清掉並說明，文案只有一份
+  if (pickedFor(level) && !hasLoadout(level)) { openRoster('pick', 'intro'); pendingCp = cp; prepickFromCp(cp); return; } // 跟「開始守夜」一樣先點兵
+  $('#intro').hidden = true; startGame(cp); // 難度在 startGame 裡才套用，點兵頁退出不會留下來
 });
 
 // ====== 開發者面板 ======

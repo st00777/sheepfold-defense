@@ -6,7 +6,7 @@ const path = require('path');
 const D = require(path.join(__dirname, '..', 'data.js'));
 const E = require(path.join(__dirname, '..', 'engine.js'));
 
-function run(blockerKey) {
+function run(blockerKey, interrupt) {
   const lv = D.LEVELS.find(l => l.units.includes(blockerKey) && l.waves.some(w => w.list.some(([t]) => t === 'thief')));
   const G = E.create(lv.id, 'calm'); G.food = 999; G.started = true; G.phase = 'wave';
   const r = 2, c = 3;
@@ -14,9 +14,10 @@ function run(blockerKey) {
   assert.ok(E.place(G, r, c, blockerKey).ok);
   E.dev.spawn(G, 'thief', r, c + 1.2);
   const e = G.enemies[0];
-  let maxLift = 0, seenMid = false;
+  let maxLift = 0, seenMid = false, hit = false;
   for (let i = 0; i < 400 && !e.dead; i++) {
     E.step(G, 0.05);
+    if (interrupt && e.vaulting > 0 && !hit) { e.st.stun = 1.5; e.st.panic = 1.0; hit = true; } // 翻到一半被定身＋驚慌
     maxLift = Math.max(maxLift, e.lift || 0);
     if (e.vaulting > 0 && e.x > c - 0.4 && e.x < c + 0.4) seenMid = true; // 翻到牆上方的時候
     G.enemies = G.enemies.filter(x => x === e); // 不讓關卡自己的波次干擾
@@ -31,6 +32,13 @@ test('石牆：賊走弧線翻過去', () => {
   assert.ok(maxLift > 0.9, '中途有離地 lift=' + maxLift);
   assert.ok(seenMid, '翻的過程有經過牆上方');
   assert.strictEqual(e.lift, 0, '落地後 lift 歸零');
+});
+
+test('石牆：翻到一半被定身或驚慌，仍會落地在牆的另一側', () => {
+  const { e } = run('wall', true);
+  assert.strictEqual(e.vaulted, true, '一定落地');
+  assert.ok(e.x < 3 - 0.4, '落在牆的另一側 x=' + e.x);
+  assert.strictEqual(e.lift, 0, '沒有懸在半空');
 });
 
 test('守望樓：賊翻不過，只能咬', () => {

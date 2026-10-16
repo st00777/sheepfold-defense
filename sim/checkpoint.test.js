@@ -67,6 +67,13 @@ test('存檔不會被壞資料弄炸', () => {
     '波數是 0': bad(s => { s.wave = 0; }),
     '難度不存在': bad(s => { s.diff = 'hell'; }),
     '別關的存檔': bad(s => { s.levelId = lv.id + 1; }),
+    '波數超過這關': bad(s => { s.wave = 99; }),
+    '羊數不是整數': bad(s => { s.sheep = 'abc'; }),
+    '丟羊數是物件': bad(s => { s.sheepLost = {}; }),
+    '見過的敵人不是陣列': bad(s => { s.seen = 'wolf'; }),
+    '單位血量不是數字': bad(s => { s.units[0].hp = 'full'; }),
+    '單位次數是負的': bad(s => { s.units[0].uses = -1; }),
+    '修補冷卻不是數字': bad(s => { s.units[0].cd = 'soon'; }),
   };
   for (const [name, s] of Object.entries(cases)) {
     assert.strictEqual(E.checkSnapshot(s, lv.id), false, name + ' 要被 checkSnapshot 擋下');
@@ -79,6 +86,13 @@ test('存檔不會被壞資料弄炸', () => {
   // 存檔長得對、但難度跟這一局不一樣：不能還原（波次表不同，殺敵數會對不上）
   assert.strictEqual(E.checkSnapshot(good, lv.id), true);
   assert.strictEqual(E.restore(E.create(lv.id, 'storm'), good), false);
-  // 波數超過這關總波數也不行
-  assert.strictEqual(E.restore(E.create(lv.id, 'windy'), bad(s => { s.wave = 99; })), false);
+});
+
+// 預設隊伍：關卡用 must 指定「提示會教到的卡」一定帶，且不超過上限
+test('defaultPick 帶上關卡指定的 must 卡', () => {
+  for (const l of LEVELS) {
+    const p = E.defaultPick(l);
+    assert.ok(p.length <= D.MAX_CARDS && p.includes('shepherd'), `第 ${l.id} 關預設隊伍 ${p.length} 張`);
+    for (const k of [...l.fresh, ...(l.must || [])]) assert.ok(p.includes(k), `第 ${l.id} 關預設沒帶 ${k}`);
+  }
 });

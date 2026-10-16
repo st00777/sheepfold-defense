@@ -8,7 +8,7 @@ const { ROWS, COLS, UNITS, ENEMIES, LEVELS, MAX_CARDS } = D;
 
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-const BIG = ['bear', 'lion', 'alpha'];
+const BIG = Object.keys(D.ENEMIES).filter(k => D.ENEMIES[k].boss); // 頭目由 data.js 的 boss 標記決定
 const key = (r, c) => r + ',' + c;
 
 // 在那一排找一格空的，從 want 往外找

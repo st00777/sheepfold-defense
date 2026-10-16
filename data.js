@@ -51,15 +51,16 @@ const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'tower', 'arc
 // ====== 敵人 ======
 // 特殊欄位：flying 飛的／dodge 閃避率／digs 鑽地／vaults 翻牆／steals 偷羊／enrage 狂暴／howl 嚎叫秒數／roar 咆哮秒數
 // 偷雞摸狗的（dodge／vaults／steals／digs 任一）＝狗的獵物，狗對牠們用 hunt 傷害
+// boss 頭目：腳印預告用牠的圖示並放大；同一波第二隻頭目走不同排
 // thick 厚皮：石子和箭只打四成，機弦、投石機、火、毒全額（所以「石子打不痛牠」）；prio 狗優先咬誰（越大越先）
 const ENEMIES = {
   wolf:    { name: '狼',     ico: '🐺', hp: 60,  speed: 0.22, bite: 12 },
   fast:    { name: '快狼',   ico: '🐺', hp: 40,  speed: 0.40, bite: 10, cls: 'fast' },
-  alpha:   { name: '領頭狼', ico: '🐺', hp: 200, speed: 0.20, bite: 15, cls: 'alpha', howl: 8, prio: 4,
+  alpha:   { name: '領頭狼', ico: '🐺', hp: 200, speed: 0.20, bite: 15, cls: 'alpha', howl: 8, prio: 4, boss: true,
              tip: '嚎叫讓附近狼群加速。派牧羊犬咬住牠' },
-  bear:    { name: '母熊',   ico: '🐻', hp: 420, speed: 0.15, bite: 25, cls: 'big', enrage: 0.5, thick: true, prio: 2,
+  bear:    { name: '母熊',   ico: '🐻', hp: 420, speed: 0.15, bite: 25, cls: 'big', enrage: 0.5, thick: true, prio: 2, boss: true,
              tip: '血量高，半血狂暴。石子傷害低，改用機弦手' },
-  lion:    { name: '獅子',   ico: '🦁', hp: 600, speed: 0.15, bite: 30, cls: 'big lion', roar: 12, wallMul: 4, thick: true, prio: 2,
+  lion:    { name: '獅子',   ico: '🦁', hp: 600, speed: 0.15, bite: 30, cls: 'big lion', roar: 12, wallMul: 4, thick: true, prio: 2, boss: true,
              tip: '咆哮讓附近夥伴停手，拆牆很快。狗拖住，機弦手集中攻擊' },
   thief:   { name: '賊',     ico: '🥷', hp: 70,  speed: 0.25, bite: 10, cls: 'human', vaults: true, prio: 3,
              tip: '會翻過石牆，改用守望樓攔截' },
@@ -72,8 +73,11 @@ const ENEMIES = {
   digger:  { name: '野狗',   ico: '🐕‍🦺', hp: 80, speed: 0.22, bite: 12, cls: 'dig', digs: true, digSpeed: 0.35,
              tip: '鑽地繞過前排。土堆是牠冒出來的地方，在土堆左邊放牆或狗' },
   bird:    { name: '鷙鳥',   ico: '🦅', hp: 50,  speed: 0.20, bite: 0,  cls: 'fly', flying: true,
-             tip: '飛越牆與狗，只有投射攻擊打得到' },
+             tip: '飛越牆與狗，射手的投射和瓦瓶火把才打得到' },
 };
+
+// 圖鑑把移動速度翻成快／慢的門檻（每秒走幾格）
+const SPEED_FAST = 0.35, SPEED_SLOW = 0.15;
 
 // ====== 狀態效果（秒數與強度） ======
 const STATUS = {
@@ -100,6 +104,7 @@ const TRICKLE = { every: 5, gives: 5 }; // 沒放牧人也會慢慢有糧
 
 // ====== 關卡 ======
 // units：這一關能用的卡（順序＝卡片順序）；fresh：這一關新開的卡（會閃光）
+// must：預設隊伍一定帶的卡（提示會教到的那幾張，免得玩家沒換隊就被指向沒帶的卡）
 // waves：list [[種類, 隻數]…]；gap 隔幾秒放一隻；rows 走哪幾排；hpMul 血量倍數；ordered 不洗牌（教學用，新敵人排在固定位置）
 // say：這波開始時的一句；hint：上一波清完休息時的「牧人提醒」
 // outroLose：依死因的失敗文案（wolf 狼闖入／bird 鷙鳥飛入／sheep 羊被偷光）
@@ -172,7 +177,7 @@ const LEVELS = [
     id: 5, name: '提哥亞的牧人', title: '誰不懼怕', ref: '取材：阿摩司書 1:1、3:8、5:19',
     speaker: '阿摩司',
     intro: '我是牧人，又是修理桑樹的，不是先知的門徒。獅子吼叫，誰不懼怕？今晚天上也要看著，鷙鳥會飛過牆。火盆給你，石子穿過火就會燒。',
-    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier'], fresh: ['brazier'],
+    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier'], fresh: ['brazier'], must: ['thorns'],
     tips: ['🦂 荊棘學會新招：放下後再點一下花 50 糧撒蠍子，踩入的敵人中毒', '🔥 火盆要放在射手前面，石子穿過才會變火', '🦅 鷙鳥飛過牆和狗，只有投射攻擊打得到'],
     waves: [
       { list: [['wolf', 6]],                                  gap: 4.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
@@ -187,7 +192,7 @@ const LEVELS = [
     id: 6, name: '基甸的三百人', title: '瓶子、火把、角', ref: '取材：士師記 7 章',
     speaker: '基甸',
     intro: '三百人對一大群，多如蝗蟲。瓶子、火把、角，各人站在自己的地方。天亮前就見分曉。',
-    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn'], fresh: ['jar', 'horn'],
+    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn'], fresh: ['jar', 'horn'], must: ['archer'],
     tips: ['⏱ 今晚準備時間較短，先放產糧和防線'],
     prep: 12,
     waves: [
@@ -203,7 +208,7 @@ const LEVELS = [
     id: 7, name: '尋找我的羊', title: '最後一夜', ref: '取材：以西結書 34 章、詩篇 23 篇',
     speaker: null,
     intro: '「牧人在羊群四散的日子怎樣尋找他的羊，我必照樣尋找我的羊。」「失喪的，我必尋找；被逐的，我必領回；受傷的，我必纏裹；有病的，我必醫治。」（結 34:12、16）這是最後一夜。',
-    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult'], fresh: ['healer', 'catapult'],
+    units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult'], fresh: ['healer', 'catapult'], must: ['archer'],
     tips: ['🦁 今晚共五波，最後一波有兩隻獅子'],
     sheep: 3,
     waves: [
@@ -223,5 +228,5 @@ const LEVELS = [
   },
 ];
 
-const DATA = { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
+const DATA = { SPEED_FAST, SPEED_SLOW, ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
 if (typeof module !== 'undefined') module.exports = DATA; else window.DATA = DATA;

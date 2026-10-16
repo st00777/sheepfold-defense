@@ -17,9 +17,10 @@
   function levelById(id) { return LEVELS.find(l => l.id === id) || LEVELS[0]; }
 
   // ====== 點兵 ======
-  // 這一關卡太多時預設帶哪幾張：牧人與新開的卡一定帶，其餘照 PICK_ORDER 補到上限
+  // 這一關卡太多時預設帶哪幾張：牧人、新開的卡、關卡指定的 must 一定帶，其餘照 PICK_ORDER 補到上限
   function defaultPick(level) {
-    const p = ['shepherd', ...level.fresh.filter(k => k !== 'shepherd')];
+    const p = ['shepherd'];
+    for (const k of [...level.fresh, ...(level.must || [])]) if (!p.includes(k) && level.units.includes(k)) p.push(k);
     for (const k of PICK_ORDER) if (p.length < MAX_CARDS && level.units.includes(k) && !p.includes(k)) p.push(k);
     return p;
   }
@@ -113,9 +114,14 @@
   const isInt = (n, lo, hi) => Number.isInteger(n) && n >= lo && n <= hi;
   function checkSnapshot(snap, levelId) {
     if (!snap || typeof snap !== 'object' || snap.levelId !== levelId) return false;
-    if (!DIFFS[snap.diff] || !isInt(snap.wave, 1, 99) || !Number.isFinite(snap.food) || snap.food < 0) return false;
+    const level = LEVELS.find(l => l.id === levelId); if (!level) return false;
+    if (!DIFFS[snap.diff] || !isInt(snap.wave, 1, level.waves.length - 1) || !Number.isFinite(snap.food) || snap.food < 0) return false;
+    if (snap.sheep !== undefined && !isInt(snap.sheep, 0, 99)) return false;
+    if (snap.sheepLost !== undefined && !isInt(snap.sheepLost, 0, 99)) return false;
+    if (snap.seen !== undefined && !Array.isArray(snap.seen)) return false;
     if (!Array.isArray(snap.units) || snap.units.length > ROWS * COLS) return false;
-    return snap.units.every(s => s && UNITS[s.type] && isInt(s.r, 0, ROWS - 1) && isInt(s.c, 0, COLS - 1));
+    return snap.units.every(s => s && UNITS[s.type] && isInt(s.r, 0, ROWS - 1) && isInt(s.c, 0, COLS - 1)
+      && (s.hp === undefined || Number.isFinite(s.hp)) && (s.uses === undefined || isInt(s.uses, 0, 99)) && (s.cd === undefined || (Number.isFinite(s.cd) && s.cd >= 0)));
   }
   function restore(G, snap) {
     if (!checkSnapshot(snap, G.levelId) || snap.diff !== G.diff || snap.wave >= G.waves.length) return false;
@@ -129,7 +135,7 @@
       if (typeof s.cd === 'number' && s.cd > 0) u.repairAt = G.time + s.cd;
       u.hp = Math.min(u.maxHp, Math.max(1, Number.isFinite(s.hp) ? s.hp : u.maxHp));
     }
-    G.food = Math.max(0, snap.food); if (G.level.sheep) G.sheep = Math.max(1, Math.min(G.level.sheep, snap.sheep || G.sheep));
+    G.food = Math.max(0, snap.food); if (G.level.sheep) G.sheep = Math.max(1, Math.min(G.level.sheep, Number.isInteger(snap.sheep) ? snap.sheep : G.sheep));
     G.sheepLost = Number.isInteger(snap.sheepLost) ? snap.sheepLost : 0;
     if (Array.isArray(snap.seen)) for (const t of snap.seen) if (ENEMIES[t]) G.seen.add(t);
     G.wave = snap.wave;
@@ -167,6 +173,15 @@
       return { ok: true, msg: `${def.name}修補了` };
     }
     return { ok: false, msg: def.kind === 'producer' ? '已經是老牧人了' : def.kind === 'blocker' ? '牆還好好的' : u.upgraded ? '已經升級過了' : '這格已經有人了' };
+  }
+
+  // 單位角標：糧夠了才提示「升級」或「修補」。規則放這裡，畫面層只負責畫（跟 tapUnit 同一套條件）
+  function tapHint(G, u) {
+    const def = UNITS[u.type], f = Math.floor(G.food);
+    if (def.kind === 'producer' && !u.elder && f >= ELDER_COST) return '升級';
+    if (def.kind === 'blocker' && u.hp < u.maxHp * 0.7 && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) return '修補';
+    if (def.upgrade && !u.upgraded && G.level.id >= def.upgrade.from && f >= def.upgrade.cost) return '升級';
+    return '';
   }
 
   // 鏟子：拆掉自己放的單位，退一半糧（含升老牧人花的）
@@ -207,7 +222,7 @@
   function startWave(G, i) {
     const w = G.waves[i];
     G.wave = i + 1; G.phase = 'wave'; G.queue = buildQueue(G, i).slice();
-    G.spawnTimer = 0;
+    G.spawnTimer = 0; G.bossRows = {};
     ev(G, { t: 'toast', msg: w.say });
   }
 
@@ -226,6 +241,8 @@
       });
       if (weak.length) rows = weak;
     }
+    // 同一波第二隻頭目走不同排（例：最後一夜的兩隻獅子），兩邊都要顧
+    if (ENEMIES[type].boss && G.bossRows && G.bossRows[type] !== undefined && rows.length > 1) { const other = rows.filter(r => r !== G.bossRows[type]); if (other.length) rows = other; }
     G.nextRow = rows[Math.floor(G.rng() * rows.length)];
     G.nextType = type;
     ev(G, { t: 'marker', r: G.nextRow, type });
@@ -236,6 +253,7 @@
     const r = G.nextRow ?? w.rows[Math.floor(G.rng() * w.rows.length)];
     G.nextRow = null; G.nextType = null;
     ev(G, { t: 'marker', r: null });
+    if (ENEMIES[type].boss) (G.bossRows = G.bossRows || {})[type] = r;
     spawnAt(G, type, r, COLS, w.hpMul || 1);
     G.spawnedTotal++;
   }
@@ -509,9 +527,7 @@
         else { e.x -= speedOf(e) * dt; continue; }
       }
 
-      // 驚慌：往右跑，不咬
-      if (e.st.panic) { e.x = Math.min(COLS + 0.3, e.x + STATUS.panic.speed * dt); e.biting = null; continue; }
-      if (e.st.stun || e.st.distract || e.heldBy) { e.biting = null; if (e.heldBy) biteDog(G, e, dt); continue; }
+      // 翻牆中：已經跳起來就一定落地，定身／驚慌等落地後才算（不然會懸在半空或被推回去再彈回弧線）
       if (e.vaulting > 0) {
         e.vaulting -= dt;
         const p = Math.min(1, 1 - e.vaulting / VAULT_TIME);
@@ -521,6 +537,9 @@
         continue;
       }
 
+      // 驚慌：往右跑，不咬
+      if (e.st.panic) { e.x = Math.min(COLS + 0.3, e.x + STATUS.panic.speed * dt); e.biting = null; continue; }
+      if (e.st.stun || e.st.distract || e.heldBy) { e.biting = null; if (e.heldBy) biteDog(G, e, dt); continue; }
       // 抱著羊往回跑
       if (e.carrying) {
         e.x += def.fleeSpeed * dt;
@@ -575,6 +594,6 @@
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; },
   };
 
-  const Engine = { create, place, tapUnit, sell, snapshot, checkSnapshot, restore, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, dev };
+  const Engine = { create, place, tapUnit, tapHint, sell, snapshot, checkSnapshot, restore, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
