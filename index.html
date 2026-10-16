@@ -423,13 +423,13 @@ function tapCard(key, el) {
   const u = UNITS[key];
   if (G.food < u.cost) {
     el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
-    toast(`糧不夠，${u.name}要 ${u.cost} 糧`); return;
+    toast(`糧不足，${u.name}要 ${u.cost} 糧`); return;
   }
   selected = (selected === key) ? null : key;
   if (el.classList.contains('new')) { el.classList.remove('new'); const t = el.querySelector('.tag.fresh'); if (t) t.remove(); markSeen(key); }
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.key === selected));
   cells.forEach(c => { c.classList.remove('sell'); c.classList.toggle('hint', !!selected && !G.units[c.dataset.r + ',' + c.dataset.c] && !G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
-  toast(selected ? (u.kind === 'instant' ? `點狼群中間，${u.name}就打破在那裡` : `點一格草地放下${u.name}`) : '先點一張卡，再點草地放下去');
+  toast(selected ? (u.kind === 'instant' ? `點敵人密集處，${u.name}就打破在那裡，範圍傷害並嚇退` : `點一格草地放下${u.name}`) : '先點一張卡，再點草地放下去');
 }
 function tapShovel() {
   if (!G || G.over) return;
@@ -730,7 +730,7 @@ function renderRoster() {
       grid.appendChild(d);
     }
     const n = roster.picked.size;
-    $('#roster-count').textContent = roster.mode === 'pick' ? (n < MIN_CARDS ? `已選 ${n} 張，至少要帶 ${MIN_CARDS} 張` : `已選 ${n} / ${MAX_CARDS} 張`) : `已開放 ${roster.units.length} 種`;
+    $('#roster-count').textContent = roster.mode === 'pick' ? (n < MIN_CARDS ? `已選 ${n} 張，至少要帶 ${MIN_CARDS} 張` : `已選 ${n} / ${MAX_CARDS} 張`) : `已開放 ${roster.units.length} 種單位`;
     $('#roster-go').disabled = roster.mode === 'pick' && n < MIN_CARDS;
   } else {
     let seen = 0;
@@ -742,7 +742,7 @@ function renderRoster() {
       if (ok) d.addEventListener('click', () => { roster.focus = k; renderRoster(); });
       grid.appendChild(d);
     }
-    $('#roster-count').textContent = `遇過 ${seen} / ${Object.keys(ENEMIES).length} 種`;
+    $('#roster-count').textContent = `遇過 ${seen} / ${Object.keys(ENEMIES).length} 種敵人`;
   }
   renderRosterDetail();
 }
@@ -758,21 +758,21 @@ function tapRoster(k) {
 // 白話數字：每個單位一句
 function unitNums(k) {
   const u = UNITS[k], s = [];
-  if (u.hp > 1) s.push(`耐咬 ${u.hp}`);
-  if (u.kind === 'producer') s.push(`每 ${u.every} 秒送 ${u.gives} 糧，老牧人每 ${(u.every * ELDER_MUL).toFixed(1)} 秒（升級 ${ELDER_COST} 糧）`);
-  if (u.kind === 'shooter') s.push(`每 ${u.every} 秒打 ${u.dmg}${u.range ? `，只打 ${u.range} 格內` : ''}${u.splash ? '，落點附近一起掉血' : ''}`);
-  if (u.kind === 'blocker') s.push(`修補一次 ${REPAIR_COST} 糧回 ${REPAIR_HP}`);
-  if (u.kind === 'dog') s.push(`咬大傢伙每秒 ${u.dps}、咬偷雞摸狗的每秒 ${u.hunt}；受傷休息 ${u.rest} 秒回滿`);
-  if (u.poison) s.push(`${u.uses} 次，中毒 ${STATUS.poison.t} 秒每秒掉 ${STATUS.poison.dps}、咬合變弱`);
-  if (u.slow) s.push(`踩上速度減半、每秒掉 ${u.dps}`);
-  if (u.kind === 'instant') s.push(`九格內各 ${u.dmg}，嚇退 ${u.panic} 秒`);
-  if (u.push) s.push(`每 ${u.every} 秒一次，愣住 ${u.stun} 秒`);
-  if (u.heal) s.push(`周圍每秒回 ${u.heal}`);
+  if (u.hp > 1) s.push(`血量 ${u.hp}`);
+  if (u.kind === 'producer') s.push(`每 ${u.every} 秒產 ${u.gives} 糧；升級老牧人後 ${(u.every * ELDER_MUL).toFixed(1)} 秒一次（升級 ${ELDER_COST} 糧）`);
+  if (u.kind === 'shooter') s.push(`攻擊間隔 ${u.every} 秒，每次傷害 ${u.dmg}${u.range ? `，射程 ${u.range} 格` : ''}${u.pierce ? '，穿透整排' : ''}${u.splash ? '，濺射波及落點周圍' : ''}`);
+  if (u.kind === 'blocker') s.push(`修補一次 ${REPAIR_COST} 糧，回復 ${REPAIR_HP} 血量`);
+  if (u.kind === 'dog') s.push(`一般目標每秒傷害 ${u.dps}；賊、偷羊人、狐狸、野狗每秒 ${u.hunt}；受傷回窩休息 ${u.rest} 秒回滿`);
+  if (u.poison) s.push(`可觸發 ${u.uses} 次；中毒 ${STATUS.poison.t} 秒，每秒傷害 ${STATUS.poison.dps}，並降低敵人攻擊`);
+  if (u.slow) s.push(`踩上移動速度減半，每秒傷害 ${u.dps}`);
+  if (u.kind === 'instant') s.push(`九格內每個敵人傷害 ${u.dmg}，嚇退 ${u.panic} 秒`);
+  if (u.push) s.push(`冷卻 ${u.every} 秒，暈眩 ${u.stun} 秒`);
+  if (u.heal) s.push(`周圍夥伴每秒回復 ${u.heal} 血量`);
   return s.join('・');
 }
 function enemyNums(k) {
-  const e = ENEMIES[k], sp = e.speed >= 0.35 ? '跑得快' : e.speed <= 0.15 ? '走得慢' : '普通速度';
-  return `血 ${e.hp}・${e.bite ? `咬 ${e.bite}/秒` : '不咬人'}・${sp}${e.thick ? '・厚皮，石子和箭只打四成' : ''}`;
+  const e = ENEMIES[k], sp = e.speed >= 0.35 ? '快' : e.speed <= 0.15 ? '慢' : '普通';
+  return `血量 ${e.hp}・${e.bite ? `每秒傷害 ${e.bite}` : '不攻擊'}・移動速度 ${sp}${e.thick ? '・厚皮：石子與箭矢傷害降至四成' : ''}`;
 }
 function renderRosterDetail() {
   const box = $('#roster-detail'), k = roster.focus;
@@ -784,7 +784,7 @@ function renderRosterDetail() {
     box.innerHTML = `<b>${u.ico} ${u.name}</b>　<span class="num">🌾 ${u.cost}</span><br>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${u.ref}</div>`;
   } else {
     const e = ENEMIES[k];
-    box.innerHTML = `<b>${e.ico} ${e.name}</b><br>${e.tip || '最普通的一隻，走到最左邊就守夜失敗'}<br><span class="num">${enemyNums(k)}</span>`;
+    box.innerHTML = `<b>${e.ico} ${e.name}</b><br>${e.tip || '最普通的一隻，走到最左邊就闖進羊圈'}<br><span class="num">${enemyNums(k)}</span>`;
   }
 }
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { roster.tab = b.dataset.tab; roster.focus = null; renderRoster(); }));
