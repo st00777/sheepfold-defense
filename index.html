@@ -38,6 +38,9 @@
   #food { color: var(--gold); }
   #sheep[hidden] { display: none; }
   #wave-info { color: var(--muted); }
+  #pause-btn { font: inherit; font-size: 16px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 2px 9px; margin-left: 8px; cursor: pointer; }
+  #resume-line { margin-top: 10px; }
+  #resume-line[hidden] { display: none; }
 
   /* 卡片列：可以左右滑 */
   #cards { display: flex; gap: 8px; padding: 8px 12px; background: var(--panel); border-top: 1px solid #000; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
@@ -224,7 +227,7 @@
 <div id="top">
   <span>🌾 糧 <b id="food">0</b></span>
   <span id="sheep" hidden>🐑 <b id="sheep-n">3</b></span>
-  <span id="wave-info">準備中</span>
+  <span><span id="wave-info">準備中</span><button id="pause-btn" title="暫停">⏸</button></span>
 </div>
 
 <div id="cards-wrap"><div id="cards"></div></div>
@@ -273,6 +276,8 @@
     </div>
     <div id="diff-hint"></div>
     <div class="tips" id="intro-loadout"></div>
+    <div class="tips" id="resume-line" hidden><span class="new" id="resume-text"></span></div>
+    <button class="btn" id="resume-cp" hidden>繼續上次</button>
     <button class="btn" id="start">開始守夜</button>
     <button class="btn alt" id="intro-roster">隊伍</button>
     <button class="btn alt" id="intro-back">回關卡</button>
@@ -291,6 +296,16 @@
     <div id="roster-detail">點一個看說明</div>
     <button class="btn" id="roster-go">開始守夜</button>
     <button class="btn alt" id="roster-back">回上一頁</button>
+  </div>
+</div>
+
+<!-- 暫停 -->
+<div class="overlay" id="pause" hidden>
+  <div class="dialog">
+    <h1>暫停中</h1>
+    <p>狼也在等。回來再按繼續。</p>
+    <button class="btn" id="resume-btn">繼續</button>
+    <button class="btn alt" id="pause-back">回關卡</button>
   </div>
 </div>
 
@@ -398,6 +413,10 @@ function openIntro(L) {
   const lo = pickedFor(L);
   $('#intro-loadout').innerHTML = lo ? `今晚上場：${lo.map(k => UNITS[k].ico).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「隊伍」可換</span>` : '';
   $('#intro-roster').textContent = lo ? '隊伍' : '圖鑑';
+  const cp = loadCheckpoint(), hasCp = !!(cp && cp.levelId === L.id && cp.wave > 0);
+  $('#resume-line').hidden = !hasCp; $('#resume-cp').hidden = !hasCp;
+  if (hasCp) $('#resume-text').textContent = `上次${DIFFS[cp.diff] ? DIFFS[cp.diff].name : ''}守到第 ${cp.wave} 波，場上的人都還在。`;
+  $('#start').textContent = hasCp ? '重新開始' : '開始守夜';
   $('#levels').hidden = true; $('#intro').hidden = false;
 }
 function applyDiff(key) {
@@ -538,6 +557,7 @@ function flushEvents() {
       case 'fx': fx(e.kind, e.r, e.x, e.id); break;
       case 'marker': setMarker(e.r, e.type); break;
       case 'sheep': $('#sheep-n').textContent = G.sheep; break;
+      case 'waveclear': if (e.wave < G.waves.length) saveCheckpoint(Engine.snapshot(G)); break;
       case 'win': onWin(); break;
       case 'lose': onLose(e.reason); break;
     }
@@ -646,7 +666,7 @@ function recordBest(cleared) {
   saveProgress();
 }
 function onWin() {
-  recordBest(true);
+  recordBest(true); clearCheckpoint();
   const next = LEVELS.find(l => l.id === level.id + 1);
   endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${level.outroWin}`);
   $('#next').hidden = !next;
@@ -656,7 +676,7 @@ function onWin() {
   }
 }
 function onLose(reason) {
-  recordBest(false);
+  recordBest(false); clearCheckpoint();
   const titles = { wolf: '狼闖進羊圈了', bird: '鷙鳥飛進羊圈了', sheep: '羊被偷光了' };
   const text = (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
   endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`);
@@ -673,23 +693,27 @@ function clearBoard() {
   tut.on = false; $('#tut-skip').classList.remove('on');
   $('#result').hidden = true;
 }
-function startGame() {
+function startGame(fromCp) {
   clearBoard();
   G = Engine.create(level.id, diff);
   const lo = pickedFor(level);
   if (lo) Engine.applyPick(G, lo); // 只帶點兵選的卡
+  const resumed = fromCp ? Engine.restore(G, fromCp) : false;
+  if (!resumed) clearCheckpoint(); // 重新開始就丟掉舊檢查點
   buildCards();
   cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint', 'sell', 'teach'); c.classList.toggle('rock', G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
   $('#sheep').hidden = !level.sheep; $('#sheep-n').textContent = G.sheep;
-  toast('先點一張卡，再點草地放下去');
+  for (const k in G.units) renderUnit(G.units[k].r, G.units[k].c); G.events.length = 0;
+  toast(resumed ? `從第 ${G.wave + 1} 波繼續，場上的人都還在` : '先點一張卡，再點草地放下去');
   draw();
-  if (level.id === 1 && (!tutDone() || /[?&]tut/.test(location.search))) tutStart();
+  if (!resumed && level.id === 1 && (!tutDone() || /[?&]tut/.test(location.search))) tutStart();
   last = performance.now();
   raf = requestAnimationFrame(tick);
 }
 function backToLevels() {
   clearBoard();
-  if (G) G.over = true;
+  if (G) G.over = true; // 中途回關卡不清檢查點，之後可以「繼續上次」
+  paused = false; $('#pause').hidden = true;
   buildLevels();
   $('#intro').hidden = true; $('#result').hidden = true; $('#levels').hidden = false;
 }
@@ -842,6 +866,33 @@ function tutEnd(msg) {
   if (msg) toast(msg, true);
 }
 $('#tut-skip').addEventListener('click', () => tutEnd('好，自己來。狼要來了'));
+
+// ====== 暫停與檢查點 ======
+// 暫停：上方 ⏸ 或切到背景；畫面蓋一層，按繼續才走
+function pauseGame() {
+  if (!G || G.over || paused) return;
+  if (!$('#result').hidden || !$('#roster').hidden || !$('#intro').hidden || !$('#levels').hidden) return;
+  paused = true; $('#pause').hidden = false;
+}
+function resumeGame() {
+  paused = false; $('#pause').hidden = true; $('#dev-pause').classList.remove('on'); $('#dev-pause').textContent = '暫停';
+  last = performance.now();
+}
+$('#pause-btn').addEventListener('click', pauseGame);
+$('#resume-btn').addEventListener('click', resumeGame);
+$('#pause-back').addEventListener('click', () => { resumeGame(); backToLevels(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+
+// 檢查點：每清完一波存一次（單一欄位，只留最後一次）；守完、輸了、回關卡、重新開始都清掉
+const CKEY = 'sheepfold-checkpoint';
+function loadCheckpoint() { try { const c = JSON.parse(localStorage.getItem(CKEY) || 'null'); return c && typeof c === 'object' ? c : null; } catch (e) { return null; } }
+function saveCheckpoint(snap) { try { localStorage.setItem(CKEY, JSON.stringify(snap)); } catch (e) {} }
+function clearCheckpoint() { try { localStorage.removeItem(CKEY); } catch (e) {} }
+$('#resume-cp').addEventListener('click', () => {
+  const cp = loadCheckpoint(); if (!cp || cp.levelId !== level.id) return;
+  if (DIFFS[cp.diff]) applyDiff(cp.diff);
+  $('#intro').hidden = true; startGame(cp);
+});
 
 // ====== 開發者面板 ======
 function setDev(on) {

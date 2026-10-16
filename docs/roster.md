@@ -31,6 +31,11 @@
 - 雇工圖示 🧍→🤾，說明改「便宜的投石工」。
 - 未做（待 James 決定）：第 1 關手把手教學、狗加強、蠍窩荊棘拉開、狐狸提示改字、「狼只走直線」說明、小居文案。
 
+## 暫停與檢查點（2026-10-16 James 拍板）
+
+- 暫停：#pause-btn 或 visibilitychange→hidden 都蓋 #pause 層；`paused` 與開發者列共用。原本切背景 rAF 停＋dt 上限 0.05 就等於暫停，差在回來會先看到暫停畫面。
+- 檢查點：引擎每清完一波發 `waveclear`，畫面層存 `Engine.snapshot(G)`（levelId／diff／wave／food／sheep／units 的 type,r,c,hp,elder,upgraded,uses）到 localStorage `sheepfold-checkpoint`。開場頁有同關檢查點就顯示「繼續上次」，`Engine.restore` 用 makeUnit 重放單位、phase=rest、timer=WAVE_REST+4、killed 依已清波數算；不存敵人與投射物。贏／輸／重新開始會清；中途回關卡保留（玩家多半是想晚點回來）。
+
 ## 第 1 關手把手教學（2026-10-16 James 拍板）
 
 - 只在第 1 關、只教一次（localStorage `sheepfold-tutorial-done`；`?tut` 重看）。三步：牧人放 (2,0) → 糧到 100 放投石手 (2,1) → 糧到 50 放石牆 (2,4)。教學中引擎 `G.holdWaves` 停住倒數但糧照來，沒輪到的卡壓暗、目標格亮金框，可按「我會了，跳過教學」。做完才說「狼要來了」。

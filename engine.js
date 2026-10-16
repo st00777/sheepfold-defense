@@ -83,16 +83,45 @@
     if (G.food < def.cost) return { ok: false, msg: `糧不夠，${def.name}要 ${def.cost} 糧` };
     G.food -= def.cost;
     if (def.kind === 'instant') { useInstant(G, r, c, k); return { ok: true, msg: `${def.name}打破了` }; }
+    makeUnit(G, r, c, k);
+    // 第一次放牧人／石牆，順便教「再點一下」
+    if (def.kind === 'producer' && !G.taughtElder) { G.taughtElder = true; return { ok: true, msg: `牧人就位。糧夠 ${ELDER_COST} 時再點牧人一下，升老牧人送糧更快` }; }
+    if (def.kind === 'blocker' && !G.taughtRepair) { G.taughtRepair = true; return { ok: true, msg: `${def.name}就位。被咬壞時點它一下，花 ${REPAIR_COST} 糧修補` }; }
+    return { ok: true, msg: `${def.name}就位` };
+  }
+
+  // 真的把單位放上場（place 與檢查點還原共用）
+  function makeUnit(G, r, c, k) {
+    const def = UNITS[k];
     const u = { id: G.nextId++, type: k, r, c, hp: def.hp, maxHp: def.hp, timer: def.every ? def.every * 0.6 : 0, fear: 0, elder: false };
     if (def.kind === 'dog') { u.x = c; u.holding = null; }
     if (def.kind === 'floor') { u.uses = def.uses || 0; u.stung = new Set(); }
     if (k === 'horn') u.timer = 6; // 剛放下不會馬上吹
     G.units[key(r, c)] = u;
     ev(G, { t: 'unit', r, c });
-    // 第一次放牧人／石牆，順便教「再點一下」
-    if (def.kind === 'producer' && !G.taughtElder) { G.taughtElder = true; return { ok: true, msg: `牧人就位。糧夠 ${ELDER_COST} 時再點牧人一下，升老牧人送糧更快` }; }
-    if (def.kind === 'blocker' && !G.taughtRepair) { G.taughtRepair = true; return { ok: true, msg: `${def.name}就位。被咬壞時點它一下，花 ${REPAIR_COST} 糧修補` }; }
-    return { ok: true, msg: `${def.name}就位` };
+    return u;
+  }
+
+  // ====== 檢查點：每清完一波存一次，只存場上單位與糧，不存敵人，所以永遠從下一波的開頭接 ======
+  function snapshot(G) {
+    return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep,
+      units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded, uses: u.uses })) };
+  }
+  function restore(G, snap) {
+    if (!snap || snap.levelId !== G.levelId || !Array.isArray(snap.units)) return false;
+    for (const s of snap.units) {
+      if (!UNITS[s.type] || G.units[key(s.r, s.c)] || G.rocks.has(key(s.r, s.c))) continue;
+      const u = makeUnit(G, s.r, s.c, s.type);
+      if (s.elder) u.elder = true;
+      if (s.upgraded && UNITS[s.type].upgrade) u.upgraded = true;
+      if (typeof s.uses === 'number') u.uses = s.uses;
+      u.hp = Math.min(u.maxHp, Math.max(1, s.hp || u.maxHp));
+    }
+    G.food = Math.max(0, snap.food || 0); if (G.level.sheep) G.sheep = Math.max(1, snap.sheep || G.sheep);
+    G.wave = Math.max(0, Math.min(snap.wave || 0, G.waves.length - 1));
+    G.phase = 'rest'; G.timer = WAVE_REST + 4; G.started = true; G.taughtElder = G.taughtRepair = true;
+    G.killed = G.waves.slice(0, G.wave).reduce((n, w) => n + w.list.reduce((m, [, k]) => m + k, 0), 0);
+    return true;
   }
 
   // 沒選卡時點已有的單位：牧人升級、牆修補
@@ -265,6 +294,7 @@
         if (G.spawnTimer <= 0) { spawn(G, G.queue.shift()); G.spawnTimer = G.waves[G.wave - 1].gap; }
       } else if (!G.enemies.length) {
         G.phase = 'rest'; G.timer = WAVE_REST;
+        ev(G, { t: 'waveclear', wave: G.wave }); // 畫面層拿去存檢查點
         const next = G.waves[G.wave];
         ev(G, { t: 'toast', msg: G.wave >= G.waves.length ? '最後一隻跑了……' : (next.hint ? `${G.level.speaker || '牧人'}：${next.hint}` : `第 ${G.wave} 波擋住了，喘口氣`) });
       }
@@ -524,6 +554,6 @@
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; },
   };
 
-  const Engine = { create, place, tapUnit, sell, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, dev };
+  const Engine = { create, place, tapUnit, sell, snapshot, restore, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
