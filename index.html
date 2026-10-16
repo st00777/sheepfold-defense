@@ -383,6 +383,8 @@ let P = loadProgress();
 function saveProgress(p) { try { localStorage.setItem(PKEY, JSON.stringify(p || P)); } catch (e) {} }
 const unlockAll = /[?&]all/.test(location.search);
 function unlocked(id) { return id === 1 || unlockAll || !!P.cleared[id - 1]; }
+// 所有已開放關卡的卡總和（圖鑑用；也用來判斷玩家手上有沒有這一夜帶不了的卡）
+function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k); return all; }
 
 // ====== 畫面建立 ======
 function buildBoard() {
@@ -441,7 +443,10 @@ function openIntro(L) {
   applyDiff(diff);
   showBest();
   const lo = pickedFor(L);
-  $('#intro-loadout').innerHTML = lo ? `今晚上場：${lo.map(k => UNITS[k].ico).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「隊伍」可換</span>` : '';
+  const extra = unlockedUnits().length - L.units.length; // 玩家手上比這一夜多出幾張卡
+  $('#intro-loadout').innerHTML = lo
+    ? `今晚上場：${lo.map(k => UNITS[k].ico).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「隊伍」可換</span>`
+    : `今晚上場：${L.units.map(k => UNITS[k].ico).join(' ')}${extra > 0 ? `　<span class="new">這一夜只有這 ${L.units.length} 位，後來認識的夥伴要到後面的夜才會同行，不能帶回來</span>` : ''}`;
   $('#intro-roster').textContent = lo ? '隊伍' : '圖鑑';
   const cp = loadCheckpoint(), mine = !!(cp && cp.levelId === L.id), hasCp = mine && Engine.checkSnapshot(cp, L.id);
   if (mine && !hasCp) clearCheckpoint(); // 壞掉或舊版的存檔：清掉，並告訴玩家
@@ -783,11 +788,12 @@ function openRoster(mode, from) {
     $('#roster-title').textContent = '今晚的隊伍';
     $('#roster-sub').textContent = `營火邊點名，今晚一起守夜的夥伴。${level.units.length} 張卡只能帶 ${MAX_CARDS} 張`;
   } else {
-    const all = [];
-    for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k);
-    roster.units = sortUnits(all); roster.picked = new Set();
+    roster.units = sortUnits(unlockedUnits()); roster.picked = new Set();
     $('#roster-title').textContent = '圖鑑';
-    $('#roster-sub').textContent = '守過的夜裡遇見的人、狗和野獸';
+    const extra = roster.units.length - level.units.length;
+    $('#roster-sub').textContent = roster.from === 'intro' && extra > 0
+      ? `這一夜只有亮著的 ${level.units.length} 位同行；暗掉的是後面的夜才會遇見的夥伴，帶不回來`
+      : '守過的夜裡遇見的人、狗和野獸';
   }
   $('#roster-go').hidden = mode !== 'pick';
   $('#roster-back').textContent = roster.from === 'intro' ? '回開場' : '回關卡';
@@ -801,7 +807,8 @@ function renderRoster() {
     for (const k of roster.units) {
       const u = UNITS[k], d = document.createElement('div');
       const fresh = roster.mode === 'pick' && level.fresh.includes(k);
-      d.className = 'rc' + (roster.mode === 'pick' ? (roster.picked.has(k) ? ' on' : ' off') : '') + (u.kind === 'instant' ? ' once' : '') + (roster.focus === k ? ' focus' : '');
+      const away = roster.mode !== 'pick' && roster.from === 'intro' && !level.units.includes(k); // 這一夜不同行的夥伴
+      d.className = 'rc' + (roster.mode === 'pick' ? (roster.picked.has(k) ? ' on' : ' off') : away ? ' off' : '') + (u.kind === 'instant' ? ' once' : '') + (roster.focus === k ? ' focus' : '');
       d.style.setProperty('--u', `var(--u-${k})`);
       d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag fresh">新</div>' : ''}${u.kind === 'instant' ? '<div class="tag once">一次</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
       d.addEventListener('click', () => tapRoster(k));
@@ -859,7 +866,8 @@ function renderRosterDetail() {
   if (roster.tab === 'units') {
     const u = UNITS[k];
     const fresh = roster.mode === 'pick' && level.fresh.includes(k);
-    const note = roster.mode !== 'pick' ? '' : k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : fresh ? '<br><span class="new">這一夜新開的卡，建議帶上</span>' : '';
+    const away = roster.mode !== 'pick' && roster.from === 'intro' && !level.units.includes(k);
+    const note = away ? '<br><span class="new">這一夜還沒遇見，要到後面的夜才會同行</span>' : roster.mode !== 'pick' ? '' : k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : fresh ? '<br><span class="new">這一夜新開的卡，建議帶上</span>' : '';
     box.innerHTML = `<b>${u.ico} ${u.name}</b>　<span class="num">🌾 ${u.cost}</span><br>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${u.ref}${u.upgrade ? '・升級 ' + u.upgrade.ref : ''}</div>`;
   } else {
     const e = ENEMIES[k];
