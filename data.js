@@ -15,8 +15,8 @@ const UNITS = {
               desc: '擋在前面，很耐咬。再點一下花 25 糧修補', ref: '民 32:16' },
   sling:    { name: '機弦手',   ico: '🎯',   cost: 150, hp: 60,  kind: 'shooter', every: 3.2, dmg: 90, shot: 'sling',
               desc: '一發重擊、裝填慢，專打獅子和熊', ref: '撒上 17:40' },
-  dog:      { name: '牧羊犬',   ico: '🐕',   cost: 75,  hp: 150, kind: 'dog', dps: 10, run: 1.6,
-              desc: '跑過去咬住狼不讓走，狼會先咬牠', ref: '伯 30:1' },
+  dog:      { name: '牧羊犬',   ico: '🐕',   cost: 75,  hp: 220, kind: 'dog', dps: 10, hunt: 30, run: 1.6, rest: 10,
+              desc: '抓賊的。翻牆的、鑽地的、抱羊跑的、狐狸，牠追上就狠咬；大傢伙也能拖幾秒。受傷就回窩趴著，不會死', ref: '伯 30:1' },
   hireling: { name: '雇工',     ico: '🤾',   cost: 25,  hp: 40,  kind: 'shooter', every: 0.9, dmg: 10, shot: 'stone', range: 2.5, flees: 1.0,
               desc: '便宜的投石工，會丟石頭，但狼一靠近就逃走', ref: '約 10:12' },
   tower:    { name: '守望樓',   ico: '🗼',   cost: 125, hp: 600, kind: 'blocker', tall: true,
@@ -49,6 +49,7 @@ const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'tower', 'arc
 
 // ====== 敵人 ======
 // 特殊欄位：flying 飛的／dodge 閃避率／digs 鑽地／vaults 翻牆／steals 偷羊／enrage 狂暴／howl 嚎叫秒數／roar 咆哮秒數
+// 偷雞摸狗的（dodge／vaults／steals／digs 任一）＝狗的獵物，狗對牠們用 hunt 傷害
 // thick 厚皮：石子和箭只打四成，機弦、投石機、火、毒全額（所以「石子打不痛牠」）；prio 狗優先咬誰（越大越先）
 const ENEMIES = {
   wolf:    { name: '狼',     ico: '🐺', hp: 60,  speed: 0.22, bite: 12 },

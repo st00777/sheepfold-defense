@@ -225,6 +225,8 @@
     return b;
   }
   const targetable = e => !e.underground && !e.dead;
+  // 偷雞摸狗的：狗專咬（翻牆、偷羊、閃避、鑽地）
+  const sneaky = e => { const d = ENEMIES[e.type]; return !!(d.vaults || d.steals || d.dodge || d.digs); };
 
   // ====== 每一步 ======
   function step(G, dt) {
@@ -274,7 +276,12 @@
       return true;
     });
     G.shots = G.shots.filter(s => !s.dead);
-    for (const k in G.units) { const u = G.units[k]; if (u.hp <= 0) removeUnit(G, u); }
+    for (const k in G.units) {
+      const u = G.units[k]; if (u.hp > 0) continue;
+      // 狗不會死：放開咬住的、跑回窩趴著休息，回滿血再出動
+      if (UNITS[u.type].kind === 'dog') { if (u.holding) { const e = G.enemies.find(x => x.id === u.holding); if (e) e.heldBy = null; u.holding = null; } u.hp = 1; u.resting = true; u.restT = UNITS[u.type].rest; ev(G, { t: 'toast', msg: '牧羊犬受傷了，回窩趴著休息' }); ev(G, { t: 'fx', kind: 'rest', r: u.r, x: u.x }); continue; }
+      removeUnit(G, u);
+    }
   }
 
   function removeUnit(G, u) {
@@ -350,10 +357,17 @@
   }
 
   function dogAct(G, u, def, dt) {
+    // 休息中：跑回窩，血慢慢回滿才再出動
+    if (u.resting) {
+      const d = u.c - u.x; if (Math.abs(d) > 0.01) u.x += Math.sign(d) * Math.min(Math.abs(d), def.run * dt);
+      u.restT -= dt; u.hp = Math.min(u.maxHp, u.hp + u.maxHp / def.rest * dt);
+      if (u.restT <= 0) { u.resting = false; u.hp = u.maxHp; ev(G, { t: 'pop', r: u.r, c: u.c, text: '汪！' }); }
+      return;
+    }
     const held = u.holding ? G.enemies.find(e => e.id === u.holding) : null;
     if (held && targetable(held) && !held.st.panic) {
       u.x = held.x - 0.55;
-      hurt(G, held, def.dps * dt);
+      hurt(G, held, (sneaky(held) ? def.hunt : def.dps) * dt);
       return;
     }
     if (held) { held.heldBy = null; }

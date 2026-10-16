@@ -123,6 +123,8 @@
   .ripple::after { animation-delay: .25s; }
   @keyframes ripple { to { transform: scale(2.6); opacity: 0; } }
   .dog-run .body { width: 70%; height: 70%; border-radius: 50%; background: #c9a24a; display: flex; align-items: center; justify-content: center; position: relative; }
+  .dog-run.rest { opacity: .55; }
+  .dog-run.rest .body::after { content: '💤'; position: absolute; top: -8px; right: -6px; font-size: .5em; }
   .mark { right: 2px; font-size: clamp(14px, 4.5vw, 26px); opacity: .85; animation: blink .8s infinite alternate; }
   .mark.special span { display: flex; align-items: center; justify-content: center; width: 72%; height: 72%; border-radius: 50%; box-shadow: 0 0 0 2px #8a2f2c, 0 0 10px 2px #8a2f2c88; }
   .mark.boss span { box-shadow: 0 0 0 3px var(--gold), 0 0 12px 3px #e6b84a88; }
@@ -470,7 +472,7 @@ function renderUnit(r, c) {
 }
 
 // ====== 畫面上的一次性效果 ======
-const FX = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', vault: '↷', grab: '🐑', splash: '💥', enrage: '😡' };
+const FX = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', vault: '↷', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤' };
 function fx(kind, r, x, id) {
   if (kind === 'mound') { const d = spawnFx('🕳️', r, x, true); moundEls.set(id, d); return; }
   if (kind === 'emerge') { const d = moundEls.get(id); if (d) { d.remove(); moundEls.delete(id); } }
@@ -591,6 +593,7 @@ function draw() {
     let el = els.get(u.id);
     if (!el) { el = document.createElement('div'); el.className = 'dog-run'; el.innerHTML = `<div class="body">🐕</div><div class="hp"><i style="width:100%"></i></div>`; board.appendChild(el); els.set(u.id, el); }
     el.style.left = (u.x / COLS * 100) + '%'; el.style.top = (u.r / ROWS * 100) + '%';
+    el.classList.toggle('rest', !!u.resting);
     el.querySelector('.hp > i').style.width = (Math.max(0, u.hp) / u.maxHp * 100) + '%';
   }
   for (const [id, el] of els) if (!alive.has(id)) { el.remove(); els.delete(id); }
@@ -759,7 +762,7 @@ function unitNums(k) {
   if (u.kind === 'producer') s.push(`每 ${u.every} 秒送 ${u.gives} 糧，老牧人每 ${(u.every * ELDER_MUL).toFixed(1)} 秒（升級 ${ELDER_COST} 糧）`);
   if (u.kind === 'shooter') s.push(`每 ${u.every} 秒打 ${u.dmg}${u.range ? `，只打 ${u.range} 格內` : ''}${u.splash ? '，落點附近一起掉血' : ''}`);
   if (u.kind === 'blocker') s.push(`修補一次 ${REPAIR_COST} 糧回 ${REPAIR_HP}`);
-  if (u.kind === 'dog') s.push(`咬住後每秒 ${u.dps}`);
+  if (u.kind === 'dog') s.push(`咬大傢伙每秒 ${u.dps}、咬偷雞摸狗的每秒 ${u.hunt}；受傷休息 ${u.rest} 秒回滿`);
   if (u.poison) s.push(`${u.uses} 次，中毒 ${STATUS.poison.t} 秒每秒掉 ${STATUS.poison.dps}、咬合變弱`);
   if (u.slow) s.push(`踩上速度減半、每秒掉 ${u.dps}`);
   if (u.kind === 'instant') s.push(`九格內各 ${u.dmg}，嚇退 ${u.panic} 秒`);

@@ -53,7 +53,7 @@ function decide(G, skill) {
     const types = new Set(es.map(e => e.type)); if (G.nextRow === r && G.nextType) types.add(G.nextType);
     const hasShooter = has(G, r, u => kindOf(u) === 'shooter' && !UNITS[u.type].flees);
     const hasSling = has(G, r, u => u.type === 'sling');
-    const hasDog = has(G, r, u => u.type === 'dog');
+    const hasDog = has(G, r, u => u.type === 'dog' && !u.resting); // 休息中的狗不算，玩家會再放一隻
     const hasBlock = has(G, r, (u, c) => kindOf(u) === 'blocker' && c >= 3);
     const big = [...types].some(t => BIG.includes(t));
     const needArcher = types.has('locust');
