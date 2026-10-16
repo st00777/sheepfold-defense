@@ -9,6 +9,7 @@
   const SHOT_SPEED = { stone: 6, arrow: 9, sling: 7 };
   const THICK_MUL = 0.35; // 厚皮敵人吃石子、箭的比例
   const LOB_TIME = 0.8;
+  const VAULT_TIME = 1.2; // 賊翻牆要幾秒：這段時間牠連續越過牆，畫面層用 lift 畫弧線
 
   // 牧人送糧間隔：暴風夜拉長，但後面的關卡一樣打折
   function shepherdEvery(G) { const sc = G.level.diffScale ?? 0.6; return UNITS.shepherd.every + (DIFFS[G.diff].shepherdEvery - UNITS.shepherd.every) * sc; }
@@ -243,7 +244,7 @@
     const def = ENEMIES[type];
     const hp = Math.round(def.hp * (hpMul || 1));
     const e = { id: G.nextId++, type, r, x, hp, maxHp: hp, st: {}, heldBy: null, biting: null,
-      underground: !!def.digs, vaulted: false, vaulting: 0, carrying: false, enraged: false, abilityT: def.howl ? 3 : def.roar ? 4 : 0, dead: false };
+      underground: !!def.digs, vaulted: false, vaulting: 0, vaultFrom: 0, vaultTo: 0, lift: 0, carrying: false, enraged: false, abilityT: def.howl ? 3 : def.roar ? 4 : 0, dead: false };
     G.enemies.push(e);
     ev(G, { t: 'spawn', e });
     // 野狗：一出生就把土堆印在牠要冒出來的格子，玩家才有時間在旁邊放東西
@@ -511,7 +512,14 @@
       // 驚慌：往右跑，不咬
       if (e.st.panic) { e.x = Math.min(COLS + 0.3, e.x + STATUS.panic.speed * dt); e.biting = null; continue; }
       if (e.st.stun || e.st.distract || e.heldBy) { e.biting = null; if (e.heldBy) biteDog(G, e, dt); continue; }
-      if (e.vaulting > 0) { e.vaulting -= dt; if (e.vaulting <= 0) { e.x = e.vaultTo; e.vaulted = true; ev(G, { t: 'toast', msg: '賊翻過牆了！' }); } continue; }
+      if (e.vaulting > 0) {
+        e.vaulting -= dt;
+        const p = Math.min(1, 1 - e.vaulting / VAULT_TIME);
+        e.x = e.vaultFrom + (e.vaultTo - e.vaultFrom) * p; // 連續越過牆，不是瞬移
+        e.lift = Math.sin(p * Math.PI);                     // 離地高度 0→1→0，畫面層畫弧線
+        if (e.vaulting <= 0) { e.x = e.vaultTo; e.lift = 0; e.vaulted = true; ev(G, { t: 'toast', msg: '賊翻過牆了！' }); }
+        continue;
+      }
 
       // 抱著羊往回跑
       if (e.carrying) {
@@ -527,7 +535,7 @@
         const b = G.units[key(e.r, frontCol)];
         if (b && e.x <= frontCol + 0.6 && ['blocker', 'producer', 'shooter', 'support'].includes(UNITS[b.type].kind)) {
           if (def.vaults && !e.vaulted && UNITS[b.type].kind === 'blocker' && !UNITS[b.type].tall) {
-            e.vaulting = 1.2; e.vaultTo = frontCol - 0.45; ev(G, { t: 'fx', kind: 'vault', r: e.r, x: e.x }); continue;
+            e.vaulting = VAULT_TIME; e.vaultFrom = e.x; e.vaultTo = frontCol - 0.45; continue; // 動作本身就是說明，不飄符號
           }
           blocked = true;
           const mul = (def.wallMul && UNITS[b.type].kind === 'blocker') ? def.wallMul : 1;

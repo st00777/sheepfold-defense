@@ -534,7 +534,7 @@ function renderUnit(r, c) {
 }
 
 // ====== 畫面上的一次性效果 ======
-const FX = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', vault: '↷', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤' };
+const FX = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤' };
 function fx(kind, r, x, id) {
   if (kind === 'mound') { const d = spawnFx('🕳️', r, x, true); moundEls.set(id, d); return; }
   if (kind === 'emerge') { const d = moundEls.get(id); if (d) { d.remove(); moundEls.delete(id); } }
@@ -636,7 +636,7 @@ function draw() {
       board.appendChild(el); els.set(e.id, el);
     }
     el.classList.toggle('s-burn', !!e.st.burn); el.classList.toggle('s-poison', !!e.st.poison); el.classList.toggle('s-stun', !!(e.st.stun || e.st.distract));
-    el.style.transform = `translate(${(e.x * 100).toFixed(2)}%, ${e.r * 100}%)`;
+    el.style.transform = `translate(${(e.x * 100).toFixed(2)}%, ${((e.r - (e.lift || 0) * 0.6) * 100).toFixed(1)}%)`; // lift：賊翻牆的弧線
     el.classList.toggle('underground', !!e.underground);
     el.classList.toggle('carry', !!e.carrying);
     el.querySelector('.hp > i').style.transform = `scaleX(${(Math.max(0, e.hp) / e.maxHp).toFixed(3)})`;
