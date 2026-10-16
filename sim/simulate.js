@@ -33,6 +33,9 @@ function decide(G, skill) {
   // 開局三牧人（James 的打法）
   if (count('shepherd') < (G.diff === 'storm' ? 4 : 3) && can('shepherd')) { for (const r of [2, 1, 3, 0]) if (!has(G, r, u => u.type === 'shepherd') && tryPlace(G, r, freeCell(G, r, 0), 'shepherd')) return; }
 
+  // 纏裹的牧人：糧夠就膏油（範圍 5×5）
+  for (const k in G.units) { const u = G.units[k]; if (u.type === 'healer' && !u.upgraded && UNITS.healer.upgrade && G.level.id >= UNITS.healer.upgrade.from && G.food >= UNITS.healer.upgrade.cost && E.tapUnit(G, u.r, u.c).ok) return; }
+
   // 修牆（那排已經有射手才修，不然先補射手）
   for (const k in G.units) { const u = G.units[k]; if (kindOf(u) === 'blocker' && u.hp < u.maxHp * 0.4 && G.food >= D.REPAIR_COST && has(G, u.r, v => kindOf(v) === 'shooter') && E.tapUnit(G, u.r, u.c).ok) return; }
 

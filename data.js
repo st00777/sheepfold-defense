@@ -7,6 +7,7 @@ const ROWS = 5, COLS = 7;
 // ====== 我方單位 ======
 // kind：producer 產糧／shooter 射手／blocker 牆／dog 牧羊犬／floor 鋪地／instant 一次性／support 輔助
 // upgrade：放下後「再點一下」花糧升級，欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）
+// heal 每秒回血／range 回血範圍幾格（1＝周圍八格、2＝5×5）／brave 獅子咆哮嚇不停
 const UNITS = {
   shepherd: { name: '牧人',     ico: '🧑‍🌾', cost: 50,  hp: 60,  kind: 'producer', every: 7,   gives: 25,
               desc: '定時產糧。再點一下升級成老牧人，產糧更快', ref: '創 31:40' },
@@ -34,8 +35,10 @@ const UNITS = {
               desc: '一次性。九格範圍傷害，並嚇退敵人', ref: '士 7:19' },
   horn:     { name: '吹角手',   ico: '📯',   cost: 100, hp: 60,  kind: 'support', every: 20, push: 1, stun: 2,
               desc: '每 20 秒吹角，同排敵人後退一格並暈眩', ref: '民 10:9' },
-  healer:   { name: '纏裹的牧人', ico: '🩹', cost: 100, hp: 60,  kind: 'support', every: 1, heal: 5,
-              desc: '不攻擊，持續回復周圍八格夥伴的血量', ref: '結 34:16' },
+  healer:   { name: '纏裹的牧人', ico: '🩹', cost: 100, hp: 60,  kind: 'support', every: 1, heal: 8, range: 1, brave: true,
+              desc: '不攻擊，持續回復周圍八格夥伴的血量，不怕獅子咆哮。再點一下膏油，範圍擴大到 5×5、回血更多', ref: '結 34:16',
+              // 升級：再點一下花糧膏油，範圍 1 格→2 格（5×5 共 24 格）、回血 8→12；brave＝獅子咆哮嚇不停它
+              upgrade: { name: '膏油', ico: '🫗', cost: 50, from: 7, heal: 12, range: 2, desc: '膏油後周圍 5×5 共 24 格的夥伴每秒回復 12 血量，一位顧整條防線', ref: '詩 23:5' } },
   catapult: { name: '投石機',   ico: '🛞',   cost: 200, hp: 80,  kind: 'shooter', every: 4, dmg: 45, shot: 'lob', splash: 1.2,
               desc: '攻擊同排最遠的敵人，濺射傷害波及落點周圍', ref: '代下 26:15' },
 };
@@ -209,14 +212,14 @@ const LEVELS = [
     speaker: null,
     intro: '「牧人在羊群四散的日子怎樣尋找他的羊，我必照樣尋找我的羊。」「失喪的，我必尋找；被逐的，我必領回；受傷的，我必纏裹；有病的，我必醫治。」（結 34:12、16）這是最後一夜。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult'], fresh: ['healer', 'catapult'], must: ['archer'],
-    tips: ['🦁 今晚共五波，最後一波有兩隻獅子'],
+    tips: ['🦁 今晚共五波，最後一波有兩隻獅子', '🫗 纏裹的牧人放下後再點一下花 50 糧膏油，回血範圍擴大到 5×5，放中排就顧得到五條線'],
     sheep: 3,
     waves: [
       { list: [['wolf', 6], ['fast', 2]],                                   gap: 3.0, rows: [0, 1, 2, 3, 4], hpMul: 1.2, say: '第 1 波' },
       { list: [['wolf', 12], ['locust', 15]],                               gap: 1.0, rows: [1, 2, 3],       hpMul: 1.4, say: '擠成一串', hint: '下一波敵人密集，用投石機的濺射一砸一片' },
       { list: [['thief', 3], ['rustler', 2], ['fox', 4], ['digger', 3]],    gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.5, say: '賊和偷羊的', hint: '賊、偷羊人、狐狸、野狗齊來，備好牧羊犬與守望樓' },
       { list: [['bear', 2], ['alpha', 2], ['bird', 4], ['wolf', 10]],       gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.7, ordered: true, say: '熊和領頭狼', hint: '兩隻熊、兩隻領頭狼，還有鷙鳥，地面空中都要顧' },
-      { list: [['lion', 1], ['wolf', 10], ['lion', 1], ['fast', 8], ['locust', 20]], gap: 1.5, rows: [0, 1, 2, 3, 4], hpMul: 2,   ordered: true, say: '兩隻獅子，最後一波', hint: '最後兩隻獅子。纏裹的牧人放狗旁邊，持續回血' },
+      { list: [['lion', 1], ['wolf', 10], ['lion', 1], ['fast', 8], ['locust', 20]], gap: 1.5, rows: [0, 1, 2, 3, 4], hpMul: 2,   ordered: true, say: '兩隻獅子，最後一波', hint: '最後兩隻獅子。獅子交給狗和機弦手，纏裹的牧人膏油後顧住整排石牆' },
     ],
     outroWin: '天亮了。',
     psalm: ['耶和華是我的牧者，我必不致缺乏。', '他使我躺臥在青草地上，領我在可安歇的水邊。', '他使我的靈魂甦醒，為自己的名引導我走義路。', '我雖然行過死蔭的幽谷，也不怕遭害，因為你與我同在；你的杖，你的竿，都安慰我。', '在我敵人面前，你為我擺設筵席；你用油膏了我的頭，使我的福杯滿溢。', '我一生一世必有恩惠慈愛隨著我；我且要住在耶和華的殿中，直到永遠。'],

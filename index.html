@@ -93,6 +93,7 @@
   .unit.dog      { background: transparent; opacity: .35; font-size: .6em; }
   .unit.thorns { background: #f3ead822; border: 2px dashed #f3ead866; border-radius: 50%; }
   .unit.thorns.upgraded { border-color: #c9d46a; }
+  .unit.healer.upgraded { box-shadow: inset 0 0 0 2px var(--gold); }
   .unit .hp.thick { height: 5px; }
   .unit .hp, .enemy .hp, .dog-run .hp { position: absolute; left: 10%; right: 10%; bottom: 2px; height: 3px; background: #0006; }
   .hp > i { display: block; height: 100%; width: 100%; background: var(--ok); transform-origin: left; }  /* 血量用 scaleX 畫，不動寬度 */
@@ -848,10 +849,10 @@ function unitNums(k) {
   if (u.kind === 'dog') s.push(`一般目標每秒傷害 ${u.dps}；賊、偷羊人、狐狸、野狗每秒 ${u.hunt}；受傷回窩休息 ${u.rest} 秒回滿`);
   if (u.poison) s.push(`可觸發 ${u.uses} 次；中毒 ${STATUS.poison.t} 秒，每秒傷害 ${STATUS.poison.dps}，並降低敵人攻擊`);
   if (u.slow) s.push(`踩上移動速度減半，每秒傷害 ${u.dps}`);
-  if (u.upgrade) s.push(`第 ${u.upgrade.from} 夜起可升級${u.upgrade.name}（${u.upgrade.cost} 糧）：${u.upgrade.desc}，中毒 ${STATUS.poison.t} 秒每秒傷害 ${STATUS.poison.dps}`);
+  if (u.upgrade) s.push(`第 ${u.upgrade.from} 夜起可升級${u.upgrade.name}（${u.upgrade.cost} 糧）：${u.upgrade.desc}${u.upgrade.poison ? `，中毒 ${STATUS.poison.t} 秒每秒傷害 ${STATUS.poison.dps}` : ''}`);
   if (u.kind === 'instant') s.push(`九格內每個敵人傷害 ${u.dmg}，嚇退 ${u.panic} 秒`);
   if (u.push) s.push(`冷卻 ${u.every} 秒，暈眩 ${u.stun} 秒`);
-  if (u.heal) s.push(`周圍夥伴每秒回復 ${u.heal} 血量`);
+  if (u.heal) s.push(`周圍 ${u.range === 2 ? '5×5' : '八格'}夥伴每秒回復 ${u.heal} 血量${u.brave ? '；獅子咆哮嚇不停它' : ''}`);
   return s.join('・');
 }
 function enemyNums(k) {

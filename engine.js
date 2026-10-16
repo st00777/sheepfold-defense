@@ -156,7 +156,7 @@
       ev(G, { t: 'unit', r, c }); ev(G, { t: 'pop', r, c, text: '老牧人' });
       return { ok: true, msg: '升成老牧人了，送糧更快' };
     }
-    // 通用升級排在修補前：目前只有荊棘有 upgrade；日後若牆也能升級，受傷時要先修補再升級，這裡要調順序
+    // 通用升級排在修補前：目前荊棘（撒蠍子）與纏裹的牧人（膏油）有 upgrade；日後若牆也能升級，受傷時要先修補再升級，這裡要調順序
     if (def.upgrade && !u.upgraded) {
       const up = def.upgrade;
       if (G.level.id < up.from) return { ok: false, msg: `第 ${up.from} 夜起才學會${up.name}` };
@@ -415,8 +415,10 @@
           u.timer -= dt;
           if (u.timer > 0) continue;
           if (def.heal) {
+            const eff = u.upgraded && def.upgrade ? { ...def, ...def.upgrade } : def; // 膏油後範圍與回血都用升級值
+            const rg = eff.range || 1;
             u.timer = def.every;
-            for (const k2 in G.units) { const v = G.units[k2]; if (v === u || Math.abs(v.r - u.r) > 1 || Math.abs(v.c - u.c) > 1) continue; if (v.hp < v.maxHp && v.maxHp > 1) { v.hp = Math.min(v.maxHp, v.hp + def.heal); ev(G, { t: 'unit', r: v.r, c: v.c }); } }
+            for (const k2 in G.units) { const v = G.units[k2]; if (v === u || Math.abs(v.r - u.r) > rg || Math.abs(v.c - u.c) > rg) continue; if (v.hp < v.maxHp && v.maxHp > 1) { v.hp = Math.min(v.maxHp, v.hp + eff.heal); ev(G, { t: 'unit', r: v.r, c: v.c }); } }
           } else if (def.push) {
             const ground = inRow.filter(e => !ENEMIES[e.type].flying);
             if (!ground.length) continue;
@@ -515,7 +517,7 @@
             for (const o of G.enemies) if (o !== e && targetable(o) && dist(o, e) <= 2) o.st.howl = STATUS.howl.t;
             ev(G, { t: 'fx', kind: 'howl', r: e.r, x: e.x }); ev(G, { t: 'toast', msg: '領頭狼嚎叫，狼群衝過來了' });
           } else {
-            for (const k in G.units) { const u = G.units[k]; const d = Math.hypot(u.c - e.x, u.r - e.r); if (d <= 2 && !['floor', 'blocker', 'dog'].includes(UNITS[u.type].kind)) { u.fear = STATUS.fear.t; if (UNITS[u.type].flees) u.hp = 0; } }
+            for (const k in G.units) { const u = G.units[k]; const d = Math.hypot(u.c - e.x, u.r - e.r); if (d <= 2 && !['floor', 'blocker', 'dog'].includes(UNITS[u.type].kind) && !UNITS[u.type].brave) { u.fear = STATUS.fear.t; if (UNITS[u.type].flees) u.hp = 0; } }
             ev(G, { t: 'fx', kind: 'roar', r: e.r, x: e.x }); ev(G, { t: 'toast', msg: '獅子吼叫，附近的人都僵住了' });
           }
         }
