@@ -127,7 +127,7 @@
     if (def.kind === 'patrol') { u.rv = r; u.dir = 1; }   // rv：巡夜人現在走到哪一排（小數），dir 往上或往下
     if (def.kind === 'deflector') u.flip = false;        // 中間排的杖上下輪流趕
     if (def.kind === 'floor') u.stung = new Set(); // 記住叮過誰，同一隻只中一次毒
-    if (k === 'horn') u.timer = 6; // 剛放下不會馬上吹
+    if (k === 'horn') { u.timer = 6; u.cdLen = 6; } // 剛放下不會馬上吹；cdLen＝這段冷卻全長，畫面冷卻條用它算比例
     G.units[key(r, c)] = u;
     ev(G, { t: 'unit', r, c });
     return u;
@@ -565,7 +565,7 @@
             const all = u.upgraded && def.upgrade && def.upgrade.all; // 銀號：五排一起退
             const ground = (all ? G.enemies.filter(targetable) : inRow).filter(e => !ENEMIES[e.type].flying && !(e.vaulting > 0)); // 半空中的推不動
             if (!ground.length) continue;
-            u.timer = def.every;
+            u.timer = def.every; u.cdLen = def.every;
             for (const e of ground) { dropSheep(G, e, '被角聲推回去'); e.x = Math.min(COLS + 0.2, e.x + def.push); e.st.stun = def.stun; release(G, e); }
             ev(G, { t: 'fx', kind: 'horn', r: u.r, x: u.c });
             ev(G, { t: 'toast', msg: all ? '銀號一響，五排的狼都退了一步' : '角聲一響，那排的狼退了一步' });

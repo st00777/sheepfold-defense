@@ -417,7 +417,7 @@
 </div>
 
 <script src="data.js?v=8"></script>
-<script src="engine.js?v=8"></script>
+<script src="engine.js?v=9"></script>
 <script src="sound.js?v=7"></script>
 <script>
 'use strict';
@@ -436,7 +436,7 @@ let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf =
 const els = new Map();   // 引擎物件 id → 畫面元素
 let markerEl = null, moundEls = new Map();
 let toastTimer = 0;
-let cardEls = [], lastFood = -1, lastHand = 0;
+let cardEls = [], lastFood = -1, lastHand = 0, lastUnits = -1;
 // 開發者模式：網址加 ?dev，或連點左上角「糧」五下
 let devOn = /[?&]dev/.test(location.search), speed = 1, paused = false, devEnemy = '', foodTaps = 0;
 let devUsed = false;   // 這一局有沒有開過開發者面板；開過就不存檔，免得作弊狀態被續玩帶走
@@ -630,13 +630,7 @@ function tapCard(key, el) {
   selected = (selected === key) ? null : key;
   if (el.classList.contains('new')) { el.classList.remove('new'); const t = el.querySelector('.tag.fresh'); if (t) t.remove(); markSeen(key); }
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.key === selected));
-  let swappable = 0;
-  cells.forEach(c => {
-    const r = +c.dataset.r, col = +c.dataset.c, k = r + ',' + col;
-    const sw = !!selected && Engine.canSwap(G, r, col, selected); if (sw) swappable++;
-    c.classList.remove('sell'); c.classList.toggle('swap', sw);
-    c.classList.toggle('hint', sw || (!!selected && !G.units[k] && !G.rocks.has(k)));
-  });
+  const swappable = markHints();
   // 同類更貴的卡：點原單位直接換掉，實付＝全價－退一半（跟鏟子一樣）
   toast(selected ? (u.kind === 'instant' ? `點敵人密集處，${u.name}就打破在那裡，範圍傷害並嚇退` : swappable ? `點一格草地放下${u.name}；點亮金框的${UNITS[selected].kind === 'blocker' ? '牆' : '投手'}可直接換成${u.name}，退一半糧` : `點一格草地放下${u.name}`) : '先點一張卡，再點草地放下去');
 }
@@ -644,8 +638,20 @@ function tapShovel() {
   if (!G || G.over || tut.on) return;
   selected = (selected === 'shovel') ? null : 'shovel';
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.key === selected));
-  cells.forEach(c => { const on = selected === 'shovel' && !!G.units[c.dataset.r + ',' + c.dataset.c]; c.classList.toggle('hint', on); c.classList.toggle('sell', on); });
+  markHints();
   toast(selected ? (G.level.conveyor ? '點一個單位拆掉，沒被咬過的退回手上' : '點一個單位拆掉，退一半糧') : '先點一張卡，再點草地放下去');
+}
+// 依目前拿的卡把格子亮起來：空地虛線、可直接換的單位金實線、鏟子時有單位的格。場上單位數一變（死了、放了）draw 會再叫一次，免得亮著的格子已經空了
+function markHints() {
+  let swappable = 0;
+  cells.forEach(c => {
+    const r = +c.dataset.r, col = +c.dataset.c, k = r + ',' + col;
+    if (selected === 'shovel') { const on = !!G.units[k]; c.classList.remove('swap'); c.classList.toggle('sell', on); c.classList.toggle('hint', on); return; }
+    const sw = !!selected && !tut.on && Engine.canSwap(G, r, col, selected); if (sw) swappable++;
+    c.classList.remove('sell'); c.classList.toggle('swap', sw);
+    c.classList.toggle('hint', sw || (!!selected && !G.units[k] && !G.rocks.has(k)));
+  });
+  return swappable;
 }
 function clearSelection() {
   selected = null;
@@ -855,10 +861,13 @@ function draw() {
     const d = cells[u.r * COLS + u.c].firstElementChild; if (!d) continue;
     const bar = d.querySelector('.cd > i'); if (!bar) continue;
     const ready = u.timer <= 0;
-    bar.style.transform = `scaleX(${ready ? 1 : Math.max(0, Math.min(1, 1 - u.timer / def.every)).toFixed(3)})`;
+    const len = u.cdLen || def.every; // 剛放下只等 6 秒，條要照 6 秒算，不然一放下就七成滿
+    bar.style.transform = `scaleX(${ready ? 1 : Math.max(0, Math.min(1, 1 - u.timer / len)).toFixed(3)})`;
     d.classList.toggle('ready', ready);
   }
   $('#bar > i').style.transform = `scaleX(${G.total ? (G.killed / G.total).toFixed(3) : 0})`;
+  const nUnits = Object.keys(G.units).length;
+  if (nUnits !== lastUnits) { lastUnits = nUnits; if (selected) markHints(); }
   const f = Math.floor(G.food);
   if (f !== lastFood) { lastFood = f; for (const c of cardEls) c.classList.toggle('poor', !G.level.conveyor && f < UNITS[c.dataset.key].cost); }
   if (tut.on && tut.waiting && f >= TUT_STEPS[tut.step].need) tutShow();
