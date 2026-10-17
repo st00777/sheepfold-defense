@@ -101,8 +101,13 @@
   /* 無月夜：腳印消失那一刻整個棋盤暗一階，右邊出生的那側更暗（看不見牠從哪來） */
   #board { transition: filter 2s; }
   #board.moonless { filter: brightness(.78) saturate(.85); }
-  #board::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, #0000, #0a0c14cc); pointer-events: none; opacity: 0; transition: opacity 2s; z-index: 1; }
-  #board.moonless::after { opacity: 1; }
+  .fog { position: absolute; right: 0; height: calc(100% / 5); width: 22%; background: linear-gradient(90deg, #0000, #0a0c14cc); pointer-events: none; opacity: 0; transition: opacity 2s; z-index: 1; }
+  #board.moonless .fog { opacity: 1; }
+  /* 油燈照到的排：黑霧散掉、草地轉暖亮（棋盤整體仍是調暗的，這幾排看起來就像被燈照著） */
+  #board.moonless .fog.lit { opacity: 0; transition: opacity .6s; }
+  .cell { transition: background .6s; }
+  #board.moonless .cell.lit { background: #7d8a3f; }
+  #board.moonless .cell.lit.alt { background: #8a9847; }
   .cell.rock::after { content: '🪨'; opacity: .7; font-size: .8em; }
   .cell.hint { outline: 2px dashed var(--gold); outline-offset: -4px; }
   .cell .unit { position: relative; display: flex; align-items: center; justify-content: center; width: 80%; height: 80%; border-radius: 8px; }
@@ -422,7 +427,7 @@ document.addEventListener('touchstart', () => {}, { passive: true }); // iOS 要
 const board = $('#board');
 const boardSize = { w: 0, h: 0 }; // 棋盤大小變了才量一次，畫投射物時直接用，不每幀量
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { boardSize.w = board.clientWidth; boardSize.h = board.clientHeight; }).observe(board);
-const cells = [];
+const cells = [], fogEls = [], litRows = [false, false, false, false, false];
 let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf = 0;
 const els = new Map();   // 引擎物件 id → 畫面元素
 let markerEl = null, moundEls = new Map();
@@ -467,6 +472,9 @@ function buildBoard() {
     d.addEventListener('click', () => tapCell(r, c));
     board.appendChild(d); cells.push(d);
   }
+  // 無月夜的黑霧一排一個，油燈照到的排才能單獨散掉
+  fogEls.length = 0;
+  for (let r = 0; r < ROWS; r++) { const f = document.createElement('div'); f.className = 'fog'; f.style.top = (r / ROWS * 100) + '%'; board.appendChild(f); fogEls.push(f); }
 }
 function buildCards() {
   const wrap = $('#cards'); wrap.innerHTML = '';
@@ -820,7 +828,13 @@ function draw() {
   for (const [id, el] of els) if (!alive.has(id)) { el.remove(); els.delete(id); }
   if (biting) Sound.play('bite'); // sound.js 自己限流，每 0.45 秒最多一聲
   // 無月夜：腳印消失的那一波起棋盤變暗（跟引擎 markerVisible 同一個時間點）
-  board.classList.toggle('moonless', !!G.level.moonless && G.wave + (G.phase === 'wave' ? 0 : 1) >= G.level.moonless);
+  const dark = !!G.level.moonless && G.wave + (G.phase === 'wave' ? 0 : 1) >= G.level.moonless;
+  board.classList.toggle('moonless', dark);
+  // 油燈照到的排亮起來（跟引擎 rowLit 同一套判定：燈活著、上下 light 排內）
+  for (let r = 0; r < ROWS; r++) {
+    const lit = dark && Engine.rowLit(G, r);
+    if (lit !== litRows[r]) { litRows[r] = lit; fogEls[r].classList.toggle('lit', lit); for (let c = 0; c < COLS; c++) cells[r * COLS + c].classList.toggle('lit', lit); }
+  }
 
   $('#bar > i').style.transform = `scaleX(${G.total ? (G.killed / G.total).toFixed(3) : 0})`;
   const f = Math.floor(G.food);

@@ -114,6 +114,7 @@
     // 第一次放牧人／石牆，順便教「再點一下」
     if (def.kind === 'producer' && !G.taughtElder) { G.taughtElder = true; return { ok: true, msg: `牧人就位。糧夠 ${ELDER_COST} 時再點牧人一下，升老牧人送糧更快` }; }
     if (def.kind === 'blocker' && !G.taughtRepair) { G.taughtRepair = true; return { ok: true, msg: `${def.name}就位。被咬壞時點它一下，花 ${REPAIR_COST} 糧修補` }; }
+    if (def.light !== undefined) { const lo = Math.max(0, r - def.light) + 1, hi = Math.min(ROWS - 1, r + def.light) + 1; return { ok: true, msg: `${def.name}就位，照亮第 ${lo} 到 ${hi} 排。沒有月亮時這幾排的腳印預告會回來` }; }
     return { ok: true, msg: `${def.name}就位` };
   }
 
