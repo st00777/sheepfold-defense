@@ -85,7 +85,8 @@
   }
   // 這一波提示點名的卡一定先送到（沒有才補）
   function dealNamed(G, k) { const cv = G.level.conveyor; if (!cv || !UNITS[k] || G.hand.includes(k)) return; G.hand.push(k); ev(G, { t: 'hand' }); } // 手滿也照送（暫時多一張），不丟玩家手上的卡
-  function conveyorEvery(G) { const cv = G.level.conveyor; return (cv.every || 5.5) * (G.diff === 'calm' ? 1 : 0.82); }
+  // 送卡間隔：難度越高送得越慢（之前反過來，難度一高補給也多，三種難度模擬都 100%）
+  function conveyorEvery(G) { const cv = G.level.conveyor; return (cv.every || 5.5) * (G.diff === 'calm' ? 1 : G.diff === 'windy' ? 1.1 : 1.2); }
 
   const ev = (G, e) => G.events.push(e);
   const key = (r, c) => r + ',' + c;

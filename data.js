@@ -319,8 +319,9 @@ const LEVELS = [
     intro: '我的羊，我的工價，我說了算；改十次也是我說了算。今晚我給你什麼人，你就用什麼人，不准挑。',
     units: ['slinger', 'wall', 'sling', 'dog', 'tower', 'thorns', 'jar', 'staff', 'lamp', 'patrol'], fresh: [],
     tips: ['🎁 今晚沒有糧也沒有牧人，卡片會定時送到手上，送來什麼就用什麼', '⛏️ 送來的卡沒花糧，拆掉也不退'],
-    conveyor: { every: 5.0, max: 6, start: ['slinger', 'wall', 'staff'],
-      weights: { slinger: 30, wall: 20, staff: 12, sling: 10, dog: 8, lamp: 6, thorns: 5, patrol: 4, jar: 3, tower: 2 } },
+    // 10/18 調平：7 秒一張（一晚約 26-29 張，之前 5 秒 36 張比棋盤格子還多）；比重壓平讓瓦瓶、守望樓真的抽得到
+    conveyor: { every: 7.0, max: 6, start: ['slinger', 'wall', 'staff'],
+      weights: { slinger: 22, wall: 14, sling: 12, dog: 10, staff: 10, thorns: 8, patrol: 7, lamp: 6, jar: 6, tower: 5 } },
     waves: [
       { list: [['wolf', 6]],                                               gap: 4.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼', give: 'slinger' },
       { list: [['wolf', 8], ['jackal', 2], ['fast', 3]],                   gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.35, give: 'staff', say: '豺狼混進來了', hint: '拉班送來什麼就先放下去，別等好卡；牧人杖把散開的狼趕進投石手那排' },
