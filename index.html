@@ -229,17 +229,25 @@
   .tips .new { color: var(--new); }
   #best { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
-  /* 關卡選單 */
-  .lv { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 10px; padding: 10px 12px; margin-top: 8px; text-align: left; cursor: pointer; }
+  /* 首頁：一次只看一章，七夜塞進一屏不用捲（2026-10-17 James：選關要往下拉、圖鑑太下面） */
+  .dialog.home { padding: 18px 16px 14px; }
+  .dialog.home h1 { font-size: 22px; }
+  .dialog.home .ref { margin-bottom: 8px; }
+  #continue-btn { margin-top: 2px; padding: 11px 22px; font-size: 16px; }
+  .btn.small { margin-top: 6px; padding: 6px 14px; font-size: 13px; }
+  #ch-tabs { margin: 10px 0 4px; }
+  #ch-tabs .tab { padding: 7px 0; font-size: 14px; }
+  #ch-tabs .tab.locked { opacity: .4; }
+  .ch-sub { font-size: 12px; min-height: 16px; }
+  .lv { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 9px; padding: 6px 10px; margin-top: 5px; text-align: left; cursor: pointer; }
   .lv.locked { opacity: .45; cursor: default; }
-  .lv .n { font-size: 20px; width: 28px; text-align: center; color: var(--gold); }
-  .lv .t { flex: 1; }
-  .lv .t b { display: block; font-size: 15px; }
-  .lv .t span { font-size: 12px; color: var(--muted); }
+  .lv.next { outline: 2px solid var(--gold); outline-offset: -2px; }
+  .lv .n { font-size: 17px; width: 24px; text-align: center; color: var(--gold); }
+  .lv .t { flex: 1; min-width: 0; }
+  .lv .t b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lv .t span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
   .lv .s { font-size: 12px; color: var(--ok); white-space: nowrap; }
-  .ch { margin-top: 14px; font-size: 12px; color: var(--muted); text-align: left; letter-spacing: .08em; }
-  .ch b { color: var(--gold); margin-right: 6px; }
-  .lv .t i { font-style: normal; color: var(--muted); }
+  .upd { margin-top: 10px; font-size: 11px; color: var(--muted); }
   #psalm { text-align: left; font-size: 15px; line-height: 1.9; margin-top: 10px; }
   #psalm div { opacity: 0; transition: opacity 1.2s; }
   #psalm div.on { opacity: 1; }
@@ -311,12 +319,16 @@
 
 <!-- 關卡選單 -->
 <div class="overlay" id="levels">
-  <div class="dialog">
+  <div class="dialog home">
     <button class="corner snd-btn" id="snd-btn-levels" title="聲音">🔊</button>
     <h1>羊圈守夜</h1>
     <div class="ref">受託守夜的無名牧人。每一夜都是聖經裡牧人真的守過的夜。</div>
+    <button class="btn" id="continue-btn" hidden></button>
+    <button class="btn alt small" id="levels-codex">📖 圖鑑</button>
+    <div class="tabs" id="ch-tabs"></div>
+    <div class="ref ch-sub" id="ch-sub"></div>
     <div id="lv-list"></div>
-    <button class="btn alt" id="levels-codex">圖鑑</button>
+    <div class="upd" id="home-upd"></div>
   </div>
 </div>
 
@@ -432,7 +444,9 @@ function unlocked(id) { return id === 1 || unlockAll || !!P.cleared[id - 1]; }
 // 所有已開放關卡的卡總和（圖鑑用；也用來判斷玩家手上有沒有這一夜帶不了的卡）
 function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k); return all; }
 
-const CHAPTERS = { 1: '守夜', 2: '另外的羊 ── 沒有月亮，敵人會換排' };
+const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊' };
+const CHAPTERS = { 1: '七夜，學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來' };
+const HOME_UPDATE = '最近更新 10/17：第二章七夜上線、加了音效（右上角 🔊）、卡片改兩排不用滑';
 
 // ====== 畫面建立 ======
 function buildBoard() {
@@ -471,20 +485,39 @@ function buildCards() {
   wrap.appendChild(sh);
   cardEls = [...wrap.querySelectorAll('.card')].filter(c => UNITS[c.dataset.key]); lastFood = -1;
 }
+// 下一個還沒守過的夜（已開放但沒通過任一難度）；全守完就回 null
+function nextLevel() { return LEVELS.find(L => unlocked(L.id) && !P.cleared[L.id]) || null; }
+const chapterOf = L => L.chapter || 1;
+let homeChapter = 0; // 首頁停在哪一章；0＝自動（進度所在的章）
 function buildLevels() {
+  const chapters = [...new Set(LEVELS.map(chapterOf))];
+  const nx = nextLevel();
+  const cur = chapters.includes(homeChapter) ? homeChapter : chapterOf(nx || LEVELS[LEVELS.length - 1]);
+  // 接著守：一指跳到下一夜
+  const cb = $('#continue-btn'); cb.hidden = !nx;
+  if (nx) { cb.textContent = `接著守：第 ${nx.id} 夜 ${nx.name}`; cb.onclick = () => openIntro(nx); }
+  // 章節頁籤：第一夜還沒開的章壓暗
+  const tabs = $('#ch-tabs'); tabs.innerHTML = '';
+  for (const c of chapters) {
+    const first = LEVELS.find(L => chapterOf(L) === c), ok = unlocked(first.id);
+    const b = document.createElement('button'); b.className = 'tab' + (c === cur ? ' selected' : '') + (ok ? '' : ' locked');
+    b.textContent = `第${['', '一', '二', '三', '四'][c] || c}章 ${CHAPTER_NAMES[c] || ''}`;
+    b.addEventListener('click', () => { homeChapter = c; buildLevels(); });
+    tabs.appendChild(b);
+  }
+  $('#ch-sub').textContent = unlocked(LEVELS.find(L => chapterOf(L) === cur).id) ? (CHAPTERS[cur] || '') : '守過上一章最後一夜就會開';
   const list = $('#lv-list'); list.innerHTML = '';
-  let ch = 0;
   for (const L of LEVELS) {
+    if (chapterOf(L) !== cur) continue;
     const ok = unlocked(L.id);
-    const c = L.chapter || 1;
-    if (c !== ch) { ch = c; const h = document.createElement('div'); h.className = 'ch'; h.innerHTML = `<b>第${['', '一', '二', '三'][c] || c}章</b>${CHAPTERS[c] || ''}`; list.appendChild(h); }
     const d = document.createElement('div');
-    d.className = 'lv' + (ok ? '' : ' locked');
+    d.className = 'lv' + (ok ? '' : ' locked') + (nx && nx.id === L.id ? ' next' : '');
     const done = P.cleared[L.id] ? Object.keys(P.cleared[L.id]).map(k => DIFFS[k].name.slice(0, 2)).join('・') + ' ✅' : '';
     d.innerHTML = `<div class="n">${ok ? L.id : '🔒'}</div><div class="t"><b>${L.name}</b><span>${ok ? L.ref.replace('取材：', '') : '守過上一夜就會開'}</span></div><div class="s">${done}</div>`;
     if (ok) d.addEventListener('click', () => openIntro(L));
     list.appendChild(d);
   }
+  $('#home-upd').textContent = HOME_UPDATE;
 }
 function openIntro(L) {
   level = L;
