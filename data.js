@@ -55,7 +55,7 @@ const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'tower', 'arc
 // 特殊欄位：flying 飛的／dodge 閃避率／digs 鑽地／vaults 翻牆／steals 偷羊／enrage 狂暴／howl 嚎叫秒數／roar 咆哮秒數
 // 偷雞摸狗的（dodge／vaults／steals／digs 任一）＝狗的獵物，狗對牠們用 hunt 傷害
 // boss 頭目：腳印預告用牠的圖示並放大；同一波第二隻頭目走不同排
-// thick 厚皮：石子和箭只打四成，機弦、投石機、火、毒全額（所以「石子打不痛牠」）；prio 狗優先咬誰（越大越先）
+// thick 厚皮：石子和箭只打 THICK_MUL（35%），機弦、投石機、火、毒全額（所以「石子打不痛牠」）；prio 狗優先咬誰（越大越先）
 const ENEMIES = {
   wolf:    { name: '狼',     ico: '🐺', hp: 60,  speed: 0.22, bite: 12 },
   fast:    { name: '快狼',   ico: '🐺', hp: 40,  speed: 0.40, bite: 10, cls: 'fast' },
@@ -78,6 +78,8 @@ const ENEMIES = {
   bird:    { name: '鷙鳥',   ico: '🦅', hp: 50,  speed: 0.20, bite: 0,  cls: 'fly', flying: true,
              tip: '飛越牆與狗，射手的投射和瓦瓶火把才打得到' },
 };
+
+const THICK_MUL = 0.35; // 厚皮敵人吃石子、箭的比例（圖鑑「效果」頁也讀這個）
 
 // 圖鑑把移動速度翻成快／慢的門檻（每秒走幾格）
 const SPEED_FAST = 0.35, SPEED_SLOW = 0.15;
@@ -231,5 +233,5 @@ const LEVELS = [
   },
 ];
 
-const DATA = { SPEED_FAST, SPEED_SLOW, ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
+const DATA = { THICK_MUL, SPEED_FAST, SPEED_SLOW, ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
 if (typeof module !== 'undefined') module.exports = DATA; else window.DATA = DATA;

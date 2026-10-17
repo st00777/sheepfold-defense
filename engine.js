@@ -7,7 +7,7 @@
   const { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE } = D;
 
   const SHOT_SPEED = { stone: 6, arrow: 9, sling: 7 };
-  const THICK_MUL = 0.35; // 厚皮敵人吃石子、箭的比例
+  const THICK_MUL = D.THICK_MUL ?? 0.35; // 厚皮敵人吃石子、箭的比例（正本在 data.js）
   const LOB_TIME = 0.8;
   const VAULT_TIME = 1.2; // 賊翻牆要幾秒：這段時間牠連續越過牆，畫面層用 lift 畫弧線
 

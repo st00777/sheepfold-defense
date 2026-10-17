@@ -312,7 +312,7 @@
   <div class="dialog roster">
     <h1 id="roster-title">今晚的隊伍</h1>
     <div class="ref" id="roster-sub"></div>
-    <div class="tabs"><button class="tab selected" data-tab="units">我方</button><button class="tab" data-tab="enemies">敵方</button></div>
+    <div class="tabs"><button class="tab selected" data-tab="units">我方</button><button class="tab" data-tab="enemies">敵方</button><button class="tab" data-tab="effects">效果</button></div>
     <div id="roster-grid"></div>
     <div id="roster-count"></div>
     <div id="roster-detail">點一個看說明</div>
@@ -327,6 +327,7 @@
     <h1>暫停中</h1>
     <p>狼也在等。回來再按繼續。</p>
     <button class="btn" id="resume-btn">繼續</button>
+    <button class="btn alt" id="pause-codex">圖鑑</button>
     <button class="btn alt" id="pause-back">回關卡</button>
   </div>
 </div>
@@ -343,8 +344,8 @@
   </div>
 </div>
 
-<script src="data.js?v=4"></script>
-<script src="engine.js?v=4"></script>
+<script src="data.js?v=5"></script>
+<script src="engine.js?v=5"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、DIFFS、LEVELS 由 data.js 直接提供
@@ -786,6 +787,10 @@ function openRoster(mode, from) {
     roster.picked = new Set(pickedFor(level) || level.units);
     $('#roster-title').textContent = '今晚的隊伍';
     $('#roster-sub').textContent = `營火邊點名，今晚一起守夜的夥伴。${level.units.length} 張卡只能帶 ${MAX_CARDS} 張`;
+  } else if (roster.from === 'pause') { // 對局中暫停查圖鑑：只列這一夜同行的卡，遊戲維持暫停
+    roster.units = sortUnits(level.units); roster.picked = new Set();
+    $('#roster-title').textContent = '圖鑑';
+    $('#roster-sub').textContent = '這一夜同行的夥伴、遇見的野獸，和效果名詞。狼也在等，看完回暫停';
   } else {
     roster.units = sortUnits(unlockedUnits()); roster.picked = new Set();
     $('#roster-title').textContent = '圖鑑';
@@ -795,9 +800,9 @@ function openRoster(mode, from) {
       : '守過的夜裡遇見的人、狗和野獸';
   }
   $('#roster-go').hidden = mode !== 'pick';
-  $('#roster-back').textContent = roster.from === 'intro' ? '回開場' : '回關卡';
+  $('#roster-back').textContent = roster.from === 'intro' ? '回開場' : roster.from === 'pause' ? '回暫停' : '回關卡';
   renderRoster();
-  $('#levels').hidden = true; $('#intro').hidden = true; $('#roster').hidden = false;
+  $('#levels').hidden = true; $('#intro').hidden = true; $('#pause').hidden = true; $('#roster').hidden = false;
 }
 function renderRoster() {
   const grid = $('#roster-grid'); grid.innerHTML = '';
@@ -816,6 +821,15 @@ function renderRoster() {
     const n = roster.picked.size;
     $('#roster-count').textContent = roster.mode === 'pick' ? (n < MIN_CARDS ? `已選 ${n} 張，至少要帶 ${MIN_CARDS} 張` : `已選 ${n} / ${MAX_CARDS} 張`) : `已開放 ${roster.units.length} 種單位`;
     $('#roster-go').disabled = roster.mode === 'pick' && n < MIN_CARDS;
+  } else if (roster.tab === 'effects') {
+    GLOSSARY.forEach((g, i) => {
+      const d = document.createElement('div');
+      d.className = 'rc' + (roster.focus === String(i) ? ' focus' : '');
+      d.innerHTML = `<div class="ico">${g.ico}</div><div class="name">${g.name}</div>`;
+      d.addEventListener('click', () => { roster.focus = String(i); renderRoster(); });
+      grid.appendChild(d);
+    });
+    $('#roster-count').textContent = `${GLOSSARY.length} 個效果名詞，數字跟遊戲裡一樣`;
   } else {
     let seen = 0;
     for (const k in ENEMIES) {
@@ -839,29 +853,57 @@ function tapRoster(k) {
   }
   renderRoster();
 }
-// 白話數字：每個單位一句
+// 白話數字：每個單位一句，數字全部從資料表帶，改數值不用改文案
 function unitNums(k) {
   const u = UNITS[k], s = [];
-  if (u.hp > 1) s.push(`血量 ${u.hp}`);
-  if (u.kind === 'producer') s.push(`每 ${u.every} 秒產 ${u.gives} 糧；升級老牧人後 ${(u.every * ELDER_MUL).toFixed(1)} 秒一次（升級 ${ELDER_COST} 糧）`);
-  if (u.kind === 'shooter') s.push(`攻擊間隔 ${u.every} 秒，每次傷害 ${u.dmg}${u.range ? `，射程 ${u.range} 格` : ''}${u.pierce ? '，穿透整排' : ''}${u.splash ? '，濺射波及落點周圍' : ''}`);
-  if (u.kind === 'blocker') s.push(`修補一次 ${REPAIR_COST} 糧，回復 ${REPAIR_HP} 血量`);
-  if (u.kind === 'dog') s.push(`一般目標每秒傷害 ${u.dps}；賊、偷羊人、狐狸、野狗每秒 ${u.hunt}；受傷回窩休息 ${u.rest} 秒回滿`);
-  if (u.poison) s.push(`中毒 ${STATUS.poison.t} 秒，每秒傷害 ${STATUS.poison.dps}，並降低敵人攻擊；持續有效，每隻敵人只中一次`);
-  if (u.slow) s.push(`踩上移動速度減半，每秒傷害 ${u.dps}`);
-  if (u.upgrade) s.push(`第 ${u.upgrade.from} 夜起可升級${u.upgrade.name}（${u.upgrade.cost} 糧）：${u.upgrade.desc}${u.upgrade.poison ? `，中毒 ${STATUS.poison.t} 秒每秒傷害 ${STATUS.poison.dps}` : ''}`);
-  if (u.kind === 'instant') s.push(`九格內每個敵人傷害 ${u.dmg}，嚇退 ${u.panic} 秒`);
-  if (u.push) s.push(`冷卻 ${u.every} 秒，暈眩 ${u.stun} 秒`);
-  if (u.heal) s.push(`周圍 ${u.range === 2 ? '5×5' : '八格'}夥伴每秒回復 ${u.heal} 血量${u.brave ? '；獅子咆哮嚇不停它' : ''}`);
+  s.push(u.hp > 1 ? `血量 ${u.hp}` : '一次性，放下就用掉，沒有血量');
+  if (u.kind === 'producer') s.push(`每 ${u.every} 秒產 ${u.gives} 糧；升級老牧人（${ELDER_COST} 糧）後每 ${(u.every * ELDER_MUL).toFixed(1)} 秒一次`);
+  if (u.kind === 'shooter') s.push(`攻擊間隔 ${u.every} 秒，每次傷害 ${u.dmg}，${u.range ? `射程 ${u.range} 格` : '射程整排'}${u.pierce ? `；穿透整排，每穿一隻傷害剩 ${Math.round(u.falloff * 100)}%` : ''}${u.splash ? `；打同排最遠的敵人，落點 ${u.splash} 格內一起受傷（濺射）` : ''}`);
+  if (u.flees) s.push(`敵人進到 ${u.flees} 格內就逃走（單位消失），該排敵人愣住 3 秒`);
+  if (u.kind === 'blocker') s.push(`不攻擊；修補一次 ${REPAIR_COST} 糧回 ${REPAIR_HP} 血量，間隔 ${REPAIR_CD} 秒${u.tall ? '；賊翻不過' : '；賊會翻過去'}`);
+  if (u.kind === 'dog') s.push(`咬一般敵人每秒 ${u.dps}，咬賊、偷羊人、狐狸、野狗每秒 ${u.hunt}；被咬住的敵人停下改咬狗；血量歸零不會死，回窩休息 ${u.rest} 秒回滿`);
+  if (u.slow) s.push(`鋪地不擋路；踩上的敵人速度 ×${STATUS.slow.mul}、每秒傷害 ${u.dps}；被踩時每秒磨損 ${u.wear}`);
+  if (u.ignite) s.push(`不攻擊；同排射手的石子與箭矢穿過它就帶火，命中的敵人燃燒 ${STATUS.burn.t} 秒、每秒 ${STATUS.burn.dps}，會傳給貼著的敵人`);
+  if (u.kind === 'instant') s.push(`落點周圍九格每個敵人傷害 ${u.dmg}，並嚇退 ${u.panic} 秒（往回跑）`);
+  if (u.push) s.push(`不攻擊；每 ${u.every} 秒吹一次，同排地面敵人後退 ${u.push} 格並暈眩 ${u.stun} 秒（飛的不受影響）`);
+  if (u.heal) s.push(`不攻擊；周圍${u.range === 2 ? ' 5×5 ' : '八格'}受傷的夥伴每秒回復 ${u.heal} 血量，多位相鄰會疊加${u.brave ? '；獅子咆哮嚇不停它' : ''}`);
+  if (u.upgrade) { const p = u.upgrade; s.push(`第 ${p.from} 夜起再點一下花 ${p.cost} 糧升級「${p.name}」：${p.desc}${p.poison ? `；中毒 ${STATUS.poison.t} 秒、每秒 ${STATUS.poison.dps}、攻擊 ×${STATUS.poison.biteMul}，同一隻只中一次` : ''}`); }
   return s.join('・');
 }
 function enemyNums(k) {
   const e = ENEMIES[k], sp = e.speed >= SPEED_FAST ? '快' : e.speed <= SPEED_SLOW ? '慢' : '普通';
-  return `血量 ${e.hp}・${e.bite ? `每秒傷害 ${e.bite}` : '不攻擊'}・移動速度 ${sp}${e.thick ? '・厚皮：石子與箭矢傷害降至四成' : ''}`;
+  const s = [`血量 ${e.hp}`, e.bite ? `每秒傷害 ${e.bite}` : '不攻擊', `移動速度 ${sp}`];
+  if (e.thick) s.push(`厚皮：石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%，機弦、投石機、火、毒全額`);
+  if (e.howl) s.push(`每 ${e.howl} 秒嚎叫：2 格內的狼速度 ×${STATUS.howl.mul}，持續 ${STATUS.howl.t} 秒`);
+  if (e.roar) s.push(`每 ${e.roar} 秒咆哮：2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走`);
+  if (e.wallMul) s.push(`咬牆傷害 ×${e.wallMul}`);
+  if (e.enrage) s.push(`血量低於 ${Math.round(e.enrage * 100)}% 狂暴：速度與傷害 ×2`);
+  if (e.vaults) s.push('翻過石牆（守望樓翻不過）');
+  if (e.steals) s.push(`走到最左邊抱走一隻羊，以每秒 ${e.fleeSpeed} 格往回逃，追上就把羊救回`);
+  if (e.dodge) s.push(`閃避 ${Math.round(e.dodge * 100)}% 的石子與箭矢；狗、荊棘、火把照常`);
+  if (e.digs) s.push(`鑽地繞過前排，從土堆冒出；地下每秒走 ${e.digSpeed} 格`);
+  if (e.flying) s.push('飛越牆、狗、荊棘；只有投射打得到；飛到最左邊就闖進羊圈');
+  return s.join('・');
 }
+// 效果名詞表（圖鑑第三頁籤）：單位說明與敵人提示裡出現的詞，這裡各一句，數字同樣從資料表帶
+const GLOSSARY = [
+  { name: '穿透', ico: '🏹', text: `箭矢穿過整排敵人，每穿一隻傷害剩 ${Math.round(UNITS.archer.falloff * 100)}%。來源：弓箭手` },
+  { name: '濺射', ico: '🛞', text: `砸到最遠的敵人，落點 ${UNITS.catapult.splash} 格內的敵人一起受傷。來源：投石機` },
+  { name: '燃燒', ico: '🔥', text: `每秒傷害 ${STATUS.burn.dps}，持續 ${STATUS.burn.t} 秒；貼著燃燒敵人的其他敵人會被點燃。來源：火盆（石子與箭矢穿過它）` },
+  { name: '中毒', ico: '🦂', text: `每秒傷害 ${STATUS.poison.dps}，持續 ${STATUS.poison.t} 秒，期間攻擊 ×${STATUS.poison.biteMul}；同一片荊棘對同一隻只叮一次。來源：荊棘蠍窩` },
+  { name: '減速', ico: '🌿', text: `踩在荊棘上速度 ×${STATUS.slow.mul}，離開就恢復。來源：荊棘` },
+  { name: '暈眩', ico: '📯', text: `不動也不咬。來源：吹角手（${UNITS.horn.stun} 秒）；雇工逃跑時該排敵人也會愣 3 秒` },
+  { name: '嚇退', ico: '🏺', text: `往回跑 ${UNITS.jar.panic} 秒，跑的時候不咬人。來源：瓦瓶火把` },
+  { name: '咬住', ico: '🐕', text: '牧羊犬咬住的敵人停下不走，改咬狗，直到狗受傷回窩。狗對賊、偷羊人、狐狸、野狗咬得特別痛' },
+  { name: '嚎叫', ico: '🐺', text: `領頭狼每 ${ENEMIES.alpha.howl} 秒一次，2 格內的狼速度 ×${STATUS.howl.mul}，持續 ${STATUS.howl.t} 秒。對策：狗咬住牠` },
+  { name: '咆哮', ico: '🦁', text: `獅子每 ${ENEMIES.lion.roar} 秒一次，2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走` },
+  { name: '狂暴', ico: '🐻', text: `母熊血量低於 ${Math.round(ENEMIES.bear.enrage * 100)}% 時速度與傷害 ×2，直到被打倒` },
+  { name: '厚皮', ico: '🛡', text: `石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%；機弦、投石機、火、毒全額。母熊、獅子都是厚皮` },
+];
 function renderRosterDetail() {
   const box = $('#roster-detail'), k = roster.focus;
   if (!k) { box.innerHTML = roster.mode === 'pick' ? '點一下選或取消，說明會顯示在這裡' : '點一個看說明'; return; }
+  if (roster.tab === 'effects') { const g = GLOSSARY[+k]; if (g) box.innerHTML = `<b>${g.ico} ${g.name}</b><br>${g.text}`; return; }
   if (roster.tab === 'units') {
     const u = UNITS[k];
     const fresh = roster.mode === 'pick' && level.fresh.includes(k);
@@ -875,7 +917,7 @@ function renderRosterDetail() {
 }
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { roster.tab = b.dataset.tab; roster.focus = null; renderRoster(); }));
 $('#roster-go').addEventListener('click', () => { if (roster.picked.size < MIN_CARDS) return; saveLoadout(level.id, sortUnits([...roster.picked])); $('#roster').hidden = true; const cp = pendingCp; pendingCp = null; startGame(cp); });
-$('#roster-back').addEventListener('click', () => { $('#roster').hidden = true; if (roster.from === 'intro') $('#intro').hidden = false; else $('#levels').hidden = false; });
+$('#roster-back').addEventListener('click', () => { $('#roster').hidden = true; if (roster.from === 'intro') $('#intro').hidden = false; else if (roster.from === 'pause') $('#pause').hidden = false; else $('#levels').hidden = false; });
 $('#intro-roster').addEventListener('click', () => openRoster(pickedFor(level) ? 'pick' : 'view', 'intro'));
 $('#levels-codex').addEventListener('click', () => openRoster('view', 'levels'));
 
@@ -926,6 +968,7 @@ function resumeGame() {
 }
 $('#pause-btn').addEventListener('click', pauseGame);
 $('#resume-btn').addEventListener('click', resumeGame);
+$('#pause-codex').addEventListener('click', () => openRoster('view', 'pause')); // 暫停中查圖鑑，看完回暫停
 $('#pause-back').addEventListener('click', () => { resumeGame(); backToLevels(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
 
