@@ -16,7 +16,7 @@
 | hireling | 雇工 | 小噴菇 | 約 10:12 見狼就逃 | 便宜短射程，狼靠近就逃，逃跑時該排狼追牠停 3 秒 | 3 |
 | tower | 守望樓 | 高堅果 | 賽 5:2 園中蓋樓 | 厚牆，賊翻不過 | 3 |
 | archer | 弓箭手 | 穿透 | 創 21:20 曠野的弓箭手 | 一箭穿整排，每穿一隻傷害遞減 | 4 |
-| thorns | 荊棘 | 地刺 | 何 2:6 荊棘堵塞道路 | 鋪地，踩上變慢又掉血，踩久了會爛（磨損 3/秒）。**第 5 夜起再點一下花 50 糧升級「荊棘蠍窩」**（申 8:15）：踩入中毒 8 秒每秒 4、咬合變弱，可觸發 8 次，撒完荊棘還在。10/16 James 拍板把蠍窩併進荊棘升級，`upgrade` 欄位通用 | 4（升級 5） |
+| thorns | 荊棘 | 地刺 | 何 2:6 荊棘堵塞道路 | 鋪地，踩上變慢又掉血，踩久了會爛（磨損 3/秒）。**第 5 夜起再點一下花 50 糧升級「荊棘蠍窩」**（申 8:15）：踩入中毒 8 秒每秒 4、咬合變弱，持續有效（同一隻只中一次）。10/16 James 拍板把蠍窩併進荊棘升級，`upgrade` 欄位通用；10/17 拍板拿掉 8 次上限（那是獨立陷阱時代的遺留，題材上蠍子住在荊棘裡不會用完） | 4（升級 5） |
 | brazier | 火盆 | 火炬樹樁 | 路 2:8 夜間按更次看守 | 石子箭矢穿過變火，命中灼傷且會傳火 | 5 |
 | jar | 瓦瓶火把 | 櫻桃炸彈 | 士 7:19 基甸打破瓶子 | 一次性，九格內的狼受傷並驚慌往回跑 | 6 |
 | horn | 吹角手 | （擊退） | 民 10:9 吹角敵人被擊退 | 每 20 秒該排狼退一格並暫停 | 6 |
@@ -34,7 +34,7 @@
 ## 暫停與檢查點（2026-10-16 James 拍板）
 
 - 暫停：#pause-btn 或 visibilitychange→hidden 都蓋 #pause 層；`paused` 與開發者列共用。原本切背景 rAF 停＋dt 上限 0.05 就等於暫停，差在回來會先看到暫停畫面。
-- 檢查點：引擎每清完一波發 `waveclear`，畫面層存 `Engine.snapshot(G)`（levelId／diff／wave／food／sheep／sheepLost／seen／units 的 type,r,c,hp,elder,upgraded,uses,cd＝修補冷卻剩幾秒）到 localStorage `sheepfold-checkpoint`。開場頁用 `Engine.checkSnapshot(snap, levelId)` 驗過才顯示「繼續上次」（關卡、難度、波數 ≥1、糧為非負數、每個單位種類存在且座標在棋盤內）；驗不過就清掉並在開場頁寫「存檔讀不出來」。`Engine.restore` 再多驗難度要跟這一局相同、波數小於總波數，用 makeUnit 重放單位、老牧人節奏套 ELDER_MUL、phase=rest、timer=WAVE_REST+4、killed 依已清波數算；不存敵人與投射物。
+- 檢查點：引擎每清完一波發 `waveclear`，畫面層存 `Engine.snapshot(G)`（levelId／diff／wave／food／sheep／sheepLost／seen／units 的 type,r,c,hp,elder,upgraded,cd＝修補冷卻剩幾秒（舊存檔的 uses 欄位仍驗格式但忽略））到 localStorage `sheepfold-checkpoint`。開場頁用 `Engine.checkSnapshot(snap, levelId)` 驗過才顯示「繼續上次」（關卡、難度、波數 ≥1、糧為非負數、每個單位種類存在且座標在棋盤內）；驗不過就清掉並在開場頁寫「存檔讀不出來」。`Engine.restore` 再多驗難度要跟這一局相同、波數小於總波數，用 makeUnit 重放單位、老牧人節奏套 ELDER_MUL、phase=rest、timer=WAVE_REST+4、killed 依已清波數算；不存敵人與投射物。
 - 2026-10-16 code review 後補的規則：贏／輸／重新開始**同一關**才清（開別關不動別關的存檔）；開過開發者面板（`devUsed`）的那一局不存；「繼續上次」走跟「開始守夜」一樣的點兵檢查，難度只套這一局不寫回 `sheepfold-diff`；還原半途丟例外會整個重建新局。測試在 `sim/checkpoint.test.js`、`sim/vault.test.js`（`node --test sim/*.test.js`；不要給整個 sim/ 目錄，simulate.js 不是測試）。
 
 ## 第 1 關手把手教學（2026-10-16 James 拍板）

@@ -97,7 +97,7 @@
     const def = UNITS[k];
     const u = { id: G.nextId++, type: k, r, c, hp: def.hp, maxHp: def.hp, timer: def.every ? def.every * 0.6 : 0, fear: 0, elder: false };
     if (def.kind === 'dog') { u.x = c; u.holding = null; }
-    if (def.kind === 'floor') { u.uses = def.uses || 0; u.stung = new Set(); }
+    if (def.kind === 'floor') u.stung = new Set(); // 記住叮過誰，同一隻只中一次毒
     if (k === 'horn') u.timer = 6; // 剛放下不會馬上吹
     G.units[key(r, c)] = u;
     ev(G, { t: 'unit', r, c });
@@ -107,7 +107,7 @@
   // ====== 檢查點：每清完一波存一次，只存場上單位與糧，不存敵人，所以永遠從下一波的開頭接 ======
   function snapshot(G) {
     return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep, sheepLost: G.sheepLost, seen: [...G.seen],
-      units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded, uses: u.uses,
+      units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded,
         cd: u.repairAt ? Math.max(0, Math.round((u.repairAt - G.time) * 10) / 10) : 0 })) };
   }
   // 存檔長得對不對：關卡、難度、波數、糧、每個單位的種類與座標都要在範圍內（localStorage 可能被改壞或版本變了）
@@ -131,7 +131,6 @@
       const u = makeUnit(G, s.r, s.c, s.type);
       if (s.elder && def.every) { u.elder = true; u.timer = Math.min(u.timer, def.every * ELDER_MUL); }
       if (s.upgraded && def.upgrade) u.upgraded = true;
-      if (typeof s.uses === 'number') u.uses = s.uses;
       if (typeof s.cd === 'number' && s.cd > 0) u.repairAt = G.time + s.cd;
       u.hp = Math.min(u.maxHp, Math.max(1, Number.isFinite(s.hp) ? s.hp : u.maxHp));
     }
@@ -161,7 +160,7 @@
       const up = def.upgrade;
       if (G.level.id < up.from) return { ok: false, msg: `第 ${up.from} 夜起才學會${up.name}` };
       if (G.food < up.cost) return { ok: false, msg: `${up.name}要 ${up.cost} 糧` };
-      G.food -= up.cost; u.upgraded = true; if (up.uses) u.uses = up.uses;
+      G.food -= up.cost; u.upgraded = true;
       ev(G, { t: 'unit', r, c }); ev(G, { t: 'pop', r, c, text: up.name });
       return { ok: true, msg: `${up.name}好了，${up.desc}` };
     }
@@ -402,10 +401,9 @@
         for (const e of G.enemies) {
           if (e.r !== u.r || !targetable(e) || ENEMIES[e.type].flying) continue;
           if (Math.abs(e.x - u.c) >= 0.5) continue;
-          if (eff.poison && u.uses > 0 && !u.stung.has(e.id)) {
-            u.stung.add(e.id); e.st.poison = eff.poison; u.uses--;
+          if (eff.poison && !u.stung.has(e.id)) { // 蠍子不會用完，但同一隻只叮一次
+            u.stung.add(e.id); e.st.poison = eff.poison;
             ev(G, { t: 'fx', kind: 'sting', r: e.r, x: e.x }); ev(G, { t: 'unit', r: u.r, c: u.c });
-            if (u.uses <= 0 && !eff.slow) { u.hp = 0; } // 純陷阱用完就沒了；荊棘撒完蠍子還在
           }
           if (eff.slow) { e.st.slow = 0.15; hurt(G, e, def.dps * dt); u.hp -= def.wear * dt; if (G.rng() < dt * 3) ev(G, { t: 'unit', r: u.r, c: u.c }); if (u.hp <= 0) break; }
         }

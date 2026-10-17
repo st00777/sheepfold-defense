@@ -27,8 +27,8 @@ const UNITS = {
               desc: '箭矢穿透整排，每穿一隻傷害降低', ref: '創 21:20' },
   thorns:   { name: '荊棘',     ico: '🌿',   cost: 75,  hp: 150, kind: 'floor', slow: 0.5, dps: 6, wear: 3,
               desc: '鋪地減速並持續傷害，踩久會損壞。放在射手前面最划算；第 5 夜起再點一下撒蠍子', ref: '何 2:6',
-              // 升級：再點一下花糧撒蠍子進去，踩入的敵人中毒（from＝第幾夜起學會）
-              upgrade: { name: '荊棘蠍窩', ico: '🦂', cost: 50, from: 5, poison: 8, uses: 8, desc: '撒蠍子進荊棘，踩入的敵人中毒，可觸發 8 次', ref: '申 8:15' } },
+              // 升級：再點一下花糧撒蠍子進去，踩入的敵人中毒（from＝第幾夜起學會）；持續有效，每隻敵人同一片荊棘只叮一次
+              upgrade: { name: '荊棘蠍窩', ico: '🦂', cost: 50, from: 5, poison: 8, desc: '撒蠍子進荊棘，踩入的敵人中毒，持續有效', ref: '申 8:15' } },
   brazier:  { name: '火盆',     ico: '🔥',   cost: 75,  hp: 100, kind: 'support', ignite: true,
               desc: '點燃穿過的石子與箭矢，燃燒會傳給隔壁敵人', ref: '路 2:8' },
   jar:      { name: '瓦瓶火把', ico: '🏺',   cost: 100, hp: 0,   kind: 'instant', dmg: 30, panic: 2.5,

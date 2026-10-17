@@ -535,7 +535,7 @@ function renderUnit(r, c) {
   d.className = 'unit ' + u.type + (u.elder ? ' elder' : '') + (u.upgraded ? ' upgraded' : '') + (u.fear > 0 ? ' fear' : '');
   d.style.setProperty('--u', `var(--u-${u.type})`);
   const ico = def.kind === 'dog' ? '🦴' : def.ico;
-  const sting = u.upgraded && def.upgrade.uses ? `<div class="badge">${def.upgrade.ico}${u.uses}</div>` : '';
+  const sting = u.upgraded && def.upgrade && def.upgrade.ico ? `<div class="badge">${def.upgrade.ico}</div>` : ''; // 升級角標：荊棘 🦂、纏裹的牧人 🫗
   const bar = sting + ((u.maxHp > 1 && def.kind !== 'dog') ? `<div class="hp"><i style="transform:scaleX(${(u.hp / u.maxHp).toFixed(3)})"></i></div>` : '');
   d.innerHTML = `${ico}${bar}`;
   cell.appendChild(d);
@@ -847,7 +847,7 @@ function unitNums(k) {
   if (u.kind === 'shooter') s.push(`攻擊間隔 ${u.every} 秒，每次傷害 ${u.dmg}${u.range ? `，射程 ${u.range} 格` : ''}${u.pierce ? '，穿透整排' : ''}${u.splash ? '，濺射波及落點周圍' : ''}`);
   if (u.kind === 'blocker') s.push(`修補一次 ${REPAIR_COST} 糧，回復 ${REPAIR_HP} 血量`);
   if (u.kind === 'dog') s.push(`一般目標每秒傷害 ${u.dps}；賊、偷羊人、狐狸、野狗每秒 ${u.hunt}；受傷回窩休息 ${u.rest} 秒回滿`);
-  if (u.poison) s.push(`可觸發 ${u.uses} 次；中毒 ${STATUS.poison.t} 秒，每秒傷害 ${STATUS.poison.dps}，並降低敵人攻擊`);
+  if (u.poison) s.push(`中毒 ${STATUS.poison.t} 秒，每秒傷害 ${STATUS.poison.dps}，並降低敵人攻擊；持續有效，每隻敵人只中一次`);
   if (u.slow) s.push(`踩上移動速度減半，每秒傷害 ${u.dps}`);
   if (u.upgrade) s.push(`第 ${u.upgrade.from} 夜起可升級${u.upgrade.name}（${u.upgrade.cost} 糧）：${u.upgrade.desc}${u.upgrade.poison ? `，中毒 ${STATUS.poison.t} 秒每秒傷害 ${STATUS.poison.dps}` : ''}`);
   if (u.kind === 'instant') s.push(`九格內每個敵人傷害 ${u.dmg}，嚇退 ${u.panic} 秒`);
