@@ -226,6 +226,11 @@
   .btn[hidden] { display: none; }
   .btn:disabled { opacity: .4; cursor: default; }
   .tips { font-size: 13px; color: var(--muted); text-align: left; margin-top: 10px; line-height: 1.6; }
+  /* 今晚有新夥伴：先引去圖鑑看一眼再開打（只提醒一次） */
+  .newbox { background: #0004; border: 1px solid var(--new); border-radius: 10px; padding: 10px 12px 12px; margin-top: 8px; font-size: 14px; line-height: 1.6; }
+  .newbox[hidden] { display: none; }
+  .newbox .btn { margin-top: 6px; padding: 9px 22px; font-size: 15px; }
+  .btn.quiet { background: transparent; color: var(--text); border: 1px solid var(--muted); }
   .tips .new { color: var(--new); }
   #best { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
@@ -338,6 +343,10 @@
     <h1 id="intro-title"></h1>
     <div class="ref" id="intro-ref"></div>
     <p id="intro-text"></p>
+    <div class="newbox" id="intro-new" hidden>
+      <div id="intro-new-text"></div>
+      <button class="btn" id="intro-new-btn">先看圖鑑</button>
+    </div>
     <div class="tips" id="intro-tips"></div>
     <div id="diffs">
       <button class="diff" data-key="calm">寧靜夜</button>
@@ -526,6 +535,7 @@ function openIntro(L) {
   const t = $('#intro-text');
   t.innerHTML = L.speaker ? `<span class="who">${L.speaker}：</span>${L.intro}` : `<div class="verse">${L.intro}</div>`;
   $('#intro-tips').innerHTML = L.fresh.map(k => `<div class="new">${UNITS[k].ico} ${UNITS[k].name}：${UNITS[k].desc}</div>`).join('') + (L.tips || []).map(x => `<div>${x}</div>`).join('');
+  showIntroNew(L);
   applyDiff(savedDiff()); // 回開場頁一律用平常的預設難度（續玩那一局可能臨時換過）
   showBest();
   const lo = pickedFor(L);
@@ -542,6 +552,33 @@ function openIntro(L) {
   if (mine) $('#resume-text').textContent = hasCp ? `上次${DIFFS[cp.diff].name}守到第 ${cp.wave} 波，場上的人都還在。` : CP_BROKEN;
   $('#start').textContent = hasCp ? '重新開始' : '開始守夜';
   $('#levels').hidden = true; $('#intro').hidden = false;
+}
+// 這一夜新開的卡、或舊卡在這一夜學會的新招（升級 from＝這一夜），第一次來先引去圖鑑看
+const NKEY = 'sheepfold-intro-seen';
+function introSeen() { try { return JSON.parse(localStorage.getItem(NKEY) || '[]'); } catch (e) { return []; } }
+function newThisNight(L) {
+  const seen = introSeen();
+  const fresh = L.fresh.filter(k => !seen.includes(`${L.id}:${k}`));
+  const upg = L.units.filter(k => UNITS[k].upgrade && UNITS[k].upgrade.from === L.id && !L.fresh.includes(k) && !seen.includes(`${L.id}:${k}`));
+  return { fresh, upg };
+}
+function showIntroNew(L) {
+  const { fresh, upg } = newThisNight(L);
+  const box = $('#intro-new'), any = fresh.length || upg.length;
+  box.hidden = !any;
+  $('#start').classList.toggle('quiet', !!any); // 有新夥伴時主按鈕讓給「先看圖鑑」
+  if (!any) return;
+  const parts = [];
+  if (fresh.length) parts.push(`今晚有新夥伴：${fresh.map(k => `${UNITS[k].ico} ${UNITS[k].name}`).join('、')}`);
+  if (upg.length) parts.push(`${upg.map(k => `${UNITS[k].ico} ${UNITS[k].name}`).join('、')}學會新招：${upg.map(k => UNITS[k].upgrade.name).join('、')}`);
+  $('#intro-new-text').textContent = parts.join('；') + '。先去圖鑑看一眼怎麼用，再開始守夜。';
+  $('#intro-new-btn').onclick = () => {
+    const focus = fresh[0] || upg[0];
+    try { const a = introSeen(); for (const k of [...fresh, ...upg]) a.push(`${L.id}:${k}`); localStorage.setItem(NKEY, JSON.stringify(a)); } catch (e) {}
+    openRoster(pickedFor(L) ? 'pick' : 'view', 'intro');
+    roster.focus = focus; renderRoster();
+    const el = [...document.querySelectorAll('#roster-grid .rc')].find(x => x.dataset.key === focus); if (el) el.scrollIntoView({ block: 'nearest' });
+  };
 }
 function savedDiff() { try { const k = localStorage.getItem('sheepfold-diff'); return DIFFS[k] ? k : diff; } catch (e) { return diff; } }
 function applyDiff(key, save = true) {
@@ -928,9 +965,10 @@ function renderRoster() {
   if (roster.tab === 'units') {
     for (const k of roster.units) {
       const u = UNITS[k], d = document.createElement('div');
-      const fresh = roster.mode === 'pick' && level.fresh.includes(k);
+      const fresh = (roster.mode === 'pick' || roster.from === 'intro') && level.fresh.includes(k);
       const away = roster.mode !== 'pick' && roster.from === 'intro' && !level.units.includes(k); // 這一夜不同行的夥伴
       d.className = 'rc' + (roster.mode === 'pick' ? (roster.picked.has(k) ? ' on' : ' off') : away ? ' off' : '') + (u.kind === 'instant' ? ' once' : '') + (roster.focus === k ? ' focus' : '');
+      d.dataset.key = k;
       d.style.setProperty('--u', `var(--u-${k})`);
       d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag fresh">新</div>' : ''}${u.kind === 'instant' ? '<div class="tag once">一次</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
       d.addEventListener('click', () => tapRoster(k));
@@ -1038,9 +1076,10 @@ function renderRosterDetail() {
   if (roster.tab === 'effects') { const g = GLOSSARY[+k]; if (g) box.innerHTML = `<b>${g.ico} ${g.name}</b><br>${g.text}`; return; }
   if (roster.tab === 'units') {
     const u = UNITS[k];
-    const fresh = roster.mode === 'pick' && level.fresh.includes(k);
+    const fresh = (roster.mode === 'pick' || roster.from === 'intro') && level.fresh.includes(k);
     const away = roster.mode !== 'pick' && roster.from === 'intro' && !level.units.includes(k);
-    const note = away ? '<br><span class="new">這一夜還沒遇見，要到後面的夜才會同行</span>' : roster.mode !== 'pick' ? '' : k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : fresh ? '<br><span class="new">這一夜新開的卡，建議帶上</span>' : '';
+    const learns = roster.from === 'intro' && u.upgrade && u.upgrade.from === level.id;
+    const note = away ? '<br><span class="new">這一夜還沒遇見，要到後面的夜才會同行</span>' : fresh ? `<br><span class="new">這一夜新開的卡${roster.mode === 'pick' ? '，建議帶上' : ''}</span>` : learns ? `<br><span class="new">這一夜起學會「${u.upgrade.name}」：放下後再點一下</span>` : roster.mode === 'pick' && k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : '';
     box.innerHTML = `<b>${u.ico} ${u.name}</b>　<span class="num">🌾 ${u.cost}</span><br>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${u.ref}${u.upgrade ? '・升級 ' + u.upgrade.ref : ''}</div>`;
   } else {
     const e = ENEMIES[k];
@@ -1049,7 +1088,7 @@ function renderRosterDetail() {
 }
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { roster.tab = b.dataset.tab; roster.focus = null; renderRoster(); }));
 $('#roster-go').addEventListener('click', () => { if (roster.picked.size < MIN_CARDS) return; saveLoadout(level.id, sortUnits([...roster.picked])); $('#roster').hidden = true; const cp = pendingCp; pendingCp = null; startGame(cp); });
-$('#roster-back').addEventListener('click', () => { $('#roster').hidden = true; if (roster.from === 'intro') $('#intro').hidden = false; else if (roster.from === 'pause') $('#pause').hidden = false; else $('#levels').hidden = false; });
+$('#roster-back').addEventListener('click', () => { $('#roster').hidden = true; if (roster.from === 'intro') { showIntroNew(level); $('#intro').hidden = false; } else if (roster.from === 'pause') $('#pause').hidden = false; else $('#levels').hidden = false; });
 $('#intro-roster').addEventListener('click', () => openRoster(pickedFor(level) ? 'pick' : 'view', 'intro'));
 $('#levels-codex').addEventListener('click', () => openRoster('view', 'levels'));
 
