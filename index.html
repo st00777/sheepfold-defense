@@ -39,7 +39,18 @@
   #food { color: var(--gold); }
   #sheep[hidden] { display: none; }
   #wave-info { color: var(--muted); }
-  #pause-btn { font: inherit; font-size: 16px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 2px 9px; margin-left: 8px; cursor: pointer; }
+  #pause-btn, #snd-btn { font: inherit; font-size: 16px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 2px 9px; margin-left: 8px; cursor: pointer; }
+  /* 聲音設定（暫停層）：一列一個選項，右邊是開關或三檔 */
+  .snd { text-align: left; margin: 12px 0 4px; }
+  .snd-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-top: 1px solid #0004; font-size: 15px; }
+  .snd-row:first-child { border-top: 0; }
+  .snd-row .seg { display: flex; gap: 4px; }
+  .snd-row button { font: inherit; font-size: 14px; background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 8px; padding: 5px 14px; cursor: pointer; min-width: 52px; }
+  .snd-row button.on { border-color: var(--gold); background: var(--card-on); }
+  .snd-note { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: left; }
+  /* 開場頁右上角的喇叭：第一次進來就看得到，聲音響起前就能關 */
+  .dialog { position: relative; }
+  .corner { position: absolute; right: 12px; top: 12px; font: inherit; font-size: 18px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 3px 9px; cursor: pointer; }
   #resume-line { margin-top: 10px; }
   #resume-line[hidden] { display: none; }
 
@@ -75,8 +86,8 @@
   #tut-skip { display: none; margin: 6px auto 0; font: inherit; font-size: 12px; background: transparent; color: var(--muted); border: 1px solid var(--muted); border-radius: 6px; padding: 3px 10px; }
   #tut-skip.on { display: block; }
   /* 按壓回饋：所有可按的東西都縮一點點 */
-  .btn, .diff, .tab, .lv, .rc, #pause-btn, #tut-skip { transition: transform 120ms var(--ease-out); }
-  .card:active, .btn:not(:disabled):active, .diff:active, .tab:active, .lv:not(.locked):active, .rc:not(.locked):active, #pause-btn:active, #tut-skip:active { transform: scale(.97); }
+  .btn, .diff, .tab, .lv, .rc, #pause-btn, #snd-btn, .corner, .snd-row button, #tut-skip { transition: transform 120ms var(--ease-out); }
+  .card:active, .btn:not(:disabled):active, .diff:active, .tab:active, .lv:not(.locked):active, .rc:not(.locked):active, #pause-btn:active, #snd-btn:active, .corner:active, .snd-row button:active, #tut-skip:active { transform: scale(.97); }
 
   /* 棋盤 */
   #board-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; }
@@ -239,7 +250,7 @@
     .card.new::after, .cell.teach::before { opacity: .8; }
     .pop, .fx { animation-name: fadeOut; animation-duration: .5s; }
     .dialog { transition: opacity 200ms; }
-    .card:active, .btn:active, .diff:active, .tab:active, .lv:active, .rc:active, #pause-btn:active, #tut-skip:active { transform: none; }
+    .card:active, .btn:active, .diff:active, .tab:active, .lv:active, .rc:active, #pause-btn:active, #snd-btn:active, .corner:active, .snd-row button:active, #tut-skip:active { transform: none; }
   }
   @keyframes fadeOut { to { opacity: 0; } }
 </style>
@@ -249,7 +260,7 @@
 <div id="top">
   <span>🌾 糧 <b id="food">0</b></span>
   <span id="sheep" hidden>🐑 <b id="sheep-n">3</b></span>
-  <span><span id="wave-info">準備中</span><button id="pause-btn" title="暫停">⏸</button></span>
+  <span><span id="wave-info">準備中</span><button id="snd-btn" class="snd-btn" title="聲音">🔊</button><button id="pause-btn" title="暫停">⏸</button></span>
 </div>
 
 <div id="cards-wrap"><div id="cards"></div></div>
@@ -277,6 +288,7 @@
 <!-- 關卡選單 -->
 <div class="overlay" id="levels">
   <div class="dialog">
+    <button class="corner snd-btn" id="snd-btn-levels" title="聲音">🔊</button>
     <h1>羊圈守夜</h1>
     <div class="ref">受託守夜的無名牧人。每一夜都是聖經裡牧人真的守過的夜。</div>
     <div id="lv-list"></div>
@@ -326,6 +338,12 @@
   <div class="dialog">
     <h1>暫停中</h1>
     <p>狼也在等。回來再按繼續。</p>
+    <div class="snd" id="snd-panel">
+      <div class="snd-row"><span>音效</span><button data-snd="sfx">開</button></div>
+      <div class="snd-row"><span>蟲鳴</span><button data-snd="amb">關</button></div>
+      <div class="snd-row"><span>音量</span><div class="seg"><button data-vol="0">小</button><button data-vol="1">中</button><button data-vol="2">大</button></div></div>
+    </div>
+    <div class="snd-note">手機切到靜音時不會有聲音。</div>
     <button class="btn" id="resume-btn">繼續</button>
     <button class="btn alt" id="pause-codex">圖鑑</button>
     <button class="btn alt" id="pause-back">回關卡</button>
@@ -344,8 +362,9 @@
   </div>
 </div>
 
-<script src="data.js?v=5"></script>
-<script src="engine.js?v=5"></script>
+<script src="data.js?v=6"></script>
+<script src="engine.js?v=6"></script>
+<script src="sound.js?v=6"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、DIFFS、LEVELS 由 data.js 直接提供
@@ -520,6 +539,7 @@ function tapCell(r, c) {
   const res = Engine.place(G, r, c, selected);
   flushEvents();
   if (!res.ok) { toast(res.msg || ''); return; }
+  if (UNITS[selected].kind !== 'instant') Sound.play('place'); // 瓦瓶的聲音走 fx blast
   clearSelection();
   if (tut.on) { tutAdvance(); return; }
   toast(res.msg);
@@ -544,6 +564,9 @@ function renderUnit(r, c) {
 
 // ====== 畫面上的一次性效果 ======
 const FX = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤' };
+// 引擎事件對應的音效（名稱在 sound.js）；沒列的就沒聲音
+const FX_SFX = { blast: 'blast', ignite: 'ignite', horn: 'horn', emerge: 'emerge', grab: 'grab', splash: 'hit', enrage: 'growl', rest: 'whine', howl: 'howl', roar: 'roar', flee: 'whine' };
+const SPAWN_SFX = {}; // 出生就叫的敵人（第二章的夜鴞、豹會放進來）
 function fx(kind, r, x, id) {
   if (kind === 'mound') { const d = spawnFx('🕳️', r, x, true); moundEls.set(id, d); return; }
   if (kind === 'emerge') { const d = moundEls.get(id); if (d) { d.remove(); moundEls.delete(id); } }
@@ -589,15 +612,16 @@ function flushEvents() {
   const spawned = [];
   for (const e of G.events) {
     switch (e.t) {
-      case 'spawn': spawned.push(e.e.type); break;
+      case 'spawn': spawned.push(e.e.type); if (SPAWN_SFX[e.e.type]) Sound.play(SPAWN_SFX[e.e.type]); break;
       case 'toast': toast(e.msg); break;
+      case 'die': Sound.play('die'); break;
       case 'callout': if (!seenEnemy(e.type)) { toast(`${ENEMIES[e.type].ico} ${e.tip}`, true); markSeenEnemy(e.type); } break;
-      case 'pop': pop(e.r, e.c, e.text); break;
+      case 'pop': pop(e.r, e.c, e.text); if (e.text[0] === '+') Sound.play('food'); break;
       case 'unit': renderUnit(e.r, e.c); break;
-      case 'fx': fx(e.kind, e.r, e.x, e.id); break;
+      case 'fx': fx(e.kind, e.r, e.x, e.id); if (FX_SFX[e.kind]) Sound.play(FX_SFX[e.kind]); break;
       case 'marker': setMarker(e.r, e.type); break;
       case 'sheep': $('#sheep-n').textContent = G.sheep; break;
-      case 'waveclear': if (!devUsed && e.wave < G.waves.length) saveCheckpoint(Engine.snapshot(G)); break;
+      case 'waveclear': Sound.play('clear'); if (!devUsed && e.wave < G.waves.length) saveCheckpoint(Engine.snapshot(G)); break;
       case 'win': onWin(); break;
       case 'lose': onLose(e.reason); break;
     }
@@ -612,7 +636,9 @@ function tick(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (paused) return;
   // 加速時分成小步跑，數值行為才跟 1× 一樣
+  const wasWave = G.phase === 'wave';
   for (let i = 0; i < speed; i++) { Engine.step(G, dt); flushEvents(); if (G.over) break; }
+  if (!wasWave && G.phase === 'wave') Sound.play('wave');
   draw();
 }
 
@@ -633,8 +659,9 @@ function draw() {
     `第 ${G.wave} / ${n} 波`);
 
   const alive = new Set();
+  let biting = false;
   for (const e of G.enemies) {
-    alive.add(e.id);
+    alive.add(e.id); if (e.biting || e.heldBy) biting = true;
     let el = els.get(e.id);
     if (!el) {
       const def = ENEMIES[e.type];
@@ -654,7 +681,7 @@ function draw() {
   for (const s of G.shots) {
     alive.add(s.id);
     let el = els.get(s.id);
-    if (!el) { el = document.createElement('div'); el.className = 'shot ' + s.kind; board.appendChild(el); els.set(s.id, el); }
+    if (!el) { el = document.createElement('div'); el.className = 'shot ' + s.kind; board.appendChild(el); els.set(s.id, el); Sound.play('shot'); }
     el.classList.toggle('burn', !!s.burn);
     const lift = s.kind === 'lob' ? Math.sin(Math.min(1, s.t) * Math.PI) * 0.6 : 0;
     el.style.transform = `translate(${(s.x / COLS * bw - 6).toFixed(1)}px, ${((s.r + 0.5 - lift) / ROWS * bh - 6).toFixed(1)}px)`;
@@ -669,6 +696,7 @@ function draw() {
     el.querySelector('.hp > i').style.transform = `scaleX(${(Math.max(0, u.hp) / u.maxHp).toFixed(3)})`;
   }
   for (const [id, el] of els) if (!alive.has(id)) { el.remove(); els.delete(id); }
+  if (biting) Sound.play('bite'); // sound.js 自己限流，每 0.45 秒最多一聲
 
   $('#bar > i').style.transform = `scaleX(${G.total ? (G.killed / G.total).toFixed(3) : 0})`;
   const f = Math.floor(G.food);
@@ -701,6 +729,7 @@ function recordBest(cleared) {
   saveProgress();
 }
 function onWin() {
+  Sound.ambient(false); Sound.play('dawn');
   recordBest(true); clearCheckpoint(level.id);
   const next = LEVELS.find(l => l.id === level.id + 1);
   endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${level.outroWin}`);
@@ -711,6 +740,7 @@ function onWin() {
   }
 }
 function onLose(reason) {
+  Sound.ambient(false); Sound.play('lose');
   recordBest(false); clearCheckpoint(level.id);
   const titles = { wolf: '狼闖進羊圈了', bird: '鷙鳥飛進羊圈了', sheep: '羊被偷光了' };
   const text = (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
@@ -751,9 +781,10 @@ function startGame(fromCp) {
   if (!resumed && level.id === 1 && (!tutDone() || /[?&]tut/.test(location.search))) tutStart();
   last = performance.now();
   raf = requestAnimationFrame(tick);
+  Sound.ambient(true);
 }
 function backToLevels() {
-  clearBoard();
+  clearBoard(); Sound.ambient(false);
   if (G) G.over = true; // 中途回關卡不清檢查點，之後可以「繼續上次」
   paused = false; $('#pause').hidden = true; syncPause();
   buildLevels();
@@ -960,7 +991,7 @@ function syncPause() { board.classList.toggle('paused', paused); $('#dev-pause')
 function pauseGame() {
   if (!G || G.over || paused) return;
   if (!$('#result').hidden || !$('#roster').hidden || !$('#intro').hidden || !$('#levels').hidden) return;
-  paused = true; $('#pause').hidden = false; syncPause();
+  paused = true; $('#pause').hidden = false; syncPause(); syncSoundUI();
 }
 function resumeGame() {
   paused = false; $('#pause').hidden = true; syncPause();
@@ -970,7 +1001,22 @@ $('#pause-btn').addEventListener('click', pauseGame);
 $('#resume-btn').addEventListener('click', resumeGame);
 $('#pause-codex').addEventListener('click', () => openRoster('view', 'pause')); // 暫停中查圖鑑，看完回暫停
 $('#pause-back').addEventListener('click', () => { resumeGame(); backToLevels(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden) pauseGame(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { pauseGame(); Sound.suspend(); } else Sound.resume(); });
+
+// ====== 聲音設定 ======
+// 頂欄與開場頁的喇叭：一下切全部靜音；暫停層裡才有細項（音效／蟲鳴／音量三檔）
+function syncSoundUI() {
+  const p = Sound.prefs;
+  document.querySelectorAll('.snd-btn').forEach(b => { b.textContent = p.sfx ? '🔊' : '🔇'; b.title = p.sfx ? '聲音：開（點一下靜音）' : '聲音：關（點一下打開）'; });
+  document.querySelectorAll('#snd-panel [data-snd]').forEach(b => { const on = !!p[b.dataset.snd]; b.textContent = on ? '開' : '關'; b.classList.toggle('on', on); });
+  document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.classList.toggle('on', Number(b.dataset.vol) === p.vol));
+}
+document.querySelectorAll('.snd-btn').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); Sound.set('sfx', !Sound.prefs.sfx); syncSoundUI(); Sound.play('tap'); }));
+document.querySelectorAll('#snd-panel [data-snd]').forEach(b => b.addEventListener('click', () => { Sound.set(b.dataset.snd, !Sound.prefs[b.dataset.snd]); syncSoundUI(); Sound.play('tap'); }));
+document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.addEventListener('click', () => { Sound.set('vol', Number(b.dataset.vol)); syncSoundUI(); Sound.play('clear'); }));
+// iOS 要有一次手勢才能出聲：第一次點任何地方就把聲音打開
+document.addEventListener('pointerdown', () => Sound.unlock(), { capture: true, passive: true });
+syncSoundUI();
 
 // 檢查點：每清完一波存一次，每關各存一份（去玩別關不會蓋掉）；守完、輸了、重新開始同一關只清自己這關的
 const CKEY = id => `sheepfold-checkpoint-${id}`;
