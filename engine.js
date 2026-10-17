@@ -6,6 +6,7 @@
   const D = (typeof module !== 'undefined') ? require('./data.js') : root.DATA;
   const { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE } = D;
 
+  const STRAY = D.STRAY; // 迷羊（第二章的中立角色）
   const SHOT_SPEED = { stone: 6, arrow: 9, sling: 7 };
   const THICK_MUL = D.THICK_MUL ?? 0.35; // 厚皮敵人吃石子、箭的比例（正本在 data.js）
   const LOB_TIME = 0.8;
@@ -63,16 +64,31 @@
       sheep: level.sheep || 0, sheepLost: 0,
       over: false, result: null, events: [], seen: new Set(), started: false, holdWaves: false, // holdWaves：教學中先不放狼
       nextId: 1, time: 0,
+      // 第二章：nextVisible 無月夜時腳印看不看得見；strays 場上的迷羊、strayQueue 這波還沒出來的迷羊（秒）；hand 送卡模式手上的卡
+      nextVisible: true, strays: [], strayQueue: [], waveT: 0, hand: [], convT: 0,
     };
+    if (level.conveyor) { G.food = 0; G.taughtElder = G.taughtRepair = true; for (let i = 0; i < (level.conveyor.start || 3); i++) dealCard(G); } // 沒有糧：不教升級修補
     return G;
   }
+
+  // ====== 送卡模式（第 11 夜「拉班的工價」）：卡片定時送到手上，費用 0，不能自己選 ======
+  function dealCard(G) {
+    const cv = G.level.conveyor; if (!cv || G.hand.length >= (cv.max || 6)) return false;
+    const pool = Object.entries(cv.weights).filter(([k]) => UNITS[k] && G.level.units.includes(k));
+    const tot = pool.reduce((n, [, w]) => n + w, 0); let x = G.rng() * tot;
+    for (const [k, w] of pool) { x -= w; if (x <= 0) { G.hand.push(k); ev(G, { t: 'hand' }); return true; } }
+    return false;
+  }
+  // 這一波提示點名的卡一定先送到（沒有才補）
+  function dealNamed(G, k) { const cv = G.level.conveyor; if (!cv || !UNITS[k] || G.hand.includes(k)) return; if (G.hand.length >= (cv.max || 6)) G.hand.shift(); G.hand.push(k); ev(G, { t: 'hand' }); }
+  function conveyorEvery(G) { const cv = G.level.conveyor; return (cv.every || 5.5) * (G.diff === 'calm' ? 1 : 0.82); }
 
   const ev = (G, e) => G.events.push(e);
   const key = (r, c) => r + ',' + c;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.r - b.r);
 
   // ====== 放置／點擊 ======
-  function canAfford(G, k) { return G.food >= UNITS[k].cost; }
+  function canAfford(G, k) { return G.level.conveyor ? G.hand.includes(k) : G.food >= UNITS[k].cost; }
 
   // 回傳 { ok, msg }
   function place(G, r, c, k) {
@@ -82,8 +98,13 @@
     if (!G.level.units.includes(k)) return { ok: false, msg: '這一關還沒有這張卡' };
     if (G.rocks.has(key(r, c))) return { ok: false, msg: '這格是石頭' };
     if (G.units[key(r, c)]) return { ok: false, msg: '這格已經有人了' };
-    if (G.food < def.cost) return { ok: false, msg: `糧不夠，${def.name}要 ${def.cost} 糧` };
-    G.food -= def.cost;
+    if (G.level.conveyor) {
+      const i = G.hand.indexOf(k); if (i < 0) return { ok: false, msg: `${def.name}還沒送到手上` };
+      G.hand.splice(i, 1); ev(G, { t: 'hand' }); // 送來的卡不花糧，用掉就沒了
+    } else {
+      if (G.food < def.cost) return { ok: false, msg: `糧不夠，${def.name}要 ${def.cost} 糧` };
+      G.food -= def.cost;
+    }
     if (def.kind === 'instant') { useInstant(G, r, c, k); return { ok: true, msg: `${def.name}打破了` }; }
     makeUnit(G, r, c, k);
     // 第一次放牧人／石牆，順便教「再點一下」
@@ -97,6 +118,8 @@
     const def = UNITS[k];
     const u = { id: G.nextId++, type: k, r, c, hp: def.hp, maxHp: def.hp, timer: def.every ? def.every * 0.6 : 0, fear: 0, elder: false };
     if (def.kind === 'dog') { u.x = c; u.holding = null; }
+    if (def.kind === 'patrol') { u.rv = r; u.dir = 1; }   // rv：巡夜人現在走到哪一排（小數），dir 往上或往下
+    if (def.kind === 'deflector') u.flip = false;        // 中間排的杖上下輪流趕
     if (def.kind === 'floor') u.stung = new Set(); // 記住叮過誰，同一隻只中一次毒
     if (k === 'horn') u.timer = 6; // 剛放下不會馬上吹
     G.units[key(r, c)] = u;
@@ -149,6 +172,7 @@
     const u = G.units[key(r, c)];
     if (!u) return { ok: false, msg: '先點一張卡' };
     const def = UNITS[u.type];
+    if (G.level.conveyor) return { ok: false, msg: '今晚沒有糧，不能升級也不能修補' };
     if (def.kind === 'producer' && !u.elder) {
       if (G.food < ELDER_COST) return { ok: false, msg: `升老牧人要 ${ELDER_COST} 糧` };
       G.food -= ELDER_COST; u.elder = true; u.timer = Math.min(u.timer, def.every * ELDER_MUL);
@@ -176,6 +200,7 @@
 
   // 單位角標：糧夠了才提示「升級」或「修補」。規則放這裡，畫面層只負責畫（跟 tapUnit 同一套條件）
   function tapHint(G, u) {
+    if (G.level.conveyor) return '';
     const def = UNITS[u.type], f = Math.floor(G.food);
     if (def.kind === 'producer' && !u.elder && f >= ELDER_COST) return '升級';
     if (def.kind === 'blocker' && u.hp < u.maxHp * 0.7 && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) return '修補';
@@ -189,7 +214,7 @@
     const u = G.units[key(r, c)];
     if (!u) return { ok: false, msg: '這格沒東西可拆' };
     const def = UNITS[u.type];
-    const back = Math.round((def.cost + (u.elder ? ELDER_COST : 0) + (u.upgraded ? def.upgrade.cost : 0)) * SELL_RATE);
+    const back = G.level.conveyor ? 0 : Math.round((def.cost + (u.elder ? ELDER_COST : 0) + (u.upgraded ? def.upgrade.cost : 0)) * SELL_RATE); // 送來的卡沒花糧，拆了也不退
     removeUnit(G, u); G.food += back;
     ev(G, { t: 'pop', r, c, text: `+${back}` });
     return { ok: true, msg: `${def.name}拆了，退 ${back} 糧` };
@@ -222,8 +247,17 @@
     const w = G.waves[i];
     G.wave = i + 1; G.phase = 'wave'; G.queue = buildQueue(G, i).slice();
     G.spawnTimer = 0; G.bossRows = {};
+    G.waveT = 0; G.strayQueue = [...(w.strays || [])].sort((a, b) => a - b); // 迷羊：這波開始後第幾秒走進來
+    if (w.give) dealNamed(G, w.give);
     ev(G, { t: 'toast', msg: w.say });
   }
+
+  // 無月夜：這一波起腳印預告看不見，除非那排在油燈照得到的範圍
+  function rowLit(G, r) {
+    for (const k in G.units) { const u = G.units[k], d = UNITS[u.type]; if (d.light !== undefined && u.hp > 0 && Math.abs(u.r - r) <= d.light) return true; }
+    return false;
+  }
+  function markerVisible(G, i, r) { const m = G.level.moonless; return !m || i + 1 < m || rowLit(G, r); }
 
   // 下一隻還沒出現，先決定牠走哪一排，畫面層印腳印（或牠的圖示）
   function foreshadow(G, i) {
@@ -244,7 +278,8 @@
     if (ENEMIES[type].boss && G.bossRows && G.bossRows[type] !== undefined && rows.length > 1) { const other = rows.filter(r => r !== G.bossRows[type]); if (other.length) rows = other; }
     G.nextRow = rows[Math.floor(G.rng() * rows.length)];
     G.nextType = type;
-    ev(G, { t: 'marker', r: G.nextRow, type });
+    G.nextVisible = markerVisible(G, i, G.nextRow);
+    ev(G, { t: 'marker', r: G.nextVisible ? G.nextRow : null, type });
   }
 
   function spawn(G, type) {
@@ -261,7 +296,9 @@
     const def = ENEMIES[type];
     const hp = Math.round(def.hp * (hpMul || 1));
     const e = { id: G.nextId++, type, r, x, hp, maxHp: hp, st: {}, heldBy: null, biting: null,
-      underground: !!def.digs, vaulted: false, vaulting: 0, vaultFrom: 0, vaultTo: 0, lift: 0, carrying: false, enraged: false, abilityT: def.howl ? 3 : def.roar ? 4 : 0, dead: false };
+      underground: !!def.digs, vaulted: false, vaulting: 0, vaultFrom: 0, vaultTo: 0, lift: 0, carrying: false, enraged: false, abilityT: def.howl ? 3 : def.roar ? 4 : 0, dead: false,
+      rv: r, deflectCd: 0, detourCd: 0, shiftT: def.shiftEvery ? def.shiftEvery * 0.5 : 0, crouchT: 0, crouched: false, dashLeft: 0, slamTarget: null, carryStray: false }; // rv：畫面上的排（換排時從舊排滑過去）
+    if (def.drift) { e.r0 = Math.max(def.drift, Math.min(ROWS - 1 - def.drift, r)); e.r = e.rv = e.r0; e.driftT = G.rng() * def.driftT; } // 夜鴞：以中間幾排為軸飄，不會飄出棋盤
     G.enemies.push(e);
     ev(G, { t: 'spawn', e });
     // 野狗：一出生就把土堆印在牠要冒出來的格子，玩家才有時間在旁邊放東西
@@ -275,6 +312,18 @@
     if (e.heldBy) { const d = findUnitById(G, e.heldBy); if (d) d.holding = null; e.heldBy = null; }
   }
   function findUnitById(G, id) { for (const k in G.units) if (G.units[k].id === id) return G.units[k]; return null; }
+  // 敵人換排：排號立刻換（命中判定用），畫面上的 rv 之後自己滑過去；被狗咬住的先放開
+  function moveRow(G, e, r2) {
+    if (r2 < 0 || r2 >= ROWS || r2 === e.r) return false;
+    release(G, e); e.r = r2; e.biting = null;
+    ev(G, { t: 'fx', kind: 'hop', r: r2, x: e.x, id: e.id });
+    return true;
+  }
+  // 牧人杖把敵人趕去哪一排：最上／最下排往中間趕，中間三排上下輪流
+  function deflectRow(u) {
+    if (u.r === 0) return 1; if (u.r === ROWS - 1) return ROWS - 2;
+    u.flip = !u.flip; return u.r + (u.flip ? 1 : -1);
+  }
   function ignite(G, e) { if (!e.st.burn) { e.st.burn = STATUS.burn.t; ev(G, { t: 'fx', kind: 'ignite', r: e.r, x: e.x }); } }
 
   function speedOf(e) {
@@ -284,6 +333,7 @@
     if (e.st.slow) s *= STATUS.slow.mul;
     if (e.st.howl) s *= STATUS.howl.mul;
     if (e.enraged) s *= 2;
+    if (e.dashLeft > 0) s *= STATUS.dash.mul; // 豹蹲完衝刺
     return s;
   }
   function biteOf(e) {
@@ -304,9 +354,14 @@
     // 放下第一個單位才開始倒數（新手還在看說明時不被吃掉準備時間）；糧也等到那時才滴
     if (!G.started) { if (Object.keys(G.units).length) G.started = true; else return; }
 
-    // 糧慢慢來
-    G.trickle += dt;
-    if (G.trickle >= TRICKLE.every) { G.trickle -= TRICKLE.every; G.food += TRICKLE.gives; }
+    // 糧慢慢來（送卡模式沒有糧，卡定時送）
+    if (G.level.conveyor) {
+      G.convT -= dt;
+      if (G.convT <= 0) { dealCard(G); G.convT = conveyorEvery(G); }
+    } else {
+      G.trickle += dt;
+      if (G.trickle >= TRICKLE.every) { G.trickle -= TRICKLE.every; G.food += TRICKLE.gives; }
+    }
 
     // 波次節奏
     if (G.holdWaves) {
@@ -319,6 +374,8 @@
         startWave(G, G.wave);
       }
     } else if (G.phase === 'wave') {
+      G.waveT += dt;
+      while (G.strayQueue.length && G.strayQueue[0] <= G.waveT) { G.strayQueue.shift(); spawnStray(G, null, COLS + 0.2); }
       if (G.queue.length) {
         foreshadow(G, G.wave - 1);
         G.spawnTimer -= dt;
@@ -335,12 +392,17 @@
     shotsFly(G, dt);
     enemiesMove(G, dt);
     if (G.over) return;
+    straysMove(G, dt);
+    if (G.over) return;
 
     // 清掉死掉的
     G.enemies = G.enemies.filter(e => {
       if (e.hp <= 0 || e.dead) {
         release(G, e);
-        if (e.carrying && !e.dead) ev(G, { t: 'toast', msg: '追上了，羊抱回來了 🐑' });
+        if (e.carrying && !e.dead) {
+          if (e.carryStray) { spawnStray(G, e.r, Math.min(COLS, e.x)); ev(G, { t: 'toast', msg: '追上了，迷羊落地繼續走 🐑' }); } // 叼著迷羊的倒下，羊從那裡繼續走
+          else ev(G, { t: 'toast', msg: '追上了，羊抱回來了 🐑' });
+        }
         G.killed++; // 逃走的偷羊人也算這一波結束了，進度條才會走滿
         ev(G, { t: 'die', e });
         return false;
@@ -385,6 +447,16 @@
         u.timer -= dt;
         if (u.timer > 0) continue;
         const range = def.range || COLS + 1;
+        // 投石隊：自己這排和上下 lanes 排，有敵人的排各丟一顆
+        if (def.lanes) {
+          let fired = false;
+          for (let rr = Math.max(0, u.r - def.lanes); rr <= Math.min(ROWS - 1, u.r + def.lanes); rr++) {
+            if (!byRow[rr].some(e => e.x > u.c - 0.2 && e.x - u.c <= range)) continue;
+            G.shots.push({ id: G.nextId++, kind: def.shot, r: rr, x: u.c + 0.6, dmg: def.dmg, pierce: false, falloff: 1, hit: new Set(), burn: false }); fired = true;
+          }
+          if (fired) u.timer = def.every;
+          continue;
+        }
         const targets = inRow.filter(e => e.x > u.c - 0.2 && e.x - u.c <= range);
         if (!targets.length) continue;
         u.timer = def.every;
@@ -396,11 +468,14 @@
         }
       } else if (def.kind === 'dog') {
         dogAct(G, u, def, dt);
+      } else if (def.kind === 'patrol') {
+        patrolAct(G, u, def, dt);
       } else if (def.kind === 'floor') {
         const eff = u.upgraded ? { ...def, ...def.upgrade } : def;
         for (const e of G.enemies) {
           if (e.r !== u.r || !targetable(e) || ENEMIES[e.type].flying) continue;
           if (Math.abs(e.x - u.c) >= 0.5) continue;
+          if (ENEMIES[e.type].trample) { u.hp = 0; ev(G, { t: 'fx', kind: 'trample', r: u.r, x: u.c }); ev(G, { t: 'toast', msg: '野豬把荊棘踩爛了' }); break; } // 野豬：踏過就爛
           if (eff.poison && !u.stung.has(e.id)) { // 蠍子不會用完，但同一隻只叮一次
             u.stung.add(e.id); e.st.poison = eff.poison;
             ev(G, { t: 'fx', kind: 'sting', r: e.r, x: e.x }); ev(G, { t: 'unit', r: u.r, c: u.c });
@@ -418,12 +493,13 @@
             u.timer = def.every;
             for (const k2 in G.units) { const v = G.units[k2]; if (v === u || Math.abs(v.r - u.r) > rg || Math.abs(v.c - u.c) > rg) continue; if (v.hp < v.maxHp && v.maxHp > 1) { v.hp = Math.min(v.maxHp, v.hp + eff.heal); ev(G, { t: 'unit', r: v.r, c: v.c }); } }
           } else if (def.push) {
-            const ground = inRow.filter(e => !ENEMIES[e.type].flying);
+            const all = u.upgraded && def.upgrade && def.upgrade.all; // 銀號：五排一起退
+            const ground = (all ? G.enemies.filter(targetable) : inRow).filter(e => !ENEMIES[e.type].flying);
             if (!ground.length) continue;
             u.timer = def.every;
             for (const e of ground) { e.x = Math.min(COLS + 0.2, e.x + def.push); e.st.stun = def.stun; release(G, e); }
             ev(G, { t: 'fx', kind: 'horn', r: u.r, x: u.c });
-            ev(G, { t: 'toast', msg: '角聲一響，那排的狼退了一步' });
+            ev(G, { t: 'toast', msg: all ? '銀號一響，五排的狼都退了一步' : '角聲一響，那排的狼退了一步' });
           }
         }
       }
@@ -455,9 +531,56 @@
       if (Math.abs(d) < 0.12) { u.x = goal; u.holding = e.id; e.heldBy = u.id; ev(G, { t: 'fx', kind: 'bark', r: u.r, x: u.x }); }
       else u.x += Math.sign(d) * Math.min(Math.abs(d), def.run * dt);
     } else {
-      const d = u.c - u.x;
+      // 沒敵人時：同排有迷羊就走在牠右邊護送，不然回窩
+      const s = G.strays.find(s => s.r === u.r && !s.dead);
+      const goal = s ? Math.min(COLS - 0.3, s.x + 0.6) : u.c;
+      const d = goal - u.x;
       if (Math.abs(d) > 0.01) u.x += Math.sign(d) * Math.min(Math.abs(d), def.run * dt);
     }
+  }
+
+  // 巡夜人：在自己這排和上下兩排之間來回走；當前那排前方有敵人就停下來打
+  function patrolAct(G, u, def, dt) {
+    const lo = Math.max(0, u.r - 1), hi = Math.min(ROWS - 1, u.r + 1);
+    const row = Math.round(u.rv);
+    const t = G.enemies.find(e => e.r === row && targetable(e) && !ENEMIES[e.type].flying && e.x > u.c - 0.2 && e.x - u.c <= def.reach);
+    if (t) {
+      u.timer -= dt;
+      if (u.timer <= 0) { u.timer = def.every; hurt(G, t, def.dmg); ev(G, { t: 'fx', kind: 'strike', r: row, x: t.x }); }
+      return;
+    }
+    u.timer = Math.min(u.timer, def.every * 0.5);
+    u.rv += u.dir * dt / def.walk;
+    if (u.rv >= hi) { u.rv = hi; u.dir = -1; } else if (u.rv <= lo) { u.rv = lo; u.dir = 1; }
+  }
+
+  // ====== 迷羊 ======
+  function spawnStray(G, r, x) {
+    const w = G.waves[G.wave - 1];
+    const rows = (w && w.rows) || [0, 1, 2, 3, 4];
+    const s = { id: G.nextId++, r: r === null || r === undefined ? rows[Math.floor(G.rng() * rows.length)] : r, x, dead: false };
+    G.strays.push(s); ev(G, { t: 'stray', s });
+    if (!G.toldStray) { G.toldStray = true; ev(G, { t: 'toast', msg: '有一隻迷羊從東邊走過來了，別讓狼碰到牠' }); }
+    return s;
+  }
+  function strayHome(G, s, c) {
+    s.dead = true; G.sheep++; G.food += STRAY.reward;
+    ev(G, { t: 'sheep' }); ev(G, { t: 'pop', r: s.r, c: Math.max(0, c), text: `+${STRAY.reward}` }); ev(G, { t: 'fx', kind: 'home', r: s.r, x: Math.max(0, c) });
+    ev(G, { t: 'toast', msg: '一隻迷羊回圈了 🐑' });
+  }
+  function straysMove(G, dt) {
+    for (const s of G.strays) {
+      if (s.dead) continue;
+      s.x -= STRAY.speed * dt;
+      const c = Math.round(s.x), u = G.units[key(s.r, c)];
+      if ((u && UNITS[u.type].cradle && Math.abs(s.x - c) < 0.3) || s.x < -0.4) { strayHome(G, s, c); continue; }
+      // 地面敵人碰到就叼走（被咬住、嚇退、暈眩、翻牆中的不會）
+      for (const e of G.enemies) {
+        if (e.r !== s.r || !targetable(e) || ENEMIES[e.type].flying || e.carrying || e.heldBy || e.st.panic || e.st.stun || e.vaulting > 0 || e.crouchT > 0) continue;
+        if (Math.abs(e.x - s.x) < 0.45) { e.carrying = true; e.carryStray = true; s.dead = true; ev(G, { t: 'toast', msg: `${ENEMIES[e.type].name}叼走了一隻迷羊，追上去！` }); ev(G, { t: 'fx', kind: 'grab', r: s.r, x: s.x }); break; }
+      }
+    }
+    G.strays = G.strays.filter(s => !s.dead);
   }
 
   // 投射物
@@ -499,6 +622,15 @@
 
       // 狀態倒數
       for (const k of ['burn', 'poison', 'slow', 'stun', 'panic', 'howl', 'distract']) if (e.st[k]) { e.st[k] -= dt; if (e.st[k] <= 0) delete e.st[k]; }
+      if (e.deflectCd > 0) e.deflectCd -= dt; if (e.detourCd > 0) e.detourCd -= dt;
+      // 換排的畫面位置：rv 朝 r 滑過去
+      if (def.drift) { e.driftT += dt; e.rv = e.r0 + Math.sin(e.driftT / def.driftT * Math.PI * 2) * def.drift; const nr = Math.round(e.rv); if (nr !== e.r) { e.r = nr; } } // 夜鴞：排號跟著飄
+      else if (e.rv !== e.r) { const d = e.r - e.rv, stp = dt / STATUS.hop.t; e.rv = Math.abs(d) <= stp ? e.r : e.rv + Math.sign(d) * stp; }
+      // 豹：每隔幾秒換一排（被咬住、翻牆中、蹲著的時候不換）
+      if (def.shiftEvery && !e.heldBy && !e.vaulting && !e.crouchT && !e.st.stun && !e.carrying) {
+        e.shiftT -= dt;
+        if (e.shiftT <= 0 && e.x < COLS - 0.5) { e.shiftT = def.shiftEvery; const cand = [e.r - 1, e.r + 1].filter(r => r >= 0 && r < ROWS); moveRow(G, e, cand[Math.floor(G.rng() * cand.length)]); }
+      }
       if (e.st.burn) {
         hurt(G, e, STATUS.burn.dps * dt);
         for (const o of G.enemies) if (o !== e && o.r === e.r && targetable(o) && !o.st.burn && Math.abs(o.x - e.x) < 0.6) ignite(G, o);
@@ -540,10 +672,13 @@
       // 驚慌：往右跑，不咬
       if (e.st.panic) { e.x = Math.min(COLS + 0.3, e.x + STATUS.panic.speed * dt); e.biting = null; continue; }
       if (e.st.stun || e.st.distract || e.heldBy) { e.biting = null; if (e.heldBy) biteDog(G, e, dt); continue; }
+      // 豹：走到定點先蹲（有預兆），蹲完衝兩格
+      if (def.crouchAt && !e.crouched && e.x <= def.crouchAt) { e.crouched = true; e.crouchT = def.crouch; ev(G, { t: 'fx', kind: 'crouch', r: e.r, x: e.x }); ev(G, { t: 'toast', msg: '豹蹲下來了，牠要衝了' }); }
+      if (e.crouchT > 0) { e.crouchT -= dt; e.biting = null; if (e.crouchT <= 0) { e.crouchT = 0; e.dashLeft = def.dash; } continue; }
       // 抱著羊往回跑
       if (e.carrying) {
-        e.x += def.fleeSpeed * dt;
-        if (e.x > COLS + 0.3) { e.dead = true; G.sheep--; G.sheepLost++; ev(G, { t: 'toast', msg: '一隻羊被抱走了 🐑' }); ev(G, { t: 'sheep' }); if (G.sheep <= 0) return lose(G, 'sheep'); }
+        e.x += (def.fleeSpeed || def.speed * 1.4) * dt;
+        if (e.x > COLS + 0.3) { e.dead = true; G.sheep--; G.sheepLost++; ev(G, { t: 'toast', msg: e.carryStray ? '迷羊被叼走了 🐑' : '一隻羊被抱走了 🐑' }); ev(G, { t: 'sheep' }); if (G.sheep <= 0) return lose(G, 'sheep'); }
         continue;
       }
 
@@ -552,9 +687,29 @@
       if (!def.flying) {
         const frontCol = Math.floor(e.x + 0.3);
         const b = G.units[key(e.r, frontCol)];
-        if (b && e.x <= frontCol + 0.6 && ['blocker', 'producer', 'shooter', 'support'].includes(UNITS[b.type].kind)) {
-          if (def.vaults && !e.vaulted && UNITS[b.type].kind === 'blocker' && !UNITS[b.type].tall) {
+        const bk = b ? UNITS[b.type].kind : null;
+        // 巡夜人只有走在這一排時才擋得到（在別排就從旁邊過）
+        const solid = b && ['blocker', 'producer', 'shooter', 'support', 'deflector'].includes(bk) || (bk === 'patrol' && Math.abs(b.rv - e.r) < 0.5);
+        if (solid && e.x <= frontCol + 0.6) {
+          if (def.vaults && !e.vaulted && bk === 'blocker' && !UNITS[b.type].tall) {
             e.vaulting = VAULT_TIME; e.vaultFrom = e.x; e.vaultTo = frontCol - 0.45; continue; // 動作本身就是說明，不飄符號
+          }
+          // 牧人杖：把地面的非頭目趕到隔壁排（同一隻 4 秒內不重複趕；頭目把它當普通牆咬）
+          if (bk === 'deflector' && !def.boss && e.deflectCd <= 0) {
+            const r2 = deflectRow(b);
+            if (moveRow(G, e, r2)) { e.deflectCd = UNITS[b.type].deflectCd; b.hp -= UNITS[b.type].deflect; ev(G, { t: 'unit', r: b.r, c: b.c }); if (b.hp <= 0) removeUnit(G, b); continue; }
+          }
+          // 豺狼：前面是牆、隔壁排同一格空著就繞過去
+          if (def.detour && bk === 'blocker' && e.detourCd <= 0) {
+            const cand = [e.r - 1, e.r + 1].filter(r => r >= 0 && r < ROWS && !G.units[key(r, frontCol)] && !G.rocks.has(key(r, frontCol)));
+            if (cand.length) { moveRow(G, e, cand[Math.floor(G.rng() * cand.length)]); e.detourCd = def.detour; if (!G.toldDetour) { G.toldDetour = true; ev(G, { t: 'toast', msg: '豺狼繞過牆，換到隔壁排了' }); } continue; }
+          }
+          // 野豬：撞上每道牆的第一下特別重，撞完自己暈一下
+          if (def.slam && bk === 'blocker' && e.slamTarget !== b.id) {
+            e.slamTarget = b.id; b.hp -= def.slam; e.st.stun = def.slamStun; e.dashLeft = 0;
+            ev(G, { t: 'fx', kind: 'slam', r: e.r, x: frontCol }); ev(G, { t: 'unit', r: b.r, c: b.c });
+            if (b.hp <= 0) { removeUnit(G, b); ev(G, { t: 'toast', msg: '野豬一撞，牆垮了' }); }
+            continue;
           }
           blocked = true;
           const mul = (def.wallMul && UNITS[b.type].kind === 'blocker') ? def.wallMul : 1;
@@ -564,7 +719,7 @@
           else if (G.rng() < dt * 4) ev(G, { t: 'unit', r: e.r, c: frontCol });
         }
       }
-      if (!blocked) { e.biting = null; e.x -= speedOf(e) * dt; }
+      if (!blocked) { e.biting = null; const mv = speedOf(e) * dt; e.x -= mv; if (e.dashLeft > 0) e.dashLeft -= mv; }
 
       // 走到底
       if (e.x < -0.6) {
@@ -582,18 +737,24 @@
   }
 
   // ====== 勝負 ======
-  function win(G) { G.over = true; G.result = { win: true }; ev(G, { t: 'win' }); }
+  function win(G) {
+    // 天亮了：還在路上的迷羊都算回圈
+    for (const s of G.strays) if (!s.dead) { s.dead = true; G.sheep++; }
+    G.strays = [];
+    G.over = true; G.result = { win: true }; ev(G, { t: 'win' });
+  }
   function lose(G, reason) { G.over = true; G.result = { win: false, reason }; ev(G, { t: 'lose', reason }); }
 
   // ====== 開發者模式 ======
   const dev = {
     spawn(G, type, r, c) { if (G.over || !ENEMIES[type]) return; const w = G.waves[G.wave - 1]; spawnAt(G, type, r, c, w ? w.hpMul : 1); G.total++; },
-    clear(G) { for (const e of G.enemies) { release(G, e); e.dead = true; } G.total -= G.enemies.length; G.enemies = []; G.queue = []; G.nextRow = null; G.nextType = null; ev(G, { t: 'marker', r: null }); if (G.phase === 'wave') { G.phase = 'rest'; G.timer = WAVE_REST; } },
+    clear(G) { for (const e of G.enemies) { release(G, e); e.dead = true; } G.total -= G.enemies.length; G.enemies = []; G.strays = []; G.strayQueue = []; G.queue = []; G.nextRow = null; G.nextType = null; ev(G, { t: 'marker', r: null }); if (G.phase === 'wave') { G.phase = 'rest'; G.timer = WAVE_REST; } },
     nextWave(G) { if (G.over) return; G.started = true; G.holdWaves = false; if (G.phase === 'wave') { dev.clear(G); } G.timer = Math.min(G.timer, 0.5); },
     food(G, n) { G.food += n; },
-    allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; },
+    allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; if (G.level.conveyor) for (const k of Object.keys(UNITS)) if (!G.hand.includes(k)) G.hand.push(k); ev(G, { t: 'hand' }); },
+    stray(G, r, x) { if (G.over) return; spawnStray(G, r, x); },
   };
 
-  const Engine = { create, place, tapUnit, tapHint, sell, snapshot, checkSnapshot, restore, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, dev };
+  const Engine = { create, place, tapUnit, tapHint, sell, snapshot, checkSnapshot, restore, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, rowLit, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);

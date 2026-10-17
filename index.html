@@ -27,6 +27,7 @@
     --u-shepherd: #3d6ea8; --u-slinger: #a8553d; --u-sling: #8a3f2e; --u-hireling: #7d7a6a; --u-archer: #6b4e2e;
     --u-wall: #777; --u-tower: #5c5c66; --u-dog: #c9a24a; --u-thorns: #4a7a3a;
     --u-brazier: #6e3a1e; --u-jar: #8a5a2e; --u-horn: #7a6a2a; --u-healer: #3d8a7a; --u-catapult: #5a4a3a;
+    --u-staff: #8a6a3a; --u-lamp: #b8862a; --u-patrol: #4a5a7a; --u-volley: #a8553d; --u-cradle: #7a4a6a;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
@@ -47,9 +48,10 @@
   .snd-row .seg { display: flex; gap: 4px; }
   .snd-row button { font: inherit; font-size: 14px; background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 8px; padding: 5px 14px; cursor: pointer; min-width: 52px; }
   .snd-row button.on { border-color: var(--gold); background: var(--card-on); }
+  .snd-row.off { opacity: .4; pointer-events: none; } /* 音效關著時，蟲鳴與音量先壓暗 */
   .snd-note { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: left; }
   /* 開場頁右上角的喇叭：第一次進來就看得到，聲音響起前就能關 */
-  .dialog { position: relative; }
+  #levels .dialog { position: relative; }
   .corner { position: absolute; right: 12px; top: 12px; font: inherit; font-size: 18px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 3px 9px; cursor: pointer; }
   #resume-line { margin-top: 10px; }
   #resume-line[hidden] { display: none; }
@@ -96,6 +98,11 @@
   .cell { position: relative; background: var(--grass); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); }
   .cell.alt { background: var(--grass2); }
   .cell.rock { background: var(--rock); }
+  /* 無月夜：腳印消失那一刻整個棋盤暗一階，右邊出生的那側更暗（看不見牠從哪來） */
+  #board { transition: filter 2s; }
+  #board.moonless { filter: brightness(.78) saturate(.85); }
+  #board::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #0000, #0a0c14cc); pointer-events: none; transition: width 2s; z-index: 1; }
+  #board.moonless::after { width: 22%; }
   .cell.rock::after { content: '🪨'; opacity: .7; font-size: .8em; }
   .cell.hint { outline: 2px dashed var(--gold); outline-offset: -4px; }
   .cell .unit { position: relative; display: flex; align-items: center; justify-content: center; width: 80%; height: 80%; border-radius: 8px; }
@@ -104,7 +111,11 @@
   .unit.dog      { background: transparent; opacity: .35; font-size: .6em; }
   .unit.thorns { background: #f3ead822; border: 2px dashed #f3ead866; border-radius: 50%; }
   .unit.thorns.upgraded { border-color: #c9d46a; }
-  .unit.healer.upgraded { box-shadow: inset 0 0 0 2px var(--gold); }
+  .unit.healer.upgraded, .unit.horn.upgraded { box-shadow: inset 0 0 0 2px var(--gold); }
+  .unit.lamp { box-shadow: 0 0 14px 4px #ffd98a66; }        /* 油燈：暖光暈，無月夜裡一眼看到誰照著 */
+  .unit.staff { background: transparent; border: 2px solid #c9a24a99; }
+  .unit.patrol { background: transparent; opacity: .35; font-size: .6em; } /* 跟狗窩一樣：格子只留個記號，人在外面走 */
+  .unit.cradle { background: var(--u-cradle); }
   .unit .hp.thick { height: 5px; }
   .unit .hp, .enemy .hp, .dog-run .hp { position: absolute; left: 10%; right: 10%; bottom: 2px; height: 3px; background: #0006; }
   .hp > i { display: block; height: 100%; width: 100%; background: var(--ok); transform-origin: left; }  /* 血量用 scaleX 畫，不動寬度 */
@@ -131,6 +142,16 @@
   .enemy.small .body { width: 50%; height: 50%; background: #b8682a; }
   .enemy.swarm .body { width: 45%; height: 45%; background: #5f7a34; box-shadow: none; }
   .enemy.dig .body { background: linear-gradient(180deg, #a8843a 55%, #5a4a2a 56%); overflow: hidden; }
+  /* 第二章 */
+  .enemy.sly .body { background: #6b5a3a; }                                   /* 豺狼：毛色偏黃，跟灰狼分得開 */
+  .enemy.boar .body { --k: 1.25; background: #4a3426; border-radius: 42%; }   /* 野豬：方一點 */
+  .enemy.owl .body { background: transparent; box-shadow: none; }
+  .enemy.leopard .body { --k: 1.35; background: #a8862a; box-shadow: 0 0 0 3px var(--gold); }
+  .enemy.s-crouch .body { transform: scale(calc(var(--k) * var(--hs, 1) * .8)) translateY(12%); filter: brightness(.7); } /* 蹲伏：壓低、變暗，預兆 */
+  .enemy.s-dash .body { filter: brightness(1.25); }
+  /* 巡夜人與迷羊：跟狗一樣是會動的，絕對定位走 transform */
+  .patrol-run .body { width: 70%; height: 70%; border-radius: 8px; background: var(--u-patrol); display: flex; align-items: center; justify-content: center; position: relative; }
+  .stray .body { width: 60%; height: 60%; border-radius: 50%; background: #f3ead8; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #e6b84a; }
   .enemy.underground { opacity: 0; }
   .enemy.fly { align-items: flex-start; }
   .enemy.fly .body { background: transparent; box-shadow: none; }
@@ -216,6 +237,9 @@
   .lv .t b { display: block; font-size: 15px; }
   .lv .t span { font-size: 12px; color: var(--muted); }
   .lv .s { font-size: 12px; color: var(--ok); white-space: nowrap; }
+  .ch { margin-top: 14px; font-size: 12px; color: var(--muted); text-align: left; letter-spacing: .08em; }
+  .ch b { color: var(--gold); margin-right: 6px; }
+  .lv .t i { font-style: normal; color: var(--muted); }
   #psalm { text-align: left; font-size: 15px; line-height: 1.9; margin-top: 10px; }
   #psalm div { opacity: 0; transition: opacity 1.2s; }
   #psalm div.on { opacity: 1; }
@@ -362,12 +386,12 @@
   </div>
 </div>
 
-<script src="data.js?v=6"></script>
-<script src="engine.js?v=6"></script>
-<script src="sound.js?v=6"></script>
+<script src="data.js?v=7"></script>
+<script src="engine.js?v=7"></script>
+<script src="sound.js?v=7"></script>
 <script>
 'use strict';
-// ROWS、COLS、UNITS、ENEMIES、DIFFS、LEVELS 由 data.js 直接提供
+// ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS 由 data.js 直接提供
 const $ = s => document.querySelector(s);
 const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; }; // 字沒變就不重寫，省排版
 // 糧不足搖一下：用 Web Animations 重播，不用強迫排版的老招
@@ -408,6 +432,8 @@ function unlocked(id) { return id === 1 || unlockAll || !!P.cleared[id - 1]; }
 // 所有已開放關卡的卡總和（圖鑑用；也用來判斷玩家手上有沒有這一夜帶不了的卡）
 function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k); return all; }
 
+const CHAPTERS = { 1: '守夜', 2: '另外的羊 ── 沒有月亮，敵人會換排' };
+
 // ====== 畫面建立 ======
 function buildBoard() {
   board.innerHTML = ''; cells.length = 0;
@@ -422,31 +448,35 @@ function buildBoard() {
 function buildCards() {
   const wrap = $('#cards'); wrap.innerHTML = '';
   const L = G ? G.level : level; // 開發者「全卡」會換掉這一局的 level
-  // 固定分組：產糧｜射手（含狗）｜牆｜鋪地｜一次性／輔助；組首留空隙
-  const keys = sortUnits(L.units);
+  const conveyor = !!(G && G.level.conveyor);
+  // 固定分組：產糧｜射手（含狗）｜牆｜鋪地｜一次性／輔助；組首留空隙。送卡模式：手上有什麼列什麼，照送到的順序
+  const keys = conveyor ? G.hand.slice() : sortUnits(L.units);
   let lastG = -1;
   for (const key of keys) {
-    const u = UNITS[key], g = GROUP[u.kind];
+    const u = UNITS[key], g = conveyor ? -1 : GROUP[u.kind];
     const d = document.createElement('div');
     const fresh = L.fresh.includes(key) && !seenCard(key);
-    d.className = 'card' + (fresh ? ' new' : '') + (u.kind === 'instant' ? ' once' : '') + (g !== lastG && lastG >= 0 ? ' group-start' : ''); d.dataset.key = key;
+    d.className = 'card' + (fresh ? ' new' : '') + (u.kind === 'instant' ? ' once' : '') + (g !== lastG && lastG >= 0 ? ' group-start' : '') + (key === selected ? ' selected' : ''); d.dataset.key = key;
     d.style.setProperty('--u', `var(--u-${key})`);
-    d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag fresh">新</div>' : ''}${u.kind === 'instant' ? '<div class="tag once">一次</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">🌾 ${u.cost}</div>`;
+    d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag fresh">新</div>' : ''}${u.kind === 'instant' ? '<div class="tag once">一次</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">${conveyor ? '送來的' : `🌾 ${u.cost}`}</div>`;
     d.addEventListener('click', () => tapCard(key, d));
     wrap.appendChild(d); lastG = g;
   }
   // 鏟子固定在最後，不佔點兵名額：點它再點單位就拆掉
   const sh = document.createElement('div');
   sh.className = 'card shovel group-start'; sh.dataset.key = 'shovel';
-  sh.innerHTML = `<div class="ico">⛏️</div><div class="name">鏟子</div><div class="cost">退一半</div>`;
+  sh.innerHTML = `<div class="ico">⛏️</div><div class="name">鏟子</div><div class="cost">${conveyor ? '不退糧' : '退一半'}</div>`;
   sh.addEventListener('click', () => tapShovel());
   wrap.appendChild(sh);
   cardEls = [...wrap.querySelectorAll('.card')].filter(c => UNITS[c.dataset.key]); lastFood = -1;
 }
 function buildLevels() {
   const list = $('#lv-list'); list.innerHTML = '';
+  let ch = 0;
   for (const L of LEVELS) {
     const ok = unlocked(L.id);
+    const c = L.chapter || 1;
+    if (c !== ch) { ch = c; const h = document.createElement('div'); h.className = 'ch'; h.innerHTML = `<b>第${['', '一', '二', '三'][c] || c}章</b>${CHAPTERS[c] || ''}`; list.appendChild(h); }
     const d = document.createElement('div');
     d.className = 'lv' + (ok ? '' : ' locked');
     const done = P.cleared[L.id] ? Object.keys(P.cleared[L.id]).map(k => DIFFS[k].name.slice(0, 2)).join('・') + ' ✅' : '';
@@ -466,7 +496,9 @@ function openIntro(L) {
   showBest();
   const lo = pickedFor(L);
   const extra = unlockedUnits().length - L.units.length; // 玩家手上比這一夜多出幾張卡
-  $('#intro-loadout').innerHTML = lo
+  $('#intro-loadout').innerHTML = L.conveyor
+    ? `今晚可能送來：${L.units.map(k => UNITS[k].ico).join(' ')}　<span class="new">沒有糧也沒有牧人，卡片定時送到手上，送來什麼就用什麼</span>`
+    : lo
     ? `今晚上場：${lo.map(k => UNITS[k].ico).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「隊伍」可換</span>`
     : `今晚上場：${L.units.map(k => UNITS[k].ico).join(' ')}${extra > 0 ? `　<span class="new">這一夜只有這 ${L.units.length} 位，後來認識的夥伴要到後面的夜才會同行，不能帶回來</span>` : ''}`;
   $('#intro-roster').textContent = lo ? '隊伍' : '圖鑑';
@@ -508,9 +540,9 @@ function tapCard(key, el) {
   if (!G || G.over) return;
   if (tut.on && (tut.waiting || key !== TUT_STEPS[tut.step].card)) { toast(tut.waiting ? TUT_STEPS[tut.step].wait : TUT_STEPS[tut.step].say, true); return; }
   const u = UNITS[key];
-  if (G.food < u.cost) {
+  if (!Engine.canAfford(G, key)) {
     shake(el);
-    toast(`糧不足，${u.name}要 ${u.cost} 糧`); return;
+    toast(G.level.conveyor ? `${u.name}還沒送到` : `糧不足，${u.name}要 ${u.cost} 糧`); return;
   }
   selected = (selected === key) ? null : key;
   if (el.classList.contains('new')) { el.classList.remove('new'); const t = el.querySelector('.tag.fresh'); if (t) t.remove(); markSeen(key); }
@@ -532,7 +564,7 @@ function clearSelection() {
 }
 function tapCell(r, c) {
   if (!G || G.over) return;
-  if (devOn && devEnemy) { Engine.dev.spawn(G, devEnemy, r, c); flushEvents(); draw(); return; }
+  if (devOn && devEnemy) { if (devEnemy === 'stray') Engine.dev.stray(G, r, c); else Engine.dev.spawn(G, devEnemy, r, c); flushEvents(); draw(); return; }
   if (selected === 'shovel') { const res = Engine.sell(G, r, c); flushEvents(); if (res.ok) clearSelection(); toast(res.msg || ''); return; }
   if (!selected) { if (tut.on) { toast(tut.waiting ? TUT_STEPS[tut.step].wait : TUT_STEPS[tut.step].say, true); return; } const res = Engine.tapUnit(G, r, c); flushEvents(); if (res.msg) toast(res.msg); return; }
   if (tut.on) { const [tr, tc] = TUT_STEPS[tut.step].cell; if (r !== tr || c !== tc) { toast('放在亮著的那一格', true); return; } }
@@ -555,7 +587,7 @@ function renderUnit(r, c) {
   const d = document.createElement('div');
   d.className = 'unit ' + u.type + (u.elder ? ' elder' : '') + (u.upgraded ? ' upgraded' : '') + (u.fear > 0 ? ' fear' : '');
   d.style.setProperty('--u', `var(--u-${u.type})`);
-  const ico = def.kind === 'dog' ? '🦴' : def.ico;
+  const ico = def.kind === 'dog' ? '🦴' : def.kind === 'patrol' ? '🪵' : def.ico; // 狗窩、巡夜人的崗位：人在外面走
   const sting = u.upgraded && def.upgrade && def.upgrade.ico ? `<div class="badge">${def.upgrade.ico}</div>` : ''; // 升級角標：荊棘 🦂、纏裹的牧人 🫗
   const bar = sting + ((u.maxHp > 1 && def.kind !== 'dog') ? `<div class="hp"><i style="transform:scaleX(${(u.hp / u.maxHp).toFixed(3)})"></i></div>` : '');
   d.innerHTML = `${ico}${bar}`;
@@ -563,16 +595,17 @@ function renderUnit(r, c) {
 }
 
 // ====== 畫面上的一次性效果 ======
-const FX = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤' };
+const FX = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤', slam: '💥', trample: '💨', home: '💛', strike: '✦', crouch: '👁' };
 // 引擎事件對應的音效（名稱在 sound.js）；沒列的就沒聲音
-const FX_SFX = { blast: 'blast', ignite: 'ignite', horn: 'horn', emerge: 'emerge', grab: 'grab', splash: 'hit', enrage: 'growl', rest: 'whine', howl: 'howl', roar: 'roar', flee: 'whine' };
-const SPAWN_SFX = {}; // 出生就叫的敵人（第二章的夜鴞、豹會放進來）
+const FX_SFX = { blast: 'blast', ignite: 'ignite', horn: 'horn', emerge: 'emerge', grab: 'grab', splash: 'hit', enrage: 'growl', rest: 'whine', howl: 'howl', roar: 'roar', flee: 'whine', slam: 'boar', crouch: 'growl', home: 'sheep', strike: 'hit' };
+const SPAWN_SFX = { owl: 'owl', leopard: 'growl' }; // 出生就叫的敵人：無月夜看不到，先聽到
 function fx(kind, r, x, id) {
   if (kind === 'mound') { const d = spawnFx('🕳️', r, x, true); moundEls.set(id, d); return; }
   if (kind === 'emerge') { const d = moundEls.get(id); if (d) { d.remove(); moundEls.delete(id); } }
   if (kind === 'howl' || kind === 'roar') { ripple(r, x, kind === 'roar' ? 'var(--gold)' : '#c9a0dc'); return; }
   if (kind === 'bark') return;                      // 狗咬住狼已經看得到，不飄字
   if (kind === 'dodge') { flashDodge(r, x); return; } // 狐狸閃避：殘影，不飄字
+  if (kind === 'hop') return;                       // 換排：敵人本身會滑過去，不飄字
   if (FX[kind]) spawnFx(FX[kind], r, x);
 }
 function ripple(r, x, color) {
@@ -616,12 +649,14 @@ function flushEvents() {
       case 'toast': toast(e.msg); break;
       case 'die': Sound.play('die'); break;
       case 'callout': if (!seenEnemy(e.type)) { toast(`${ENEMIES[e.type].ico} ${e.tip}`, true); markSeenEnemy(e.type); } break;
-      case 'pop': pop(e.r, e.c, e.text); if (e.text[0] === '+') Sound.play('food'); break;
+      case 'pop': pop(e.r, e.c, e.text); if (String(e.text)[0] === '+') Sound.play('food'); break;
       case 'unit': renderUnit(e.r, e.c); break;
       case 'fx': fx(e.kind, e.r, e.x, e.id); if (FX_SFX[e.kind]) Sound.play(FX_SFX[e.kind]); break;
       case 'marker': setMarker(e.r, e.type); break;
       case 'sheep': $('#sheep-n').textContent = G.sheep; break;
-      case 'waveclear': Sound.play('clear'); if (!devUsed && e.wave < G.waves.length) saveCheckpoint(Engine.snapshot(G)); break;
+      case 'hand': buildCards(); break;              // 送卡模式：手上的卡變了
+      case 'stray': Sound.play('sheep'); break;
+      case 'waveclear': if (e.wave < G.waves.length) { Sound.play('clear'); if (!devUsed) saveCheckpoint(Engine.snapshot(G)); } break; // 最後一波不播，讓天亮的和弦乾淨
       case 'win': onWin(); break;
       case 'lose': onLose(e.reason); break;
     }
@@ -650,7 +685,7 @@ function statusText(e) {
 }
 function draw() {
   const bw = boardSize.w || board.clientWidth, bh = boardSize.h || board.clientHeight; // 尺寸由 ResizeObserver 記著；還沒量到才現讀
-  setText($('#food'), String(Math.floor(G.food)));
+  setText($('#food'), G.level.conveyor ? '—' : String(Math.floor(G.food)));
   const t = Math.ceil(G.timer), n = G.waves.length;
   setText($('#wave-info'),
     G.holdWaves ? '照著提示做' :
@@ -672,7 +707,9 @@ function draw() {
       board.appendChild(el); els.set(e.id, el);
     }
     el.classList.toggle('s-burn', !!e.st.burn); el.classList.toggle('s-poison', !!e.st.poison); el.classList.toggle('s-stun', !!(e.st.stun || e.st.distract));
-    el.style.transform = `translate(${(e.x * 100).toFixed(2)}%, ${((e.r - (e.lift || 0) * 0.6) * 100).toFixed(1)}%)`; // lift：賊翻牆的弧線
+    el.classList.toggle('s-crouch', e.crouchT > 0); el.classList.toggle('s-dash', e.dashLeft > 0);
+    const rv = e.rv === undefined ? e.r : e.rv; // 換排時從舊排滑到新排
+    el.style.transform = `translate(${(e.x * 100).toFixed(2)}%, ${((rv - (e.lift || 0) * 0.6) * 100).toFixed(1)}%)`; // lift：賊翻牆的弧線
     el.classList.toggle('underground', !!e.underground);
     el.classList.toggle('carry', !!e.carrying);
     el.querySelector('.hp > i').style.transform = `scaleX(${(Math.max(0, e.hp) / e.maxHp).toFixed(3)})`;
@@ -695,12 +732,28 @@ function draw() {
     el.classList.toggle('rest', !!u.resting);
     el.querySelector('.hp > i').style.transform = `scaleX(${(Math.max(0, u.hp) / u.maxHp).toFixed(3)})`;
   }
+  for (const k in G.units) {
+    const u = G.units[k]; if (u.type !== 'patrol') continue;
+    alive.add(u.id);
+    let el = els.get(u.id);
+    if (!el) { el = document.createElement('div'); el.className = 'dog-run patrol-run'; el.innerHTML = `<div class="body">${UNITS.patrol.ico}</div><div class="hp"><i></i></div>`; board.appendChild(el); els.set(u.id, el); }
+    el.style.transform = `translate(${u.c * 100}%, ${(u.rv * 100).toFixed(1)}%)`;
+    el.querySelector('.hp > i').style.transform = `scaleX(${(Math.max(0, u.hp) / u.maxHp).toFixed(3)})`;
+  }
+  for (const s of G.strays) {
+    alive.add(s.id);
+    let el = els.get(s.id);
+    if (!el) { el = document.createElement('div'); el.className = 'dog-run stray'; el.innerHTML = `<div class="body">${STRAY.ico}</div>`; board.appendChild(el); els.set(s.id, el); }
+    el.style.transform = `translate(${(s.x * 100).toFixed(2)}%, ${s.r * 100}%)`;
+  }
   for (const [id, el] of els) if (!alive.has(id)) { el.remove(); els.delete(id); }
   if (biting) Sound.play('bite'); // sound.js 自己限流，每 0.45 秒最多一聲
+  // 無月夜：腳印消失的那一波起棋盤變暗（跟引擎 markerVisible 同一個時間點）
+  board.classList.toggle('moonless', !!G.level.moonless && G.wave + (G.phase === 'wave' ? 0 : 1) >= G.level.moonless);
 
   $('#bar > i').style.transform = `scaleX(${G.total ? (G.killed / G.total).toFixed(3) : 0})`;
   const f = Math.floor(G.food);
-  if (f !== lastFood) { lastFood = f; for (const c of cardEls) c.classList.toggle('poor', f < UNITS[c.dataset.key].cost); }
+  if (f !== lastFood) { lastFood = f; for (const c of cardEls) c.classList.toggle('poor', !G.level.conveyor && f < UNITS[c.dataset.key].cost); }
   if (tut.on && tut.waiting && f >= TUT_STEPS[tut.step].need) tutShow();
   // 牧人可升級／石牆可修補：糧夠了才掛角標，點一下就知道
   for (const k in G.units) {
@@ -802,7 +855,7 @@ function loadLoadouts() { try { return JSON.parse(localStorage.getItem(LKEY) || 
 function saveLoadout(id, keys) { sessionPick[id] = keys; try { const a = loadLoadouts(); a[id] = keys; localStorage.setItem(LKEY, JSON.stringify(a)); } catch (e) {} }
 // 這一關實際上場的卡；卡不超過上限就回 null（全帶）
 function pickedFor(L) {
-  if (L.units.length <= MAX_CARDS) return null;
+  if (L.conveyor || L.units.length <= MAX_CARDS) return null; // 送卡模式沒得選，卡是送來的
   const s = sessionPick[L.id] || loadLoadouts()[L.id];
   return Engine.validPick(L, s) ? s : Engine.defaultPick(L);
 }
@@ -898,7 +951,12 @@ function unitNums(k) {
   if (u.kind === 'instant') s.push(`落點周圍九格每個敵人傷害 ${u.dmg}，並嚇退 ${u.panic} 秒（往回跑）`);
   if (u.push) s.push(`不攻擊；每 ${u.every} 秒吹一次，同排地面敵人後退 ${u.push} 格並暈眩 ${u.stun} 秒（飛的不受影響）`);
   if (u.heal) s.push(`不攻擊；周圍${u.range === 2 ? ' 5×5 ' : '八格'}受傷的夥伴每秒回復 ${u.heal} 血量，多位相鄰會疊加${u.brave ? '；獅子咆哮嚇不停它' : ''}`);
-  if (u.upgrade) { const p = u.upgrade; s.push(`第 ${p.from} 夜起再點一下花 ${p.cost} 糧升級「${p.name}」：${p.desc}${p.poison ? `；中毒 ${STATUS.poison.t} 秒、每秒 ${STATUS.poison.dps}、攻擊 ×${STATUS.poison.biteMul}，同一隻只中一次` : ''}`); }
+  if (u.lanes) s.push(`同時攻擊上下 ${u.lanes} 排，共 ${u.lanes * 2 + 1} 排；飛的也打得到`);
+  if (u.deflect) s.push(`不攻擊；地面敵人走到它面前就被趕到隔壁排（最上最下排往中間趕，中間排上下輪流），每趕一隻自己掉 ${u.deflect} 血、同一隻 ${u.deflectCd} 秒內不重複趕；頭目與飛的不受影響`);
+  if (u.light !== undefined) s.push(`不攻擊；無月夜裡照亮自己這排和上下 ${u.light} 排，那幾排的腳印預告會回來`);
+  if (u.kind === 'patrol') s.push(`在自己這排和上下兩排之間來回走（每排 ${u.walk} 秒），走到那排就打前方 ${u.reach} 格內的敵人，攻擊間隔 ${u.every} 秒、每次傷害 ${u.dmg}；只有走在那排時才會被咬`);
+  if (u.cradle) s.push(`不攻擊；迷羊走到他那一格就立刻回圈（羊數 +1、糧 +${STRAY.reward}），不必走到最左邊`);
+  if (u.upgrade) { const p = u.upgrade; s.push(`第 ${p.from} 夜起再點一下花 ${p.cost} 糧升級「${p.name}」：${p.desc}${p.poison ? `；中毒 ${STATUS.poison.t} 秒、每秒 ${STATUS.poison.dps}、攻擊 ×${STATUS.poison.biteMul}，同一隻只中一次` : ''}${p.all ? `；每 ${u.every} 秒一次，飛的不受影響` : ''}`); }
   return s.join('・');
 }
 function enemyNums(k) {
@@ -914,6 +972,10 @@ function enemyNums(k) {
   if (e.dodge) s.push(`閃避 ${Math.round(e.dodge * 100)}% 的石子與箭矢；狗、荊棘、火把照常`);
   if (e.digs) s.push(`鑽地繞過前排，從土堆冒出；地下每秒走 ${e.digSpeed} 格`);
   if (e.flying) s.push('飛越牆、狗、荊棘；只有投射打得到；飛到最左邊就闖進羊圈');
+  if (e.detour) s.push(`前面是牆、隔壁排同一格空著就繞過去，${e.detour} 秒內不再繞；狗咬得特別痛`);
+  if (e.slam) s.push(`撞上每道牆的第一下傷害 ${e.slam}，撞完自己暈 ${e.slamStun} 秒${e.trample ? '；踏過的荊棘直接壞掉' : ''}`);
+  if (e.drift) s.push(`在上下 ${e.drift} 排之間飄（${e.driftT} 秒一圈），單排射手只在牠飄到那排時打得到；投石隊三排都打得到`);
+  if (e.shiftEvery) s.push(`每 ${e.shiftEvery} 秒換到隔壁排（被狗咬住時不換）；走到第 ${e.crouchAt} 格蹲 ${e.crouch} 秒再衝 ${e.dash} 格；牧人杖趕不動`);
   return s.join('・');
 }
 // 效果名詞表（圖鑑第三頁籤）：單位說明與敵人提示裡出現的詞，這裡各一句，數字同樣從資料表帶
@@ -929,7 +991,12 @@ const GLOSSARY = [
   { name: '嚎叫', ico: '🐺', text: `領頭狼每 ${ENEMIES.alpha.howl} 秒一次，2 格內的狼速度 ×${STATUS.howl.mul}，持續 ${STATUS.howl.t} 秒。對策：狗咬住牠` },
   { name: '咆哮', ico: '🦁', text: `獅子每 ${ENEMIES.lion.roar} 秒一次，2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走` },
   { name: '狂暴', ico: '🐻', text: `母熊血量低於 ${Math.round(ENEMIES.bear.enrage * 100)}% 時速度與傷害 ×2，直到被打倒` },
-  { name: '厚皮', ico: '🛡', text: `石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%；機弦、投石機、火、毒全額。母熊、獅子都是厚皮` },
+  { name: '厚皮', ico: '🛡', text: `石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%；機弦、投石機、火、毒全額。母熊、獅子、豹都是厚皮` },
+  { name: '換排', ico: '↕️', text: `敵人從這排換到隔壁排，射手要跟著換。來源：牧人杖（趕的）、豺狼碰到牆繞路、豹每 ${ENEMIES.leopard.shiftEvery} 秒自己換、夜鴞在三排之間飄` },
+  { name: '無月夜', ico: '🌑', text: '第二章起第二波後看不到腳印預告，不知道下一隻從哪排來。油燈照到的三排例外' },
+  { name: '迷羊', ico: '🐑', text: `不是敵人。從右邊走進來往羊圈走，走到最左邊或抱羊羔的牧人那格就回圈（羊數 +1、糧 +${STRAY.reward}）；地面敵人碰到就叼走，被叼出場算失落一隻；叼羊的被打倒，羊就從那裡繼續走。牧羊犬沒事時會走在牠旁邊護送` },
+  { name: '撞牆', ico: '🐗', text: `野豬撞上每道牆的第一下傷害 ${ENEMIES.boar.slam}，之後正常咬；撞完自己暈 ${ENEMIES.boar.slamStun} 秒。踏過荊棘直接踩爛` },
+  { name: '蹲伏', ico: '🐆', text: `豹走到第 ${ENEMIES.leopard.crouchAt} 格先蹲 ${ENEMIES.leopard.crouch} 秒（看得到預兆），然後以 ${STATUS.dash.mul} 倍速衝 ${ENEMIES.leopard.dash} 格` },
 ];
 function renderRosterDetail() {
   const box = $('#roster-detail'), k = roster.focus;
@@ -1010,6 +1077,7 @@ function syncSoundUI() {
   document.querySelectorAll('.snd-btn').forEach(b => { b.textContent = p.sfx ? '🔊' : '🔇'; b.title = p.sfx ? '聲音：開（點一下靜音）' : '聲音：關（點一下打開）'; });
   document.querySelectorAll('#snd-panel [data-snd]').forEach(b => { const on = !!p[b.dataset.snd]; b.textContent = on ? '開' : '關'; b.classList.toggle('on', on); });
   document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.classList.toggle('on', Number(b.dataset.vol) === p.vol));
+  document.querySelectorAll('#snd-panel .snd-row').forEach((row, i) => row.classList.toggle('off', i > 0 && !p.sfx));
 }
 document.querySelectorAll('.snd-btn').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); Sound.set('sfx', !Sound.prefs.sfx); syncSoundUI(); Sound.play('tap'); }));
 document.querySelectorAll('#snd-panel [data-snd]').forEach(b => b.addEventListener('click', () => { Sound.set(b.dataset.snd, !Sound.prefs[b.dataset.snd]); syncSoundUI(); Sound.play('tap'); }));
@@ -1047,7 +1115,8 @@ function setDev(on) {
 function buildDevEnemies() {
   const sel = $('#dev-enemy');
   for (const k in ENEMIES) { const o = document.createElement('option'); o.value = k; o.textContent = ENEMIES[k].ico + ' ' + ENEMIES[k].name; sel.appendChild(o); }
-  sel.addEventListener('change', () => { devEnemy = sel.value; if (devEnemy) { selected = null; document.querySelectorAll('.card').forEach(x => x.classList.remove('selected')); cells.forEach(x => x.classList.remove('hint')); toast(`點任一格，放一隻${ENEMIES[devEnemy].name}`); } });
+  const so = document.createElement('option'); so.value = 'stray'; so.textContent = STRAY.ico + ' ' + STRAY.name + '（中立）'; sel.appendChild(so);
+  sel.addEventListener('change', () => { devEnemy = sel.value; if (devEnemy) { selected = null; document.querySelectorAll('.card').forEach(x => x.classList.remove('selected')); cells.forEach(x => x.classList.remove('hint')); toast(`點任一格，放一隻${devEnemy === 'stray' ? STRAY.name : ENEMIES[devEnemy].name}`); } });
 }
 document.querySelectorAll('#dev [data-speed]').forEach(b => b.addEventListener('click', () => { speed = Number(b.dataset.speed); document.querySelectorAll('#dev [data-speed]').forEach(x => x.classList.toggle('on', x === b)); }));
 $('#dev-pause').addEventListener('click', () => { paused = !paused; syncPause(); if (!paused) last = performance.now(); });

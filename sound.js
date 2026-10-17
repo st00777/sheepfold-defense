@@ -7,7 +7,7 @@
   const VOLS = [0.35, 0.6, 1.0];
   let ctx = null, master = null, amb = null, ambWanted = false;
   const lastAt = {};  // 每種音效上次播放的時間，太密就不重播（咬牆、石子每幀都在發生）
-  const GAP = { shot: 0.08, bite: 0.45, die: 0.12, ignite: 0.25, food: 0.05, place: 0.05, hit: 0.1 };
+  const GAP = { shot: 0.08, bite: 0.45, die: 0.12, ignite: 0.25, food: 0.05, place: 0.05, hit: 0.1, whine: 0.3, grab: 0.2, sheep: 0.2 };
 
   const prefs = load();
   function load() {
@@ -20,11 +20,15 @@
     if (ctx) return ctx;
     const AC = root.AudioContext || root.webkitAudioContext; if (!AC) return null;
     try { ctx = new AC(); } catch (e) { return null; }
-    master = ctx.createGain(); master.gain.value = prefs.sfx ? VOLS[prefs.vol] : 0; master.connect(ctx.destination);
+    master = ctx.createGain(); master.gain.value = prefs.sfx ? VOLS[prefs.vol] : 0;
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 6; // 好幾個音疊在一起不爆音
+    master.connect(comp); comp.connect(ctx.destination);
     return ctx;
   }
+  // context 沒在跑就叫它跑（iOS 第一次手勢後是 suspended；來電、Siri 之後是 interrupted）
+  function wake() { if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().then(() => { if (ambWanted) startAmb(); }).catch(() => {}); }
   // 第一次手勢時叫：建好 context 並解除 iOS 的靜音狀態
-  function unlock() { const c = ensure(); if (c && c.state === 'suspended') c.resume().catch(() => {}); if (ambWanted) startAmb(); }
+  function unlock() { if (!ensure()) return; wake(); if (ambWanted) startAmb(); }
   const now = () => ctx.currentTime;
 
   // ====== 合成積木 ======
@@ -55,7 +59,7 @@
     if (f1 !== undefined) f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
     const env = ctx.createGain(); env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(g, t + a); env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     s.connect(f); f.connect(env); env.connect(master);
-    s.start(t); s.stop(t + dur + 0.05);
+    s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); // 每次從不同位置開始，石子聲才不會一模一樣
   }
 
   // ====== 音效表：名稱 → 怎麼合成 ======
@@ -87,7 +91,8 @@
 
   function play(name) {
     if (!prefs.sfx || !SFX[name]) return;
-    const c = ensure(); if (!c || c.state !== 'running') return;
+    const c = ensure(); if (!c || c.state === 'closed') return;
+    if (c.state !== 'running') wake(); // 排進去的音會等 context 醒來再出，不會掉
     const t = c.currentTime, gap = GAP[name] || 0;
     if (gap && lastAt[name] !== undefined && t - lastAt[name] < gap) return;
     lastAt[name] = t;
@@ -97,7 +102,8 @@
   // ====== 環境音：蟲鳴（高頻噪音＋快速顫動，循環） ======
   function startAmb() {
     if (!prefs.amb || !prefs.sfx || amb) return;
-    const c = ensure(); if (!c || c.state !== 'running') return;
+    const c = ensure(); if (!c || c.state === 'closed') return;
+    if (c.state !== 'running') { wake(); return; } // 醒來後 wake 會再叫一次
     const s = c.createBufferSource(); s.buffer = noiseBuffer(); s.loop = true;
     const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 4300; f.Q.value = 9;
     const g = c.createGain(); g.gain.value = 0.0001;
@@ -122,12 +128,12 @@
   function set(k, v) {
     if (k === 'sfx') prefs.sfx = !!v; else if (k === 'amb') prefs.amb = !!v; else if (k === 'vol') prefs.vol = [0, 1, 2].includes(v) ? v : 1; else return;
     save();
-    if (master) master.gain.setTargetAtTime(prefs.sfx ? VOLS[prefs.vol] : 0, ctx.currentTime, 0.05);
+    if (master) master.gain.setValueAtTime(prefs.sfx ? VOLS[prefs.vol] : 0, ctx.currentTime); // 立刻生效，切回來那一下的確認音才聽得到
     if (k !== 'vol') { if (prefs.amb && prefs.sfx && ambWanted) startAmb(); else stopAmb(); }
   }
   // 切到背景整個停掉（省電、也不會在口袋裡叫），回來再接上
   function suspend() { if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}); }
-  function resume() { if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); }
+  function resume() { wake(); }
 
   root.Sound = { unlock, play, ambient, set, suspend, resume, prefs, names: Object.keys(SFX), state: () => (ctx ? ctx.state : 'none') };
 })(typeof window !== 'undefined' ? window : globalThis);
