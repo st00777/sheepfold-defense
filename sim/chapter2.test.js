@@ -188,3 +188,33 @@ test('組合：送卡模式拆單位退回手上', () => {
   assert.ok(E.sell(G, 2, 0).ok); assert.strictEqual(G.hand.length, n + 1); assert.strictEqual(G.hand[G.hand.length - 1], k); assert.strictEqual(G.food, 0);
 });
 
+test('檢查點：送卡模式手牌跟著存、迷羊回圈後羊數不被壓回', () => {
+  const G = E.create(11, 'calm', () => 0.5); G.started = true; G.holdWaves = true; G.phase = 'rest'; G.timer = 999;
+  run(G, 20); G.wave = 2; const snap = E.snapshot(G);
+  assert.ok(snap.hand.length >= 5); assert.ok(E.checkSnapshot(snap, 11));
+  const G2 = E.create(11, 'calm', () => 0.5); assert.ok(E.restore(G2, snap)); assert.deepStrictEqual(G2.hand, snap.hand);
+  const G3 = setup(10); G3.sheep = 5; G3.wave = 2; const s3 = E.snapshot(G3);
+  const G4 = E.create(10, 'calm', () => 0.5); assert.ok(E.restore(G4, s3)); assert.strictEqual(G4.sheep, 5);
+});
+
+test('無月夜：油燈放下後舊腳印補出、夜鴞預告排不會指到邊排', () => {
+  const G = setup(9);
+  G.holdWaves = false; G.phase = 'rest'; G.wave = 1; G.timer = D.FORESHADOW_LEAD; G.builtWave = -1;
+  E.step(G, 0.01); assert.strictEqual(G.nextVisible, false); G.events.length = 0;
+  assert.ok(E.place(G, 2, 1, 'lamp').ok); E.step(G, 0.01);
+  const m = ev(G, 'marker'); assert.ok(m.length && m[m.length - 1].r === G.nextRow, '放燈後腳印補出');
+  const G2 = setup(12, () => 0.01); // rng 0.01 會挑第 0 排
+  G2.holdWaves = false; G2.phase = 'rest'; G2.wave = 1; G2.timer = D.FORESHADOW_LEAD; G2.builtWave = -1; G2.waves[1].list = [['owl', 1]];
+  E.step(G2, 0.01); assert.ok(G2.nextRow >= 1 && G2.nextRow <= 3, '夜鴞預告排 ' + G2.nextRow);
+});
+
+test('迷羊：波次提早清完也照時間來，天亮時還沒來的也算回圈', () => {
+  const G = setup(10); G.holdWaves = false; G.phase = 'rest'; G.wave = 1; G.timer = 0.01; G.waves[1].list = [['wolf', 1]]; G.waves[1].strays = [1, 40];
+  assert.ok(E.place(G, 2, 1, 'sling').ok); assert.ok(E.place(G, 1, 1, 'sling').ok); assert.ok(E.place(G, 3, 1, 'sling').ok);
+  run(G, 8); // 一隻狼早就打完、進休息
+  assert.strictEqual(G.phase, 'rest'); assert.strictEqual(G.strayQueue.length, 1, '40 秒那隻還排著');
+  run(G, 3); assert.strictEqual(G.wave, 3); assert.strictEqual(G.strayQueue.length, 2, '下一波開始時把剩下的接上');
+  const s0 = G.sheep; G.wave = G.waves.length; G.phase = 'rest'; G.timer = 0.01; run(G, 0.1);
+  assert.ok(G.over && G.result.win); assert.ok(G.sheep >= s0 + 1, '沒來的迷羊天亮算回圈');
+});
+

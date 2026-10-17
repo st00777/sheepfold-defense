@@ -56,23 +56,20 @@
   #resume-line { margin-top: 10px; }
   #resume-line[hidden] { display: none; }
 
-  /* 卡片列：可以左右滑 */
-  #cards { display: flex; gap: 8px; padding: 8px 12px; background: var(--panel); border-top: 1px solid #000; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
-  #cards::-webkit-scrollbar { display: none; }
-  .card { flex: 0 0 68px; background: var(--card); border: 2px solid transparent; border-radius: 10px; padding: 8px 4px; text-align: center; cursor: pointer; transition: transform 120ms var(--ease-out), opacity 150ms; min-height: 64px; position: relative; }
-  .card.group-start { margin-left: 10px; }
+  /* 卡片列：自動換行的格子，手機一排 5 張、8 張卡加鏟子剛好兩排，不用左右滑（2026-10-17 James：手機要一直滑很煩）；寬螢幕自然回到一排 */
+  #cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; padding: 8px 12px; background: var(--panel); border-top: 1px solid #000; }
+  .card { background: var(--card); border: 2px solid transparent; border-radius: 10px; padding: 7px 3px 6px; text-align: center; cursor: pointer; transition: transform 120ms var(--ease-out), opacity 150ms; min-height: 60px; position: relative; }
+  /* 分組只靠左上角的小色點與排序；格子會換行，不再畫分隔線 */
   /* 送卡模式：新送到的那張從下面浮上來，其他張不動 */
   .card.arrive { transition: transform 150ms var(--ease-out), opacity 150ms var(--ease-out); }
   @starting-style { .card.arrive { opacity: 0; transform: translateY(6px); } }
-  .card.group-start::before { content: ''; position: absolute; left: -8px; top: 10px; bottom: 10px; width: 2px; background: #0006; border-radius: 1px; }
   .card .dot { position: absolute; left: 5px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--u, #888); }
   .card .tag { position: absolute; right: 4px; top: 3px; font-size: 10px; color: #2b2a26; background: var(--new); border-radius: 6px; padding: 0 4px; }
-  #cards { position: relative; }
-  #cards-wrap { position: relative; background: var(--panel); }
-  #cards-wrap::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 28px; background: linear-gradient(90deg, #3a383100, var(--panel)); pointer-events: none; }
-  .card .ico { font-size: 26px; line-height: 1; }
-  .card .name { font-size: 12px; margin-top: 2px; white-space: nowrap; }
-  .card .cost { font-size: 12px; color: var(--gold); }
+  #cards-wrap { background: var(--panel); }
+  .card .ico { font-size: 24px; line-height: 1; }
+  .card .name { font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .cost { font-size: 11px; color: var(--gold); white-space: nowrap; }
+  @media (min-width: 560px) { .card .ico { font-size: 26px; } .card .name, .card .cost { font-size: 12px; } }
   .card.selected { border-color: var(--gold); background: var(--card-on); }
   .card.poor { opacity: .45; }
   .card.shovel { background: #3f3b31; }
@@ -468,8 +465,8 @@ function buildCards() {
   });
   // 鏟子固定在最後，不佔點兵名額：點它再點單位就拆掉
   const sh = document.createElement('div');
-  sh.className = 'card shovel group-start'; sh.dataset.key = 'shovel';
-  sh.innerHTML = `<div class="ico">⛏️</div><div class="name">鏟子</div><div class="cost">${conveyor ? '不退糧' : '退一半'}</div>`;
+  sh.className = 'card shovel' + (selected === 'shovel' ? ' selected' : ''); sh.dataset.key = 'shovel';
+  sh.innerHTML = `<div class="ico">⛏️</div><div class="name">鏟子</div><div class="cost">${conveyor ? '退回手上' : '退一半'}</div>`;
   sh.addEventListener('click', () => tapShovel());
   wrap.appendChild(sh);
   cardEls = [...wrap.querySelectorAll('.card')].filter(c => UNITS[c.dataset.key]); lastFood = -1;
@@ -559,7 +556,7 @@ function tapShovel() {
   selected = (selected === 'shovel') ? null : 'shovel';
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.key === selected));
   cells.forEach(c => { const on = selected === 'shovel' && !!G.units[c.dataset.r + ',' + c.dataset.c]; c.classList.toggle('hint', on); c.classList.toggle('sell', on); });
-  toast(selected ? '點一個單位拆掉，退一半糧' : '先點一張卡，再點草地放下去');
+  toast(selected ? (G.level.conveyor ? '點一個單位拆掉，沒被咬過的退回手上' : '點一個單位拆掉，退一半糧') : '先點一張卡，再點草地放下去');
 }
 function clearSelection() {
   selected = null;
@@ -658,7 +655,7 @@ function flushEvents() {
       case 'fx': fx(e.kind, e.r, e.x, e.id); if (FX_SFX[e.kind]) Sound.play(FX_SFX[e.kind]); break;
       case 'marker': setMarker(e.r, e.type); break;
       case 'sheep': $('#sheep-n').textContent = G.sheep; break;
-      case 'hand': buildCards(); break;              // 送卡模式：手上的卡變了
+      case 'hand': buildCards(); if (selected && selected !== 'shovel' && !G.hand.includes(selected)) clearSelection(); break; // 送卡模式：手上的卡變了；選著的那張已經不在就取消
       case 'stray': Sound.play('sheep'); break;
       case 'waveclear': if (e.wave < G.waves.length) { Sound.play('clear'); if (!devUsed) saveCheckpoint(Engine.snapshot(G)); } break; // 最後一波不播，讓天亮的和弦乾淨
       case 'win': onWin(); break;
