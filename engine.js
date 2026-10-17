@@ -218,7 +218,13 @@
     const u = G.units[key(r, c)];
     if (!u) return { ok: false, msg: '這格沒東西可拆' };
     const def = UNITS[u.type];
-    const back = G.level.conveyor ? 0 : Math.round((def.cost + (u.elder ? ELDER_COST : 0) + (u.upgraded ? def.upgrade.cost : 0)) * SELL_RATE); // 送來的卡沒花糧，拆了也不退
+    if (G.level.conveyor) { // 送來的卡沒花糧：拆了就退回手上（手滿了就沒了）
+      removeUnit(G, u);
+      const full = G.hand.length >= (G.level.conveyor.max || 6);
+      if (!full) { G.hand.push(u.type); ev(G, { t: 'hand' }); }
+      return { ok: true, msg: full ? `${def.name}拆了，手上滿了收不回來` : `${def.name}拆了，退回手上` };
+    }
+    const back = Math.round((def.cost + (u.elder ? ELDER_COST : 0) + (u.upgraded ? def.upgrade.cost : 0)) * SELL_RATE);
     removeUnit(G, u); G.food += back;
     ev(G, { t: 'pop', r, c, text: `+${back}` });
     return { ok: true, msg: `${def.name}拆了，退 ${back} 糧` };
@@ -231,6 +237,7 @@
       if (e.underground) continue;
       if (Math.abs(e.r - r) <= 1 && Math.abs(e.x + 0.5 - (c + 0.5)) <= 1.3) {
         hurt(G, e, def.dmg);
+        dropSheep(G, e, '被嚇到');
         e.st.panic = def.panic;
         release(G, e);
       }
@@ -301,7 +308,7 @@
     const hp = Math.round(def.hp * (hpMul || 1));
     const e = { id: G.nextId++, type, r, x, hp, maxHp: hp, st: {}, heldBy: null, biting: null,
       underground: !!def.digs, vaulted: false, vaulting: 0, vaultFrom: 0, vaultTo: 0, lift: 0, carrying: false, enraged: false, abilityT: def.howl ? 3 : def.roar ? 4 : 0, dead: false,
-      rv: r, deflectCd: 0, detourCd: 0, shiftT: def.shiftEvery ? def.shiftEvery * 0.5 : 0, crouchT: 0, crouched: false, dashLeft: 0, slamTarget: null, carryStray: false }; // rv：畫面上的排（換排時從舊排滑過去）
+      rv: r, deflectCd: 0, detourCd: 0, deflectFrom: -1, shiftT: def.shiftEvery ? def.shiftEvery * 0.5 : 0, crouchT: 0, crouched: false, dashLeft: 0, slamTarget: null, carryStray: false }; // rv：畫面上的排（換排時從舊排滑過去）
     if (def.drift) { e.r0 = Math.max(def.drift, Math.min(ROWS - 1 - def.drift, r)); e.r = e.rv = e.r0; e.driftT = G.rng() * def.driftT; } // 夜鴞：以中間幾排為軸飄，不會飄出棋盤
     G.enemies.push(e);
     ev(G, { t: 'spawn', e });
@@ -320,6 +327,7 @@
   function moveRow(G, e, r2) {
     if (r2 < 0 || r2 >= ROWS || r2 === e.r) return false;
     release(G, e); e.r = r2; e.biting = null;
+    e.hopFrom = e.rv; e.hopT = 0; // 畫面從舊排滑過去（先加速再減速）
     ev(G, { t: 'fx', kind: 'hop', r: r2, x: e.x, id: e.id });
     return true;
   }
@@ -329,6 +337,13 @@
     u.flip = !u.flip; return u.r + (u.flip ? 1 : -1);
   }
   function ignite(G, e) { if (!e.st.burn) { e.st.burn = STATUS.burn.t; ev(G, { t: 'fx', kind: 'ignite', r: e.r, x: e.x }); } }
+  // 抱著羊的被嚇到、被角聲推到就丟下羊：迷羊落地繼續走，偷羊人的羊留在原地（不會再被抱走一次，除非牠再走到底）
+  function dropSheep(G, e, why) {
+    if (!e.carrying) return;
+    e.carrying = false;
+    if (e.carryStray) { e.carryStray = false; spawnStray(G, e.r, Math.min(COLS, e.x)); }
+    ev(G, { t: 'toast', msg: `${ENEMIES[e.type].name}${why}，把羊丟下了 🐑` });
+  }
 
   function speedOf(e) {
     const def = ENEMIES[e.type];
@@ -501,7 +516,7 @@
             const ground = (all ? G.enemies.filter(targetable) : inRow).filter(e => !ENEMIES[e.type].flying);
             if (!ground.length) continue;
             u.timer = def.every;
-            for (const e of ground) { e.x = Math.min(COLS + 0.2, e.x + def.push); e.st.stun = def.stun; release(G, e); }
+            for (const e of ground) { dropSheep(G, e, '被角聲推回去'); e.x = Math.min(COLS + 0.2, e.x + def.push); e.st.stun = def.stun; release(G, e); }
             ev(G, { t: 'fx', kind: 'horn', r: u.r, x: u.c });
             ev(G, { t: 'toast', msg: all ? '銀號一響，五排的狼都退了一步' : '角聲一響，那排的狼退了一步' });
           }
@@ -629,7 +644,7 @@
       if (e.deflectCd > 0) e.deflectCd -= dt; if (e.detourCd > 0) e.detourCd -= dt;
       // 換排的畫面位置：rv 朝 r 滑過去
       if (def.drift) { e.driftT += dt; e.rv = e.r0 + Math.sin(e.driftT / def.driftT * Math.PI * 2) * def.drift; const nr = Math.round(e.rv); if (nr !== e.r) { e.r = nr; } } // 夜鴞：排號跟著飄
-      else if (e.rv !== e.r) { const d = e.r - e.rv, stp = dt / STATUS.hop.t; e.rv = Math.abs(d) <= stp ? e.r : e.rv + Math.sign(d) * stp; }
+      else if (e.rv !== e.r) { e.hopT = Math.min(1, (e.hopT || 0) + dt / STATUS.hop.t); const p = e.hopT * e.hopT * (3 - 2 * e.hopT); e.rv = e.hopT >= 1 ? e.r : (e.hopFrom ?? e.rv) + (e.r - (e.hopFrom ?? e.rv)) * p; }
       // 豹：每隔幾秒換一排（被咬住、翻牆中、蹲著的時候不換）
       if (def.shiftEvery && !e.heldBy && !e.vaulting && !e.crouchT && !e.st.stun && !e.carrying) {
         e.shiftT -= dt;
@@ -701,7 +716,8 @@
           // 牧人杖：把地面的非頭目趕到隔壁排（同一隻 4 秒內不重複趕；頭目把它當普通牆咬）
           if (bk === 'deflector' && !def.boss && e.deflectCd <= 0) {
             const r2 = deflectRow(b);
-            if (moveRow(G, e, r2)) { e.deflectCd = UNITS[b.type].deflectCd; b.hp -= UNITS[b.type].deflect; ev(G, { t: 'unit', r: b.r, c: b.c }); if (b.hp <= 0) removeUnit(G, b); continue; }
+            // 不趕回牠剛被趕來的那排（兩根杖之間不打乒乓；這根杖就當牆讓牠咬）
+            if (r2 !== e.deflectFrom && moveRow(G, e, r2)) { e.deflectFrom = b.r; e.deflectCd = UNITS[b.type].deflectCd; b.hp -= UNITS[b.type].deflect; ev(G, { t: 'unit', r: b.r, c: b.c }); if (b.hp <= 0) removeUnit(G, b); continue; }
           }
           // 豺狼：前面是牆、隔壁排同一格空著就繞過去
           if (def.detour && bk === 'blocker' && e.detourCd <= 0) {

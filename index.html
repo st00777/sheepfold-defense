@@ -61,6 +61,9 @@
   #cards::-webkit-scrollbar { display: none; }
   .card { flex: 0 0 68px; background: var(--card); border: 2px solid transparent; border-radius: 10px; padding: 8px 4px; text-align: center; cursor: pointer; transition: transform 120ms var(--ease-out), opacity 150ms; min-height: 64px; position: relative; }
   .card.group-start { margin-left: 10px; }
+  /* 送卡模式：新送到的那張從下面浮上來，其他張不動 */
+  .card.arrive { transition: transform 150ms var(--ease-out), opacity 150ms var(--ease-out); }
+  @starting-style { .card.arrive { opacity: 0; transform: translateY(6px); } }
   .card.group-start::before { content: ''; position: absolute; left: -8px; top: 10px; bottom: 10px; width: 2px; background: #0006; border-radius: 1px; }
   .card .dot { position: absolute; left: 5px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--u, #888); }
   .card .tag { position: absolute; right: 4px; top: 3px; font-size: 10px; color: #2b2a26; background: var(--new); border-radius: 6px; padding: 0 4px; }
@@ -101,8 +104,8 @@
   /* 無月夜：腳印消失那一刻整個棋盤暗一階，右邊出生的那側更暗（看不見牠從哪來） */
   #board { transition: filter 2s; }
   #board.moonless { filter: brightness(.78) saturate(.85); }
-  #board::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, #0000, #0a0c14cc); pointer-events: none; transition: width 2s; z-index: 1; }
-  #board.moonless::after { width: 22%; }
+  #board::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 22%; background: linear-gradient(90deg, #0000, #0a0c14cc); pointer-events: none; opacity: 0; transition: opacity 2s; z-index: 1; }
+  #board.moonless::after { opacity: 1; }
   .cell.rock::after { content: '🪨'; opacity: .7; font-size: .8em; }
   .cell.hint { outline: 2px dashed var(--gold); outline-offset: -4px; }
   .cell .unit { position: relative; display: flex; align-items: center; justify-content: center; width: 80%; height: 80%; border-radius: 8px; }
@@ -131,7 +134,7 @@
   .enemy, .dog-run, .mark { position: absolute; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; }
   /* 敵人辨識規則：所有敵人暗紅細圈（陣營）；大小＝威脅；金色粗圈＝頭目；形狀圓＝獸、方圓＝人；底色只做輔助 */
   .enemy .body { --k: 1; width: 70%; height: 70%; border-radius: 50%; background: #5b5b66; display: flex; align-items: center; justify-content: center; position: relative;
-    box-shadow: 0 0 0 1.5px #8a2f2c; transform: scale(calc(var(--k) * var(--hs, 1))); transition: box-shadow .2s, filter .2s; }
+    box-shadow: 0 0 0 1.5px #8a2f2c; transform: scale(calc(var(--k) * var(--hs, 1))); transition: box-shadow .2s, filter .2s, transform 200ms var(--ease-out); }
   .enemy.fast .body { --k: .8; }
   .enemy.fast .body::before { content: ''; position: absolute; left: 90%; top: 45%; width: 70%; height: 3px; background: linear-gradient(90deg, #f3ead8aa, #f3ead800); }
   .enemy.alpha .body { --k: 1.2; box-shadow: 0 0 0 3px var(--gold); }
@@ -406,7 +409,7 @@ let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf =
 const els = new Map();   // 引擎物件 id → 畫面元素
 let markerEl = null, moundEls = new Map();
 let toastTimer = 0;
-let cardEls = [], lastFood = -1;
+let cardEls = [], lastFood = -1, lastHand = 0;
 // 開發者模式：網址加 ?dev，或連點左上角「糧」五下
 let devOn = /[?&]dev/.test(location.search), speed = 1, paused = false, devEnemy = '', foodTaps = 0;
 let devUsed = false;   // 這一局有沒有開過開發者面板；開過就不存檔，免得作弊狀態被續玩帶走
@@ -451,17 +454,18 @@ function buildCards() {
   const conveyor = !!(G && G.level.conveyor);
   // 固定分組：產糧｜射手（含狗）｜牆｜鋪地｜一次性／輔助；組首留空隙。送卡模式：手上有什麼列什麼，照送到的順序
   const keys = conveyor ? G.hand.slice() : sortUnits(L.units);
+  const grew = conveyor && keys.length > lastHand; lastHand = conveyor ? keys.length : 0; // 手上變多＝最後一張是剛送到的
   let lastG = -1;
-  for (const key of keys) {
+  keys.forEach((key, i) => {
     const u = UNITS[key], g = conveyor ? -1 : GROUP[u.kind];
     const d = document.createElement('div');
     const fresh = L.fresh.includes(key) && !seenCard(key);
-    d.className = 'card' + (fresh ? ' new' : '') + (u.kind === 'instant' ? ' once' : '') + (g !== lastG && lastG >= 0 ? ' group-start' : '') + (key === selected ? ' selected' : ''); d.dataset.key = key;
+    d.className = 'card' + (fresh ? ' new' : '') + (u.kind === 'instant' ? ' once' : '') + (g !== lastG && lastG >= 0 ? ' group-start' : '') + (key === selected ? ' selected' : '') + (grew && i === keys.length - 1 ? ' arrive' : ''); d.dataset.key = key;
     d.style.setProperty('--u', `var(--u-${key})`);
     d.innerHTML = `<div class="dot"></div>${fresh ? '<div class="tag fresh">新</div>' : ''}${u.kind === 'instant' ? '<div class="tag once">一次</div>' : ''}<div class="ico">${u.ico}</div><div class="name">${u.name}</div><div class="cost">${conveyor ? '送來的' : `🌾 ${u.cost}`}</div>`;
     d.addEventListener('click', () => tapCard(key, d));
     wrap.appendChild(d); lastG = g;
-  }
+  });
   // 鏟子固定在最後，不佔點兵名額：點它再點單位就拆掉
   const sh = document.createElement('div');
   sh.className = 'card shovel group-start'; sh.dataset.key = 'shovel';

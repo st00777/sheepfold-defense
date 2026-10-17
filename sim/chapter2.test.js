@@ -160,3 +160,31 @@ test('檢查點：第二章的單位種類能存能還原', () => {
   const G2 = E.create(13, 'calm', () => 0.5); G2.level = { ...G2.level, units: Object.keys(D.UNITS) };
   assert.ok(E.restore(G2, snap)); assert.strictEqual(Object.keys(G2.units).length, 5);
 });
+
+test('組合：牧人杖不打乒乓（趕過的狼不會被趕回原排）', () => {
+  const G = setup();
+  assert.ok(E.place(G, 0, 3, 'staff').ok); assert.ok(E.place(G, 1, 3, 'staff').ok);
+  const w = spawn(G, 'wolf', 0, 3.9); run(G, 1.5);
+  assert.strictEqual(w.r, 1, '先被趕到第 1 排');
+  run(G, 6);
+  assert.notStrictEqual(w.r, 0, '不會被第 1 排的杖趕回第 0 排'); assert.ok(G.units['1,3'].hp < 150, '改成咬那根杖');
+});
+
+test('組合：瓦瓶與銀號讓叼羊的丟下羊', () => {
+  const G = setup(10);
+  E.dev.stray(G, 1, 5); const w = spawn(G, 'wolf', 1, 5.2); run(G, 1);
+  assert.ok(w.carrying);
+  assert.ok(E.place(G, 1, 5, 'jar').ok); run(G, 0.1);
+  assert.ok(!w.carrying && G.strays.length === 1, '瓦瓶一炸，羊落地');
+  const G2 = setup(14);
+  E.dev.stray(G2, 0, 5); const v = spawn(G2, 'wolf', 0, 5.2); run(G2, 1); assert.ok(v.carrying);
+  assert.ok(E.place(G2, 2, 0, 'horn').ok); G2.units['2,0'].timer = 0.1; assert.ok(E.tapUnit(G2, 2, 0).ok); run(G2, 0.3);
+  assert.ok(!v.carrying && G2.strays.length === 1, '銀號一吹，羊落地');
+});
+
+test('組合：送卡模式拆單位退回手上', () => {
+  const G = E.create(11, 'calm', () => 0.5); G.started = true; G.holdWaves = true; G.phase = 'rest'; G.timer = 999;
+  const k = G.hand[0]; assert.ok(E.place(G, 2, 0, k).ok); const n = G.hand.length;
+  assert.ok(E.sell(G, 2, 0).ok); assert.strictEqual(G.hand.length, n + 1); assert.strictEqual(G.hand[G.hand.length - 1], k); assert.strictEqual(G.food, 0);
+});
+
