@@ -67,7 +67,11 @@
       // 第二章：nextVisible 無月夜時腳印看不看得見；strays 場上的迷羊、strayQueue 這波還沒出來的迷羊（秒）；hand 送卡模式手上的卡
       nextVisible: true, strays: [], strayQueue: [], waveT: 0, hand: [], convT: 0,
     };
-    if (level.conveyor) { G.food = 0; G.taughtElder = G.taughtRepair = true; for (let i = 0; i < (level.conveyor.start || 3); i++) dealCard(G); } // 沒有糧：不教升級修補
+    if (level.conveyor) { // 沒有糧：不教升級修補；開局先給固定幾張（至少有一個射手），之後才抽
+      G.food = 0; G.taughtElder = G.taughtRepair = true;
+      const st = level.conveyor.start;
+      if (Array.isArray(st)) { for (const k of st) if (UNITS[k]) G.hand.push(k); } else for (let i = 0; i < (st || 3); i++) dealCard(G);
+    }
     return G;
   }
 
@@ -701,7 +705,7 @@
           }
           // 豺狼：前面是牆、隔壁排同一格空著就繞過去
           if (def.detour && bk === 'blocker' && e.detourCd <= 0) {
-            const cand = [e.r - 1, e.r + 1].filter(r => r >= 0 && r < ROWS && !G.units[key(r, frontCol)] && !G.rocks.has(key(r, frontCol)));
+            const cand = [e.r - 1, e.r + 1].filter(r => r >= 0 && r < ROWS && !(G.units[key(r, frontCol)] && UNITS[G.units[key(r, frontCol)].type].kind === 'blocker') && !G.rocks.has(key(r, frontCol))); // 隔壁那格只要不是牆就繞得過去（有射手就直接撲上去咬）
             if (cand.length) { moveRow(G, e, cand[Math.floor(G.rng() * cand.length)]); e.detourCd = def.detour; if (!G.toldDetour) { G.toldDetour = true; ev(G, { t: 'toast', msg: '豺狼繞過牆，換到隔壁排了' }); } continue; }
           }
           // 野豬：撞上每道牆的第一下特別重，撞完自己暈一下

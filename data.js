@@ -264,7 +264,7 @@ const LEVELS = [
 
   // ====== 第二章「另外的羊」（第 8-14 夜）：無月夜＋跨路徑 ======
   // chapter：關卡選單分章；moonless：第幾波起看不見腳印（油燈照到的排例外）；strays：這波開始後第幾秒走進一隻迷羊
-  // conveyor：送卡模式（卡定時送到手上、費用 0、沒有糧）；give：這波開始時一定先送到的卡
+  // conveyor：送卡模式（卡定時送到手上、費用 0、沒有糧；start 開局先給哪幾張、every 幾秒送一張、max 手上最多幾張、weights 抽卡權重）；give：這波開始時一定先送到的卡
   {
     id: 8, chapter: 2, name: '井邊的夜', title: '別的牧人', ref: '取材：出埃及記 2:16-20，西坡拉姊妹在井邊',
     speaker: '西坡拉', moonless: 2,
@@ -273,9 +273,9 @@ const LEVELS = [
     tips: ['🌑 月亮下山後看不到腳印預告，每排都要顧', '🦯 牧人杖不攻擊，敵人走到它面前就被趕到隔壁排。放在沒有射手的排，把敵人趕進有射手的那排'],
     waves: [
       { list: [['wolf', 5]],                                   gap: 4.5, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
-      { list: [['wolf', 8], ['fast', 3]],                      gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.2, say: '月亮下山了', hint: '月亮快下山了，之後看不見腳印。狼會散開五排來，用牧人杖把牠們趕到同一排打' },
-      { list: [['jackal', 1], ['wolf', 6], ['jackal', 2]],     gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, ordered: true, say: '有東西繞過牆', hint: '豺狼碰到牆就繞到隔壁排，光靠牆不夠。派牧羊犬咬住牠' },
-      { list: [['jackal', 3], ['wolf', 9], ['fast', 4]],       gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.5, say: '最後一波', hint: '最後一波豺狼更多。杖把狼趕進一排、狗守豺狼' },
+      { list: [['wolf', 8], ['fast', 3]],                      gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '月亮下山了', hint: '月亮快下山了，之後看不見腳印。狼會散開五排來，用牧人杖把牠們趕到同一排打' },
+      { list: [['jackal', 1], ['wolf', 7], ['jackal', 2]],     gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.45, ordered: true, say: '有東西繞過牆', hint: '豺狼碰到牆就繞到隔壁排，光靠牆不夠。派牧羊犬咬住牠' },
+      { list: [['jackal', 4], ['wolf', 10], ['fast', 4]],      gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.7, say: '最後一波', hint: '最後一波豺狼更多。杖把狼趕進一排、狗守豺狼' },
     ],
     outroWin: '羊一隻沒少。父親說：「那個人在哪裡？你們去請他來吃飯。」（出 2:20）今晚也請你。',
     outroLose: { wolf: '別的牧人趕走我們，狼也會趕走你。牧人杖放在沒有射手的那幾排，把狼趕過去打。' },
@@ -289,8 +289,8 @@ const LEVELS = [
     waves: [
       { list: [['wolf', 6]],                                               gap: 4.5, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['wolf', 8], ['fast', 4]],                                  gap: 2.2, rows: [0, 1, 2, 3, 4], hpMul: 1.2, say: '月亮下山了', hint: '沒有月亮了。油燈放中間，照亮三排，腳印就看得見' },
-      { list: [['boar', 1], ['wolf', 5]],                                  gap: 3.0, rows: [0, 1, 2, 3, 4], hpMul: 1.3, ordered: true, say: '聽，有東西在撞', hint: '是野豬。牠撞石牆第一下很重，還會踩爛荊棘。守望樓擋得住，機弦手打得快' },
-      { list: [['boar', 2], ['wolf', 8], ['jackal', 2], ['fast', 3]],      gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.5, say: '最後一波', hint: '兩頭野豬，看燈下的腳印決定機弦手放哪排' },
+      { list: [['boar', 1], ['wolf', 6]],                                  gap: 2.8, rows: [0, 1, 2, 3, 4], hpMul: 1.45, ordered: true, say: '聽，有東西在撞', hint: '是野豬。牠撞石牆第一下很重，還會踩爛荊棘。守望樓擋得住，機弦手打得快' },
+      { list: [['boar', 2], ['wolf', 9], ['jackal', 3], ['fast', 3]],      gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.7, say: '最後一波', hint: '兩頭野豬，看燈下的腳印決定機弦手放哪排' },
     ],
     outroWin: '天亮了，父親的羊一隻沒少。拉結說：那個人看見我，就放聲哭了。（創 29:11）',
     outroLose: { wolf: '拉結說：看不見的，就先點燈。油燈放中間那排，三排都亮。' },
@@ -319,13 +319,13 @@ const LEVELS = [
     intro: '我的羊，我的工價，我說了算；改十次也是我說了算。今晚我給你什麼人，你就用什麼人，不准挑。',
     units: ['slinger', 'wall', 'sling', 'dog', 'tower', 'thorns', 'jar', 'staff', 'lamp', 'patrol'], fresh: [],
     tips: ['🎁 今晚沒有糧也沒有牧人，卡片會定時送到手上，送來什麼就用什麼', '⛏️ 送來的卡沒花糧，拆掉也不退'],
-    conveyor: { every: 5.5, max: 6, start: 3,
+    conveyor: { every: 5.0, max: 6, start: ['slinger', 'wall', 'staff'],
       weights: { slinger: 30, wall: 20, staff: 12, sling: 10, dog: 8, lamp: 6, thorns: 5, patrol: 4, jar: 3, tower: 2 } },
     waves: [
       { list: [['wolf', 6]],                                               gap: 4.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼', give: 'slinger' },
-      { list: [['wolf', 8], ['jackal', 2], ['fast', 3]],                   gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.2, give: 'staff', say: '豺狼混進來了', hint: '拉班送來什麼就先放下去，別等好卡；牧人杖把散開的狼趕進投石手那排' },
-      { list: [['boar', 1], ['wolf', 8], ['fast', 4]],                     gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.3, ordered: true, give: 'sling', say: '野豬來了', hint: '野豬要來了，機弦手送到就放在牠那排' },
-      { list: [['alpha', 2], ['wolf', 12], ['jackal', 3], ['fast', 5]],    gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.5, give: 'dog', say: '最後一波，全混在一起', hint: '最後一波有兩隻領頭狼。狗送到就放，嚎叫前咬住牠' },
+      { list: [['wolf', 8], ['jackal', 2], ['fast', 3]],                   gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.35, give: 'staff', say: '豺狼混進來了', hint: '拉班送來什麼就先放下去，別等好卡；牧人杖把散開的狼趕進投石手那排' },
+      { list: [['boar', 1], ['wolf', 8], ['fast', 4]],                     gap: 2.2, rows: [0, 1, 2, 3, 4], hpMul: 1.45, ordered: true, give: 'sling', say: '野豬來了', hint: '野豬要來了，機弦手送到就放在牠那排' },
+      { list: [['alpha', 2], ['wolf', 12], ['jackal', 3], ['fast', 5]],    gap: 1.6, rows: [0, 1, 2, 3, 4], hpMul: 1.65, give: 'dog', say: '最後一波，全混在一起', hint: '最後一波有兩隻領頭狼。狗送到就放，嚎叫前咬住牠' },
     ],
     outroWin: '羊沒少。拉班數了兩遍，說：「工價的事，改天再談。」',
     outroLose: { wolf: '拉班說：給你什麼就用什麼，等好卡的人天亮前就沒羊了。' },
@@ -339,8 +339,8 @@ const LEVELS = [
     waves: [
       { list: [['wolf', 6]],                                               gap: 4.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['owl', 1], ['wolf', 6], ['owl', 2]],                       gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, ordered: true, say: '天上有東西在飄', hint: '夜鴞不走直線，單排射手打不準。投石隊一次打三排，放中間' },
-      { list: [['wolf', 12], ['fast', 5], ['jackal', 3]],                  gap: 1.4, rows: [0, 1, 2, 3, 4], hpMul: 1.4, say: '五排一起來', hint: '狼散開五排來。兩隊投石隊放第 2、4 排就五排全蓋' },
-      { list: [['owl', 4], ['boar', 2], ['wolf', 8], ['jackal', 3]],       gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.7, say: '最後一波', hint: '地上野豬、天上夜鴞。守望樓擋豬，投石隊顧天上' },
+      { list: [['wolf', 12], ['fast', 5], ['jackal', 3]],                  gap: 1.3, rows: [0, 1, 2, 3, 4], hpMul: 1.55, say: '五排一起來', hint: '狼散開五排來。兩隊投石隊放第 2、4 排就五排全蓋' },
+      { list: [['owl', 5], ['boar', 2], ['wolf', 9], ['jackal', 3]],       gap: 1.6, rows: [0, 1, 2, 3, 4], hpMul: 1.9, say: '最後一波', hint: '地上野豬、天上夜鴞。守望樓擋豬，投石隊顧天上' },
     ],
     outroWin: '天亮了。以撒說：「耶和華現在使我們寬闊了。」（創 26:22）',
     outroLose: {
@@ -374,7 +374,7 @@ const LEVELS = [
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle'], fresh: [], must: ['horn', 'volley', 'dog'],
     tips: ['🎺 吹角手放下後再點一下花 75 糧換銀號，一吹五排敵人全退', '🐆 今晚共五波，最後一波兩隻豹走不同排'],
     waves: [
-      { list: [['wolf', 8], ['fast', 2]],                                                   gap: 3.0, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '第 1 波' },
+      { list: [['wolf', 7], ['fast', 2]],                                                   gap: 3.4, rows: [0, 1, 2, 3, 4], hpMul: 1.2, say: '第 1 波' },
       { list: [['jackal', 4], ['wolf', 10], ['boar', 1]],                                   gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.5, say: '繞路的、撞牆的', hint: '豺狼和野豬一起來。吹角手換銀號，一吹五排都退一格' },
       { list: [['owl', 4], ['bird', 2], ['wolf', 10]],                                      gap: 1.6, rows: [0, 1, 2, 3, 4], hpMul: 1.6, strays: [10, 24], say: '天上滿了', hint: '夜鴞和鷙鳥都來，投石隊顧天上；迷羊會下來，狗留著' },
       { list: [['leopard', 1], ['alpha', 2], ['wolf', 10], ['boar', 2]],                    gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.8, ordered: true, strays: [14, 30], say: '豹和領頭狼', hint: '一隻豹、兩隻領頭狼。狗咬豹，銀號留給嚎叫那一刻' },
