@@ -655,10 +655,13 @@
       for (const k of ['burn', 'poison', 'slow', 'stun', 'panic', 'howl', 'distract']) if (e.st[k]) { e.st[k] -= dt; if (e.st[k] <= 0) delete e.st[k]; }
       if (e.deflectCd > 0) e.deflectCd -= dt; if (e.detourCd > 0) e.detourCd -= dt;
       // 換排的畫面位置：rv 朝 r 滑過去
-      if (def.drift) { e.driftT += dt; e.rv = e.r0 + Math.sin(e.driftT / def.driftT * Math.PI * 2) * def.drift; const nr = Math.round(e.rv); if (nr !== e.r) { e.r = nr; } } // 夜鴞：排號跟著飄
+      if (def.drift) { // 夜鴞：排號跟著飄；飄進油燈照到的排就停住（光裡的敵人不換排）
+        if (rowLit(G, e.r)) { e.rv += (e.r - e.rv) * Math.min(1, dt * 4); e.r0 = e.r; e.driftT = 0; }
+        else { e.driftT += dt; e.rv = e.r0 + Math.sin(e.driftT / def.driftT * Math.PI * 2) * def.drift; const nr = Math.round(e.rv); if (nr !== e.r) { e.r = nr; } }
+      }
       else if (e.rv !== e.r) { e.hopT = Math.min(1, (e.hopT || 0) + dt / STATUS.hop.t); const p = e.hopT * e.hopT * (3 - 2 * e.hopT); e.rv = e.hopT >= 1 ? e.r : (e.hopFrom ?? e.rv) + (e.r - (e.hopFrom ?? e.rv)) * p; }
       // 豹：每隔幾秒換一排（被咬住、翻牆中、蹲著的時候不換）
-      if (def.shiftEvery && !e.heldBy && !e.vaulting && !e.crouchT && !e.st.stun && !e.carrying) {
+      if (def.shiftEvery && !e.heldBy && !e.vaulting && !e.crouchT && !e.st.stun && !e.carrying && !rowLit(G, e.r)) { // 油燈照到的排不換
         e.shiftT -= dt;
         if (e.shiftT <= 0 && e.x < COLS - 0.5) { e.shiftT = def.shiftEvery; const cand = [e.r - 1, e.r + 1].filter(r => r >= 0 && r < ROWS); moveRow(G, e, cand[Math.floor(G.rng() * cand.length)]); }
       }
@@ -732,7 +735,8 @@
             if (r2 !== e.deflectFrom && moveRow(G, e, r2)) { e.deflectFrom = b.r; e.deflectCd = UNITS[b.type].deflectCd; b.hp -= UNITS[b.type].deflect; ev(G, { t: 'unit', r: b.r, c: b.c }); if (b.hp <= 0) removeUnit(G, b); continue; }
           }
           // 豺狼：前面是牆、隔壁排同一格空著就繞過去
-          if (def.detour && bk === 'blocker' && e.detourCd <= 0) {
+          if (def.detour && bk === 'blocker' && e.detourCd <= 0 && rowLit(G, e.r)) { if (!G.toldLampLock) { G.toldLampLock = true; ev(G, { t: 'toast', msg: '豺狼被油燈照著，繞不了路，只能咬牆' }); } }
+          else if (def.detour && bk === 'blocker' && e.detourCd <= 0) {
             const cand = [e.r - 1, e.r + 1].filter(r => r >= 0 && r < ROWS && !(G.units[key(r, frontCol)] && UNITS[G.units[key(r, frontCol)].type].kind === 'blocker') && !G.rocks.has(key(r, frontCol))); // 隔壁那格只要不是牆就繞得過去（有射手就直接撲上去咬）
             if (cand.length) { moveRow(G, e, cand[Math.floor(G.rng() * cand.length)]); e.detourCd = def.detour; if (!G.toldDetour) { G.toldDetour = true; ev(G, { t: 'toast', msg: '豺狼繞過牆，換到隔壁排了' }); } continue; }
           }

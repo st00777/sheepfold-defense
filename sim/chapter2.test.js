@@ -218,3 +218,22 @@ test('迷羊：波次提早清完也照時間來，天亮時還沒來的也算�
   assert.ok(G.over && G.result.win); assert.ok(G.sheep >= s0 + 1, '沒來的迷羊天亮算回圈');
 });
 
+test('油燈：光裡的敵人不換排——豺狼不繞路、豹不跳排、夜鴞不飄；牧人杖照樣趕', () => {
+  const G = setup();
+  assert.ok(E.place(G, 2, 4, 'wall').ok); assert.ok(E.place(G, 2, 1, 'lamp').ok);
+  const j = spawn(G, 'jackal', 2, 4.9); run(G, 2);
+  assert.strictEqual(j.r, 2, '被照著就不繞'); assert.ok(G.units['2,4'].hp < 300, '只能咬牆');
+  const G2 = setup(13, () => 0.9);
+  assert.ok(E.place(G2, 2, 1, 'lamp').ok);
+  const l = spawn(G2, 'leopard', 2, 6.4); run(G2, 8);
+  assert.strictEqual(l.r, 2, '豹在光裡不換排');
+  const G3 = setup(12, () => 0.1);
+  assert.ok(E.place(G3, 1, 1, 'lamp').ok);
+  const o = spawn(G3, 'owl', 1, 6.5); const seen = new Set();
+  for (let i = 0; i < 150; i++) { E.step(G3, 1 / 30); G3.events.length = 0; seen.add(o.r); }
+  assert.deepStrictEqual([...seen], [1], '夜鴞在光裡不飄：' + [...seen]);
+  const G4 = setup();
+  assert.ok(E.place(G4, 2, 1, 'lamp').ok); assert.ok(E.place(G4, 2, 4, 'staff').ok);
+  const w = spawn(G4, 'wolf', 2, 4.9); run(G4, 1.5);
+  assert.notStrictEqual(w.r, 2, '杖在光裡照樣趕');
+});

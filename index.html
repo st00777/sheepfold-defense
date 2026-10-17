@@ -1039,7 +1039,7 @@ function unitNums(k) {
   if (u.heal) s.push(`不攻擊；周圍${u.range === 2 ? ' 5×5 ' : '八格'}受傷的夥伴每秒回復 ${u.heal} 血量，多位相鄰會疊加${u.brave ? '；獅子咆哮嚇不停它' : ''}`);
   if (u.lanes) s.push(`同時攻擊上下 ${u.lanes} 排，共 ${u.lanes * 2 + 1} 排；飛的也打得到`);
   if (u.deflect) s.push(`不攻擊；地面敵人走到它面前就被趕到隔壁排（最上最下排往中間趕，中間排上下輪流），每趕一隻自己掉 ${u.deflect} 血、同一隻 ${u.deflectCd} 秒內不重複趕；頭目與飛的不受影響`);
-  if (u.light !== undefined) s.push(`不攻擊；無月夜裡照亮自己這排和上下 ${u.light} 排，那幾排的腳印預告會回來`);
+  if (u.light !== undefined) s.push(`不攻擊；照亮自己這排和上下 ${u.light} 排：光裡的敵人不會自己換排（豺狼不繞路、豹不跳排、夜鴞不飄，牧人杖照樣趕得動），無月夜裡那幾排的腳印預告也會回來`);
   if (u.kind === 'patrol') s.push(`在自己這排和上下兩排之間來回走（每排 ${u.walk} 秒），走到那排就打前方 ${u.reach} 格內的敵人，攻擊間隔 ${u.every} 秒、每次傷害 ${u.dmg}；只有走在那排時才會被咬`);
   if (u.cradle) s.push(`不攻擊；迷羊走到他那一格就立刻回圈（羊數 +1、糧 +${STRAY.reward}），不必走到最左邊`);
   if (u.upgrade) { const p = u.upgrade; s.push(`第 ${p.from} 夜起再點一下花 ${p.cost} 糧升級「${p.name}」：${p.desc}${p.poison ? `；中毒 ${STATUS.poison.t} 秒、每秒 ${STATUS.poison.dps}、攻擊 ×${STATUS.poison.biteMul}，同一隻只中一次` : ''}${p.all ? `；每 ${u.every} 秒一次，飛的不受影響` : ''}`); }
@@ -1078,7 +1078,7 @@ const GLOSSARY = [
   { name: '咆哮', ico: '🦁', text: `獅子每 ${ENEMIES.lion.roar} 秒一次，2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走` },
   { name: '狂暴', ico: '🐻', text: `母熊血量低於 ${Math.round(ENEMIES.bear.enrage * 100)}% 時速度與傷害 ×2，直到被打倒` },
   { name: '厚皮', ico: '🛡', text: `石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%；機弦、投石機、火、毒全額。母熊、獅子、豹都是厚皮` },
-  { name: '換排', ico: '↕️', text: `敵人從這排換到隔壁排，射手要跟著換。來源：牧人杖（趕的）、豺狼碰到牆繞路、豹每 ${ENEMIES.leopard.shiftEvery} 秒自己換、夜鴞在三排之間飄` },
+  { name: '換排', ico: '↕️', text: `敵人從這排換到隔壁排，射手要跟著換。來源：牧人杖（趕的）、豺狼碰到牆繞路、豹每 ${ENEMIES.leopard.shiftEvery} 秒自己換、夜鴞在三排之間飄。油燈照到的排，敵人不會自己換排（杖還是趕得動）` },
   { name: '無月夜', ico: '🌑', text: '第二章起第二波後看不到腳印預告，不知道下一隻從哪排來。油燈照到的三排例外' },
   { name: '迷羊', ico: '🐑', text: `不是敵人。從右邊走進來往羊圈走，走到最左邊或抱羊羔的牧人那格就回圈（羊數 +1、糧 +${STRAY.reward}）；地面敵人碰到就叼走，被叼出場算失落一隻；叼羊的被打倒，羊就從那裡繼續走。牧羊犬沒事時會走在牠旁邊護送` },
   { name: '撞牆', ico: '🐗', text: `野豬撞上每道牆的第一下傷害 ${ENEMIES.boar.slam}，之後正常咬；撞完自己暈 ${ENEMIES.boar.slamStun} 秒。踏過荊棘直接踩爛` },
