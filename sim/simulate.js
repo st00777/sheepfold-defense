@@ -1,5 +1,6 @@
 // 勝率模擬：node sim/simulate.js [關 1-14|all] [難度 calm|windy|storm|all] [局數] [玩家 good|basic]
 // good＝會依敵人換新工具的玩家；basic＝只用牧人／投石手／石牆的玩家（驗證新敵人是否真的逼出新工具）
+// 環境變數：SIM_BAN=卡,卡（隊伍裡拿掉）SIM_ADD=卡,卡（硬塞進隊伍，滿了擠掉名單最後一張）SIM_CRADLE_COL=格（抱羊羔的牧人放第幾格，預設 2）SIM_SHOW=1（印出隊伍）
 'use strict';
 const path = require('path');
 const D = require(path.join(__dirname, '..', 'data.js'));
@@ -79,7 +80,7 @@ function decide(G, skill) {
     }
     if (big && !hasSling && can('sling')) { if (tryPlace(G, r, freeCell(G, r, 2), 'sling')) return; }
     if (!hasDog && can('dog') && (strayHere || [...types].some(t => ['alpha', 'lion', 'bear', 'fox', 'rustler', 'thief', 'jackal', 'leopard'].includes(t)))) { if (tryPlace(G, r, freeCell(G, r, 3), 'dog')) return; }
-    if (strayHere && can('cradle') && !has(G, r, u => u.type === 'cradle')) { if (tryPlace(G, r, freeCell(G, r, 2), 'cradle')) return; }
+    if (strayHere && can('cradle') && !has(G, r, u => u.type === 'cradle')) { if (tryPlace(G, r, freeCell(G, r, Number(process.env.SIM_CRADLE_COL || 2)), 'cradle')) return; }
     if (es.length >= 3 && r >= 1 && r <= 3 && can('patrol') && ![r - 1, r, r + 1].some(rr => has(G, rr, u => u.type === 'patrol'))) { if (tryPlace(G, r, freeCell(G, r, 2), 'patrol')) return; }
     if (needArcher && !has(G, r, u => u.type === 'archer') && can('archer')) { if (tryPlace(G, r, freeCell(G, r, 2), 'archer')) return; }
     if (types.has('digger') && can('thorns')) {
@@ -135,7 +136,14 @@ function decideConveyor(G) {
 
 function play(levelId, diff, seed, skill) {
   const G = E.create(levelId, diff, mulberry32(seed));
-  if (!G.level.conveyor && G.level.units.length > MAX_CARDS) E.applyPick(G, E.defaultPick(G.level)); // 跟玩家一樣只帶 8 張
+  if (!G.level.conveyor) { // 跟玩家一樣只帶 8 張；SIM_BAN=卡,卡 拿掉某幾張、SIM_ADD=卡,卡 硬塞進隊伍（滿了就擠掉名單最後一張）
+    let pick = G.level.units.length > MAX_CARDS ? E.defaultPick(G.level) : G.level.units.slice();
+    const ban = (process.env.SIM_BAN || '').split(',').filter(Boolean), add = (process.env.SIM_ADD || '').split(',').filter(Boolean);
+    pick = pick.filter(k => !ban.includes(k));
+    for (const k of add) if (G.level.units.includes(k) && !pick.includes(k)) { pick.push(k); if (pick.length > MAX_CARDS) { const drop = pick.filter(x => x !== 'shepherd' && !add.includes(x)).pop(); pick.splice(pick.indexOf(drop), 1); } }
+    if (seed === 1000 && process.env.SIM_SHOW) console.log('  隊伍：' + pick.join(' '));
+    E.applyPick(G, pick);
+  }
   const dt = 1 / 30; let acc = 0, minX = COLS;
   while (!G.over && G.time < 900) {
     E.step(G, dt); G.events.length = 0;
