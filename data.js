@@ -62,6 +62,9 @@ const REPAIR_COST = 25, REPAIR_HP = 120, REPAIR_CD = 8; // 修補一次要隔 8 
 const MAX_CARDS = 8;      // 一關最多帶幾張卡上場，超過就要點兵
 const MIN_CARDS = 4;      // 點兵至少要帶幾張（只帶牧人等於沒得打）
 const SELL_RATE = 0.5;    // 鏟子拆掉單位退幾成糧（含升老牧人花的）
+// 拿著卡直接點同類單位＝一次完成「鏟掉＋放下」（James 2026-10-18：佈陣時石牆原地換守望樓，省掉四個動作）
+// 只開牆類與投手類；輔助類（油燈／火盆／吹角手…）各做各的事不互換。只能換成更貴的，守望樓換回石牆這種「倒拿糧又回滿血」先擋掉
+const SWAP_KINDS = ['blocker', 'shooter'];
 // 預設帶卡的先後：這關新開的一定帶、牧人一定帶，其餘依這個順序補滿
 const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'volley', 'staff', 'lamp', 'tower', 'archer', 'brazier', 'horn', 'catapult', 'healer', 'cradle', 'patrol', 'jar', 'thorns', 'hireling'];
 
@@ -178,7 +181,7 @@ const LEVELS = [
     speaker: null,
     intro: '「從門進去的，才是羊的牧人；從別處爬進去的，那人就是賊，就是強盜。」「雇工不是牧人，羊也不是他自己的，他看見狼來，就撇下羊逃走。」（約 10:1、12）今晚羊圈裡有三隻羊，被偷光就守不住了。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower'], fresh: ['hireling', 'tower'],
-    tips: ['🐑 羊圈裡有三隻羊，偷羊人抱著羊往回跑時，追上牠羊就回來'],
+    tips: ['🐑 羊圈裡有三隻羊，偷羊人抱著羊往回跑時，追上牠羊就回來', '🗼 拿著守望樓的卡直接點石牆，原地換掉；石牆退一半糧，跟鏟子一樣'],
     sheep: 3,
     waves: [
       { list: [['wolf', 4]],                              gap: 5.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼不多' },
@@ -391,5 +394,5 @@ const LEVELS = [
   },
 ];
 
-const DATA = { THICK_MUL, SPEED_FAST, SPEED_SLOW, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
+const DATA = { THICK_MUL, SPEED_FAST, SPEED_SLOW, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
 if (typeof module !== 'undefined') module.exports = DATA; else window.DATA = DATA;

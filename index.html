@@ -78,6 +78,7 @@
   .tag.once { background: #f3ead8cc; }
   .new .tag.once { right: 30px; }
   .cell.hint.sell { outline-color: var(--danger); }
+  .cell.hint.swap { outline-style: solid; } /* 可直接換掉的單位：金色實線，跟空格的虛線分開 */
   /* 新卡光暈：陰影固定畫在一層假元素上，循環只動它的透明度，不每幀重繪陰影 */
   .card.new::after { content: ''; position: absolute; inset: -2px; border-radius: 10px; box-shadow: 0 0 10px 2px var(--new); pointer-events: none; animation: glowFade 1.4s infinite alternate; }
   @keyframes glowFade { from { opacity: 0; } to { opacity: 1; } }
@@ -415,8 +416,8 @@
   </div>
 </div>
 
-<script src="data.js?v=7"></script>
-<script src="engine.js?v=7"></script>
+<script src="data.js?v=8"></script>
+<script src="engine.js?v=8"></script>
 <script src="sound.js?v=7"></script>
 <script>
 'use strict';
@@ -629,8 +630,15 @@ function tapCard(key, el) {
   selected = (selected === key) ? null : key;
   if (el.classList.contains('new')) { el.classList.remove('new'); const t = el.querySelector('.tag.fresh'); if (t) t.remove(); markSeen(key); }
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.key === selected));
-  cells.forEach(c => { c.classList.remove('sell'); c.classList.toggle('hint', !!selected && !G.units[c.dataset.r + ',' + c.dataset.c] && !G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
-  toast(selected ? (u.kind === 'instant' ? `點敵人密集處，${u.name}就打破在那裡，範圍傷害並嚇退` : `點一格草地放下${u.name}`) : '先點一張卡，再點草地放下去');
+  let swappable = 0;
+  cells.forEach(c => {
+    const r = +c.dataset.r, col = +c.dataset.c, k = r + ',' + col;
+    const sw = !!selected && Engine.canSwap(G, r, col, selected); if (sw) swappable++;
+    c.classList.remove('sell'); c.classList.toggle('swap', sw);
+    c.classList.toggle('hint', sw || (!!selected && !G.units[k] && !G.rocks.has(k)));
+  });
+  // 同類更貴的卡：點原單位直接換掉，實付＝全價－退一半（跟鏟子一樣）
+  toast(selected ? (u.kind === 'instant' ? `點敵人密集處，${u.name}就打破在那裡，範圍傷害並嚇退` : swappable ? `點一格草地放下${u.name}；點亮金框的${UNITS[selected].kind === 'blocker' ? '牆' : '投手'}可直接換成${u.name}，退一半糧` : `點一格草地放下${u.name}`) : '先點一張卡，再點草地放下去');
 }
 function tapShovel() {
   if (!G || G.over || tut.on) return;
@@ -642,7 +650,7 @@ function tapShovel() {
 function clearSelection() {
   selected = null;
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
-  cells.forEach(x => x.classList.remove('hint', 'sell'));
+  cells.forEach(x => x.classList.remove('hint', 'sell', 'swap'));
 }
 function tapCell(r, c) {
   if (!G || G.over) return;
@@ -650,7 +658,8 @@ function tapCell(r, c) {
   if (selected === 'shovel') { const res = Engine.sell(G, r, c); flushEvents(); if (res.ok) clearSelection(); toast(res.msg || ''); return; }
   if (!selected) { if (tut.on) { toast(tut.waiting ? TUT_STEPS[tut.step].wait : TUT_STEPS[tut.step].say, true); return; } const res = Engine.tapUnit(G, r, c); flushEvents(); if (res.msg) toast(res.msg); return; }
   if (tut.on) { const [tr, tc] = TUT_STEPS[tut.step].cell; if (r !== tr || c !== tc) { toast('放在亮著的那一格', true); return; } }
-  const res = Engine.place(G, r, c, selected);
+  // 格子有人就走「直接換」（同類更貴才會成功，其餘回原因）；沒人才是放下
+  const res = G.units[r + ',' + c] ? Engine.swap(G, r, c, selected) : Engine.place(G, r, c, selected);
   flushEvents();
   if (!res.ok) { toast(res.msg || ''); return; }
   if (UNITS[selected].kind !== 'instant') Sound.play('place'); // 瓦瓶的聲音走 fx blast
@@ -923,7 +932,7 @@ function startGame(fromCp) {
   // 重新開始「同一關」才丟掉舊檢查點（每關各一份，別關不動）；開著開發者面板這局不會存，舊檔一併清掉免得之後重打
   if (!resumed || devUsed) clearCheckpoint(level.id);
   buildCards();
-  cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint', 'sell', 'teach'); c.classList.toggle('rock', G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
+  cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint', 'sell', 'swap', 'teach'); c.classList.toggle('rock', G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
   $('#sheep').hidden = !level.sheep; $('#sheep-n').textContent = G.sheep;
   for (const k in G.units) renderUnit(G.units[k].r, G.units[k].c);
   for (let i = G.events.length - 1; i >= 0; i--) if (G.events[i].t === 'unit') G.events.splice(i, 1); // 單位已直接畫了，其餘事件留給第一幀

@@ -4,7 +4,7 @@
 'use strict';
 (function (root) {
   const D = (typeof module !== 'undefined') ? require('./data.js') : root.DATA;
-  const { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE } = D;
+  const { ROWS, COLS, UNITS, ENEMIES, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE } = D;
 
   const STRAY = D.STRAY; // 迷羊（第二章的中立角色）
   const SHOT_SPEED = { stone: 6, arrow: 9, sling: 7 };
@@ -216,22 +216,59 @@
     return '';
   }
 
+  // 鏟掉一個單位能退多少糧（含升老牧人、升級花的）；鏟子與直接換都用這條
+  function refundOf(u) { const def = UNITS[u.type]; return Math.round((def.cost + (u.elder ? ELDER_COST : 0) + (u.upgraded ? def.upgrade.cost : 0)) * SELL_RATE); }
+
+  // 送卡模式拆單位：沒被咬過的退回手上（手滿了就沒了）；被咬過的收不回來，不然等於免費修補。回傳退回了沒＋原因
+  function removeToHand(G, u) {
+    const whole = u.hp >= u.maxHp, full = G.hand.length >= (G.level.conveyor.max || 6);
+    removeUnit(G, u);
+    if (whole && !full) { G.hand.push(u.type); ev(G, { t: 'hand' }); return { back: true, why: '退回手上' }; }
+    return { back: false, why: !whole ? '被咬過的收不回來' : '手上滿了收不回來' };
+  }
+
   // 鏟子：拆掉自己放的單位，退一半糧（含升老牧人花的）
   function sell(G, r, c) {
     if (G.over) return { ok: false };
     const u = G.units[key(r, c)];
     if (!u) return { ok: false, msg: '這格沒東西可拆' };
     const def = UNITS[u.type];
-    if (G.level.conveyor) { // 送來的卡沒花糧：沒被咬過的拆了退回手上（手滿了就沒了）；被咬過的收不回來，不然等於免費修補
-      const whole = u.hp >= u.maxHp, full = G.hand.length >= (G.level.conveyor.max || 6);
-      removeUnit(G, u);
-      if (whole && !full) { G.hand.push(u.type); ev(G, { t: 'hand' }); }
-      return { ok: true, msg: !whole ? `${def.name}拆了，被咬過的收不回來` : full ? `${def.name}拆了，手上滿了收不回來` : `${def.name}拆了，退回手上` };
-    }
-    const back = Math.round((def.cost + (u.elder ? ELDER_COST : 0) + (u.upgraded ? def.upgrade.cost : 0)) * SELL_RATE);
+    if (G.level.conveyor) { const h = removeToHand(G, u); return { ok: true, msg: `${def.name}拆了，${h.why}` }; }
+    const back = refundOf(u);
     removeUnit(G, u); G.food += back;
     ev(G, { t: 'pop', r, c, text: `+${back}` });
     return { ok: true, msg: `${def.name}拆了，退 ${back} 糧` };
+  }
+
+  // 這格的單位能不能拿 k 這張卡直接換掉（同類、更貴）。畫面層用它亮格子，swap 用它守門
+  function canSwap(G, r, c, k) {
+    const u = G.units[key(r, c)], def = UNITS[k];
+    if (!u || !def) return false;
+    const old = UNITS[u.type];
+    return SWAP_KINDS.includes(def.kind) && old.kind === def.kind && u.type !== k && def.cost > old.cost;
+  }
+
+  // 拿著卡點有人的格子：一次完成「鏟掉＋放下」。算法跟鏟子一樣：要有新卡全價才能點，實付＝全價－舊單位退的一半
+  function swap(G, r, c, k) {
+    if (G.over) return { ok: false };
+    const u = G.units[key(r, c)], def = UNITS[k];
+    if (!u || !def) return { ok: false };
+    const old = UNITS[u.type];
+    if (!G.level.units.includes(k)) return { ok: false, msg: '這一關還沒有這張卡' };
+    if (u.type === k) return { ok: false, msg: old.kind === 'blocker' && u.hp < u.maxHp ? `已經是${old.name}了，被咬壞的空手點它修補` : `這格已經是${old.name}了` };
+    if (!SWAP_KINDS.includes(def.kind) || old.kind !== def.kind) return { ok: false, msg: `${old.name}不能直接換成${def.name}，要先用鏟子拆` };
+    if (def.cost <= old.cost) return { ok: false, msg: `${def.name}沒有比${old.name}貴，要換請先用鏟子拆` };
+    if (G.level.conveyor) {
+      const i = G.hand.indexOf(k); if (i < 0) return { ok: false, msg: `${def.name}還沒送到手上` };
+      G.hand.splice(i, 1); ev(G, { t: 'hand' });
+      const h = removeToHand(G, u); makeUnit(G, r, c, k);
+      return { ok: true, msg: `${old.name}換成${def.name}，${old.name}${h.why}` };
+    }
+    if (G.food < def.cost) return { ok: false, msg: `糧不夠，${def.name}要 ${def.cost} 糧` };
+    const back = refundOf(u), pay = def.cost - back;
+    G.food -= pay; removeUnit(G, u); makeUnit(G, r, c, k);
+    ev(G, { t: 'pop', r, c, text: `+${back}` });
+    return { ok: true, msg: `${old.name}換成${def.name}，退 ${back} 糧、實付 ${pay}` };
   }
 
   function useInstant(G, r, c, k) {
@@ -792,6 +829,6 @@
     stray(G, r, x) { if (G.over) return; spawnStray(G, r, x); },
   };
 
-  const Engine = { create, place, tapUnit, tapHint, sell, snapshot, checkSnapshot, restore, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, rowLit, dev };
+  const Engine = { create, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, rowLit, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
