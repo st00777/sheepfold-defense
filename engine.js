@@ -568,7 +568,7 @@
           let fired = false;
           for (let rr = Math.max(0, u.r - def.lanes); rr <= Math.min(ROWS - 1, u.r + def.lanes); rr++) {
             if (!byRow[rr].some(e => e.x > u.c - 0.2 && e.x - u.c <= range)) continue;
-            G.shots.push({ id: G.nextId++, kind: def.shot, r: rr, x: u.c + 0.6, dmg: def.dmg, pierce: false, falloff: 1, hit: new Set(), burn: false }); fired = true;
+            G.shots.push({ id: G.nextId++, kind: def.shot, r: rr, x: u.c + 0.6, ur: u.r, dmg: def.dmg, pierce: false, falloff: 1, hit: new Set(), burn: false }); fired = true; // ur：發射者那排，畫面層做出手回彈用
           }
           if (fired) u.timer = def.every;
           continue;
