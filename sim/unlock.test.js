@@ -81,3 +81,13 @@ test('升級開放夜比的是位置：膏油在第 7 位之後才行', () => {
   assert.ok(E.place(G, 2, 3, 'healer').ok);
   assert.ok(E.tapUnit(G, 2, 3).ok, '第 7 位可以膏油');
 });
+
+test('fromId→from 由引擎換算成位置，卡片說明的 {from} 填成顯示編號', () => {
+  for (const k of ['thorns', 'healer', 'horn']) {
+    const up = D.UNITS[k].upgrade;
+    assert.strictEqual(up.from, E.posOf(up.fromId), k);
+  }
+  assert.ok(!D.UNITS.thorns.desc.includes('{from}') && D.UNITS.thorns.desc.includes(`第 ${D.UNITS.thorns.upgrade.from} 夜起`));
+  assert.ok(!D.UNITS.horn.desc.includes('{from}') && D.UNITS.horn.desc.includes(`第 ${D.UNITS.horn.upgrade.from} 夜起`));
+  assert.strictEqual(E.countUnits(E.create(1, 'calm'), 'shepherd'), 0);
+});

@@ -7,7 +7,7 @@ const ROWS = 5, COLS = 7;
 // ====== 我方單位 ======
 // kind：producer 產糧／shooter 射手／blocker 牆／dog 牧羊犬／floor 鋪地／instant 一次性／support 輔助／deflector 趕路（第二章）／patrol 巡夜（第二章）
 // 第二章欄位：light 油燈照亮上下幾排（腳印預告回來）；lanes 射手同時打上下幾排；deflect 每趕一隻自己掉多少血；cradle 迷羊走到他那格就安全；walk 巡夜人每走一排要幾秒、reach 打前方幾格
-// upgrade：放下後「再點一下」花糧升級，欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）；fromId＝在哪一夜（id）學會，載入時換算成 from＝那一夜的位置（顯示編號），desc 裡的 {from} 一併填入
+// upgrade：放下後「再點一下」花糧升級，欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）；fromId＝在哪一夜（id）學會，engine.js 載入時換算成 from＝那一夜的位置（顯示編號），desc 裡的 {from} 一併填入
 // heal 每秒回血／range 回血範圍幾格（1＝周圍八格、2＝5×5）／brave 獅子咆哮嚇不停
 const UNITS = {
   shepherd: { name: '牧人',     ico: '🧑‍🌾', cost: 50,  hp: 60,  kind: 'producer', every: 7,   gives: 25,
@@ -173,7 +173,7 @@ const LEVELS = [
       { list: [['wolf', 9], ['fast', 6]], gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.6, say: '最後一波', hint: '最後一波狼更多更快。每排都要有射手，狗顧最吃緊的那排' },
     ],
     outroWin: '天亮了。雅各說：「我未來之先，你所有的很少，現今卻發大眾多」（創 30:30）。',
-    outroLose: { wolf: '狼比羊多的時候，光靠牆不夠。放一隻狗在牆後面，牠會咬住衝最快的那隻。' },
+    outroLose: { wolf: '狼比羊多的時候，光靠牆不夠。放一隻狗在牆後面，牠會撲上去咬住敵人。' },
   },
   {
     id: 2, name: '大衛的曠野', title: '伯利恆的曠野', ref: '取材：撒母耳記上 17 章，大衛在曠野為父親放羊',
@@ -212,17 +212,17 @@ const LEVELS = [
   {
     id: 16, name: '葡萄園的小狐狸', title: '擒拿狐狸', ref: '取材：雅歌 2:15，毀壞葡萄園的小狐狸',
     speaker: '葡萄園的守望者',
-    intro: '葡萄正在開花，狐狸夜裡來咬藤。羊圈就在園子旁邊，今晚只有這幾個人手。石子打不中狐狸，狗才抓得到。',
+    intro: '葡萄正在開花，狐狸夜裡來咬藤。羊圈就在園子旁邊，今晚只有這幾個人手。狐狸常閃過石子，得靠狗追上去咬住。',
     units: ['shepherd', 'slinger', 'wall', 'dog', 'hireling'], fresh: [],
-    tips: ['🐑 羊圈裡有五隻羊，被偷光才算輸', '🦊 狐狸七成閃過石子，牧羊犬追上去才抓得到；每排一隻狗', '這一夜只有這五位，沒有機弦手和守望樓，賊翻過牆也交給狗'],
+    tips: ['🐑 羊圈裡有五隻羊；偷羊人抱羊逃跑時，派牧羊犬追上救羊', '🦊 狐狸七成閃過石子，牧羊犬追上去才抓得到；每排一隻狗', '這一夜只有這五種卡，沒有機弦手和守望樓，賊翻過牆也交給狗'],
     sheep: 5,
     waves: [
       { list: [['fox', 4]],                                         gap: 3.5, rows: [1, 2, 3],       hpMul: 1,   say: '狐狸來了' },
       { list: [['thief', 1], ['fox', 6]],                           gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.2, ordered: true, say: '有人翻牆', hint: '狐狸七成閃得過石子，狗抓得到。賊會翻過石牆，狗也追得上' },
       { list: [['rustler', 2], ['fox', 5], ['wolf', 3]],            gap: 2.2, rows: [0, 1, 2, 3, 4], hpMul: 1.3, ordered: true, say: '偷羊的來了', hint: '偷羊人抱著羊往回跑，狗追上去羊就回來。狼還是交給投石手' },
-      { list: [['rustler', 3], ['fox', 8], ['thief', 2]],           gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.5, ordered: true, say: '最後一波', hint: '最後一波狐狸最多。每排一隻狗，雇工便宜，拿來補狼' },
+      { list: [['rustler', 3], ['fox', 8], ['thief', 2]],           gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.5, ordered: true, say: '最後一波', hint: '最後一波狐狸最多，還有賊和偷羊人。每排放牧羊犬，雇工補上投石攻擊' },
     ],
-    outroWin: '天亮了，五隻羊都在。守望者說：「要給我們擒拿狐狸，就是毀壞葡萄園的小狐狸，因為我們的葡萄正在開花。」（歌 2:15）',
+    outroWin: '天亮了，羊群守住了。守望者說：「要給我們擒拿狐狸，就是毀壞葡萄園的小狐狸，因為我們的葡萄正在開花。」（歌 2:15）',
     outroLose: {
       sheep: '五隻羊都被抱走了。狐狸閃得掉石子，閃不掉狗。每排放一隻狗。',
       wolf: '狼闖進來了。狐狸交給狗，狼還是要靠投石手和牆。',
@@ -280,15 +280,15 @@ const LEVELS = [
     speaker: '烏西雅的牧人',
     intro: '王在曠野建了望樓、挖了井，因為牲畜甚多。王的巧匠做的機器，也送了一台到這座望樓。今晚牆會被咬得很慘，纏裹的人也來了。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult'], fresh: ['healer', 'catapult'], must: ['sling'],
-    tips: ['🩹 纏裹的牧人不攻擊，周圍八格受傷的夥伴每秒回血，放在牆後一格', '🛞 投石機拋到該排最遠的敵人，落點周圍一起掉血，專打擠成一串的狼'],
+    tips: ['🩹 纏裹的牧人不攻擊，周圍八格受傷的夥伴每秒回復血量，放在牆後一格', '🛞 投石機拋到該排最遠的敵人，濺射傷害波及落點周圍，專打擠成一串的狼'],
     waves: [
       { list: [['wolf', 6]],                                              gap: 4.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
-      { list: [['wolf', 10], ['fast', 4]],                                gap: 1.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '五排一起咬牆', hint: '下一波狼從五排來，會一直咬牆。纏裹的牧人放在牆後一格，周圍八格的夥伴每秒回血' },
+      { list: [['wolf', 10], ['fast', 4]],                                gap: 1.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '五排一起咬牆', hint: '下一波狼從五排來，會一直咬牆。纏裹的牧人放在牆後一格，周圍八格的夥伴每秒回復血量' },
       { list: [['wolf', 14], ['locust', 16]],                             gap: 0.8, rows: [2],             hpMul: 1.5, say: '擠成一串', hint: '這波擠在中排走成一串，投石機一砸一片' },
       { list: [['bear', 1], ['alpha', 1], ['bird', 4], ['wolf', 10], ['fast', 4]], gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.8, ordered: true, say: '最後一波', hint: '熊和領頭狼一起來。機弦手打熊、狗咬住領頭狼，鷙鳥交給射手' },
     ],
     outroWin: '天亮了。「又在曠野與高原和平原，建築望樓，挖了許多井，因他的牲畜甚多」（代下 26:10）。',
-    outroLose: { wolf: '牆咬破了沒人纏裹。纏裹的牧人放在牆後一格，周圍八格都回血。', bird: '鷙鳥飛進羊圈了。天上的只有射手打得到，每排都要有人。' },
+    outroLose: { wolf: '狼把牆咬破了。下次把纏裹的牧人放在牆後一格，持續回復周圍八格夥伴的血量。', bird: '鷙鳥飛進羊圈了。天上的只有射手打得到，每排都要有人。' },
   },
   {
     id: 7, name: '尋找我的羊', title: '最後一夜', ref: '取材：以西結書 34 章、詩篇 23 篇',
@@ -375,9 +375,9 @@ const LEVELS = [
       { list: [['wolf', 5]],                                   gap: 4.5, rows: [1, 2, 3],       hpMul: 1,    say: '第 1 波，狼' },
       { list: [['wolf', 6], ['fast', 3]],                      gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.25, strays: [6, 18, 30], say: '月亮下山了，羊也來了', hint: '月亮快下山了。這一波有三隻迷羊會陸續走來，看 🐑 腳印，狗先放那排' },
       { list: [['jackal', 2], ['wolf', 7], ['fast', 3]],       gap: 2.2, rows: [0, 1, 2, 3, 4], hpMul: 1.45, ordered: true, strays: [8, 22], say: '豺狼來了', hint: '豺狼會換排去追羊，巡夜人在三排之間來回走正好接得住' },
-      { list: [['jackal', 4], ['wolf', 10], ['fast', 4]],      gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.65, strays: [10], say: '最後一波', hint: '最後一波還有一隻迷羊。守住羊圈，也把牠帶回來' },
+      { list: [['jackal', 4], ['wolf', 10], ['fast', 4]],      gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.65, strays: [10], say: '最後一波', hint: '最後一波豺狼更多，還有一隻迷羊。巡夜人放中排，牧羊犬留在羊走的那排' },
     ],
-    outroWin: '天亮了，走迷的都回來了。「我如亡羊走迷了路，求你尋找僕人」（詩 119:176）。',
+    outroWin: '天亮了，羊圈守住了。「我如亡羊走迷了路，求你尋找僕人」（詩 119:176）。',
     outroLose: {
       wolf: '狼闖進羊圈了。顧迷羊的時候，自己的門也要守住，每排都要有射手。',
       sheep: '羊都被叼走了。迷羊從哪排進來，狗就先放那排；牧人杖把狼趕去別排。',
@@ -428,8 +428,8 @@ const LEVELS = [
     waves: [
       { list: [['boar', 1], ['wolf', 5]],                                   gap: 3.0, rows: [1, 2, 3],       hpMul: 1,   ordered: true, say: '第 1 波，野豬打頭陣' },
       { list: [['jackal', 3], ['fast', 5]],                                 gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '月亮下山了', hint: '沒有月亮了，而且只歇 3 秒。油燈放中排，照亮三排' },
-      { list: [['boar', 2], ['jackal', 2], ['owl', 1], ['wolf', 6]],        gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.5, ordered: true, say: '兩頭野豬', hint: '兩頭野豬要來，守望樓擋第一下，機弦手打得快；夜鴞交給投石隊' },
-      { list: [['boar', 2], ['jackal', 4], ['wolf', 10], ['fast', 4]],      gap: 1.6, rows: [0, 1, 2, 3, 4], hpMul: 1.7, ordered: true, say: '最後一波', hint: '最後一波全來了。牆咬破就修，別等' },
+      { list: [['boar', 2], ['jackal', 2], ['owl', 1], ['wolf', 6]],        gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.5, ordered: true, say: '兩頭野豬', hint: '兩頭野豬要來，守望樓擋第一下，機弦手傷害高；夜鴞交給投石隊' },
+      { list: [['boar', 2], ['jackal', 4], ['wolf', 10], ['fast', 4]],      gap: 1.6, rows: [0, 1, 2, 3, 4], hpMul: 1.7, ordered: true, say: '最後一波', hint: '最後一波豺狼更多。牧羊犬咬住牠，石牆受傷就修補，別等牆倒了' },
     ],
     outroWin: '天亮了，羊一隻沒少。看守的人說：等他回來，照數交還他。',
     outroLose: { wolf: '歇息只有三秒，來不及擺的就擺不上了。開場先放牆和射手，牧人補在後面。', bird: '夜鴞飄進羊圈了。投石隊三排都打得到，放中排。' },
@@ -458,15 +458,15 @@ const LEVELS = [
     speaker: '猶大', moonless: 2, startFood: 100, maxUnits: { shepherd: 3 }, diffScale: 0.3, // 牧人只能三位，暴風夜的產糧拉長再打更多折，不然雙重懲罰
     intro: '我們剛到歌珊，法老把最好的地給了我們，可是人手還沒到齊。今晚糧比平常少，牧人最多三位。羊是我們全家的本錢，守好牠們。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle'], fresh: [], must: ['sling', 'dog'],
-    tips: ['🌾 今晚開局只有 100 糧，牧人最多三位；三位都升老牧人，糧才夠用', '🐆 豹會跳過石牆、每幾秒換一排，守望樓跳不過；狗咬住牠就不換排'],
+    tips: ['🌾 今晚開局只有 100 糧，牧人最多三位；三位都升成老牧人，加快產糧', '🐆 豹會跳過石牆、每幾秒換一排，守望樓跳不過；狗咬住牠就不換排'],
     waves: [
       { list: [['wolf', 6]],                                                gap: 4.0, rows: [1, 2, 3],       hpMul: 1,    say: '第 1 波，狼' },
-      { list: [['jackal', 1], ['wolf', 6], ['fast', 2]],                    gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.2,  ordered: true, say: '月亮下山了', hint: '糧少就要省：牧人先升老牧人，比多放一位划算' },
+      { list: [['jackal', 1], ['wolf', 6], ['fast', 2]],                    gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.2,  ordered: true, say: '月亮下山了', hint: '豺狼碰到牆會換排，派牧羊犬咬住牠；糧少，牧人記得升成老牧人' },
       { list: [['boar', 1], ['owl', 2], ['wolf', 8]],                       gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.5,  ordered: true, say: '野豬和夜鴞', hint: '野豬撞牆、夜鴞飄排。守望樓擋豬，投石隊打鴞' },
       { list: [['leopard', 1], ['jackal', 3], ['wolf', 10], ['fast', 4]],   gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.75, ordered: true, say: '豹來了，最後一波', hint: '豹又來了。守望樓擋牠，狗咬住牠就不換排，機弦手集中打' },
     ],
     outroWin: '天亮了。猶大對法老說的話算數：「你僕人是牧羊的，連我們的祖宗也是牧羊的。」（創 47:3）',
-    outroLose: { wolf: '糧少的時候，先放牧人再放射手，牆晚一點補。三位牧人都升老牧人，糧就夠了。', bird: '夜鴞飄進羊圈了。投石隊三排都打得到，放中排。' },
+    outroLose: { wolf: '糧少的時候，先放牧人再放射手，牆晚一點補。三位牧人都升成老牧人，產糧會更快。', bird: '夜鴞飄進羊圈了。投石隊三排都打得到，放中排。' },
   },
   {
     id: 14, chapter: 2, name: '合成一群', title: '另外的羊', ref: '取材：約翰福音 10:16、路加福音 15:4-6、以賽亞書 40:11',
@@ -490,12 +490,6 @@ const LEVELS = [
     },
   },
 ];
-
-// 升級開放夜：fromId（在哪一夜學會）換算成 from（那一夜的顯示編號＝LEVELS 位置），卡片說明的 {from} 一併填入
-for (const u of Object.values(UNITS)) if (u.upgrade && u.upgrade.fromId) {
-  u.upgrade.from = LEVELS.findIndex(l => l.id === u.upgrade.fromId) + 1;
-  u.desc = u.desc.replace('{from}', u.upgrade.from);
-}
 
 const DATA = { THICK_MUL, SPEED_FAST, SPEED_SLOW, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
 if (typeof module !== 'undefined') module.exports = DATA; else window.DATA = DATA;

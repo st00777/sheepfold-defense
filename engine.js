@@ -16,15 +16,23 @@
   function shepherdEvery(G) { const sc = G.level.diffScale ?? 0.6; return UNITS.shepherd.every + (DIFFS[G.diff].shepherdEvery - UNITS.shepherd.every) * sc; }
 
   function levelById(id) { return LEVELS.find(l => l.id === id) || LEVELS[0]; }
+  const idxOf = id => LEVELS.findIndex(l => l.id === id); // 這一夜在 LEVELS 裡的位置（0 起算；找不到 -1）
   const STRAY_LEAD = 3;                                   // 迷羊進場前幾秒先印 🐑 腳印（跟敵人腳印一樣提前量）
   const restOf = G => G.level.rest ?? WAVE_REST;          // 波間休息秒數，關卡可覆寫（第二章「交託的羊」只歇 3 秒）
+  // 升級開放夜：data.js 寫 fromId（在哪一夜學會），這裡換算成 from（那一夜的顯示編號＝位置），卡片說明的 {from} 一併填入。只做一次
+  for (const u of Object.values(UNITS)) if (u.upgrade && u.upgrade.fromId && u.upgrade.from === undefined) {
+    u.upgrade.from = posOf(u.upgrade.fromId);
+    u.desc = u.desc.replace('{from}', u.upgrade.from);
+  }
+  // 場上某種單位有幾個（maxUnits 上限用；畫面層壓暗卡片也用這條）
+  function countUnits(G, k) { let n = 0; for (const key in G.units) if (G.units[key].type === k) n++; return n; }
   // 夜的「顯示編號」＝在 LEVELS 裡的位置（1 起算）。id 永遠不動、只當存檔的 key；中途插新夜時顯示編號會變、id 不變
-  function posOf(id) { const i = LEVELS.findIndex(l => l.id === id); return i < 0 ? 0 : i + 1; }
-  function nextOf(id) { const i = LEVELS.findIndex(l => l.id === id); return i < 0 ? null : LEVELS[i + 1] || null; }
+  function posOf(id) { const i = idxOf(id); return i < 0 ? 0 : i + 1; }
+  function nextOf(id) { const i = idxOf(id); return i < 0 ? null : LEVELS[i + 1] || null; }
   // 解鎖規則：第一夜、本夜已守過、前一夜已守過、或任何更後面的夜已守過。
   // 最後一條是給老玩家的：他已經破到第二章，後來插進第一章的新夜不能把他擋在門外；「本夜已守過」則是最後一夜前面變成新夜、後面又沒有夜時的保險
   function isUnlocked(cleared, id) {
-    const i = LEVELS.findIndex(l => l.id === id); if (i < 0) return false;
+    const i = idxOf(id); if (i < 0) return false;
     if (i === 0 || (cleared && cleared[id])) return true;
     if (cleared && cleared[LEVELS[i - 1].id]) return true;
     return LEVELS.slice(i + 1).some(l => !!(cleared && cleared[l.id]));
@@ -120,7 +128,7 @@
     if (G.rocks.has(key(r, c))) return { ok: false, msg: '這格是石頭' };
     if (G.units[key(r, c)]) return { ok: false, msg: '這格已經有人了' };
     const cap = G.level.maxUnits && G.level.maxUnits[k]; // 關卡對某種單位的數量上限（歌珊的夜：牧人最多 3 位）
-    if (cap !== undefined && Object.values(G.units).filter(u => u.type === k).length >= cap) return { ok: false, msg: `${def.name}今晚最多 ${cap} 位` };
+    if (cap !== undefined && countUnits(G, k) >= cap) return { ok: false, msg: `${def.name}今晚最多 ${cap} 位` };
     if (G.level.conveyor) {
       const i = G.hand.indexOf(k); if (i < 0) return { ok: false, msg: `${def.name}還沒送到手上` };
       G.hand.splice(i, 1); ev(G, { t: 'hand' }); // 送來的卡不花糧，用掉就沒了
@@ -847,7 +855,7 @@
       e.carrying = false; e.carryStray = false; e.dead = true; n++;
     }
     ev(G, { t: 'fx', kind: 'gate', r, x: 0 });
-    ev(G, { t: 'toast', msg: `看門的把這一排的 ${n} 隻全趕了出去。這排的門沒人看了，再漏一隻就守不住` });
+    ev(G, { t: 'toast', msg: `看門的把這一排的 ${n} 隻地面敵人全趕了出去。這排的門沒人看了，再漏一隻就守不住` });
   }
 
   function biteDog(G, e, dt) {
@@ -869,13 +877,13 @@
   // ====== 開發者模式 ======
   const dev = {
     spawn(G, type, r, c) { if (G.over || !ENEMIES[type]) return; const w = G.waves[G.wave - 1]; spawnAt(G, type, r, c, w ? w.hpMul : 1); G.total++; },
-    clear(G) { for (const e of G.enemies) { release(G, e); e.dead = true; } G.total -= G.enemies.length; G.enemies = []; G.strays = []; G.strayQueue = []; G.strayNextRow = null; ev(G, { t: 'strayMark', r: null }); G.queue = []; G.nextRow = null; G.nextType = null; ev(G, { t: 'marker', r: null }); if (G.phase === 'wave') { G.phase = 'rest'; G.timer = WAVE_REST; } },
+    clear(G) { for (const e of G.enemies) { release(G, e); e.dead = true; } G.total -= G.enemies.length; G.enemies = []; G.strays = []; G.strayQueue = []; G.strayNextRow = null; ev(G, { t: 'strayMark', r: null }); G.queue = []; G.nextRow = null; G.nextType = null; ev(G, { t: 'marker', r: null }); if (G.phase === 'wave') { G.phase = 'rest'; G.timer = restOf(G); } },
     nextWave(G) { if (G.over) return; G.started = true; G.holdWaves = false; if (G.phase === 'wave') { dev.clear(G); } G.timer = Math.min(G.timer, 0.5); },
     food(G, n) { G.food += n; },
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; if (G.level.conveyor) for (const k of Object.keys(UNITS)) if (!G.hand.includes(k)) G.hand.push(k); ev(G, { t: 'hand' }); },
     stray(G, r, x) { if (G.over) return; spawnStray(G, r, x); },
   };
 
-  const Engine = { create, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, scaleWaves, defaultPick, validPick, applyPick, rowLit, dev };
+  const Engine = { create, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, rowLit, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
