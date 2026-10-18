@@ -95,12 +95,13 @@
 
   /* 棋盤 */
   #board-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; }
-  #shell { position: relative; width: 100%; max-width: 640px; }
+  #shell { position: relative; width: 100%; max-width: 640px; padding-left: var(--lane); --lane: 28px; } /* 左邊留一條「門口」走道給看門的，不跟第 0 欄搶位置 */
+  #lane { position: absolute; left: 0; top: 0; bottom: 0; width: var(--lane); border-radius: 8px 0 0 8px; background: linear-gradient(90deg, #2f2c24, #3d3929); box-shadow: inset -2px 0 4px #0006; }
   #board { position: relative; width: 100%; aspect-ratio: 7 / 5; display: grid;
     grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(5, 1fr); border-radius: 8px; overflow: hidden;
     background: #243a2a url(img/ground.webp) center / cover no-repeat; }
   /* 外框獨立一層：頭目登場只震這一層，棋盤格子不動，手機不會點錯格 */
-  #frame { position: absolute; inset: 0; border: 3px solid var(--line); border-radius: 8px; pointer-events: none; z-index: 6; }
+  #frame { position: absolute; inset: 0 0 0 var(--lane); border: 3px solid var(--line); border-radius: 8px; pointer-events: none; z-index: 6; }
   .cell { position: relative; background: var(--grass-t); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); }
   .cell.alt { background: var(--grass2-t); }
   .cell.rock { background: var(--rock); }
@@ -172,7 +173,7 @@
   #weather { position: absolute; inset: 0; pointer-events: none; z-index: 4; opacity: 0; background: #5a6a8a; }
   #board.storm #weather { opacity: .14; }
   .fence { position: absolute; left: 0; top: 0; bottom: 0; width: 9px; pointer-events: none; background: linear-gradient(90deg, #7a5a34, #a07a48 45%, #6a4a2a), repeating-linear-gradient(180deg, #0000 0 10px, #00000055 10px 13px); background-blend-mode: multiply; opacity: .92; box-shadow: 1px 0 4px #0008; }
-  #board.dawn .gate span { opacity: 1; filter: drop-shadow(0 0 6px #ffd98a); }
+  #shell.dawn .gate span { filter: drop-shadow(0 0 6px #ffd98a); }
   .enemy .body { --k: 1; width: 70%; height: 70%; border-radius: 50%; background: #5b5b66; display: flex; align-items: center; justify-content: center; position: relative;
     box-shadow: 0 0 0 1.5px #8a2f2c; transform: scale(calc(var(--k) * var(--hs, 1))); transition: box-shadow .2s, filter .2s, transform 200ms var(--ease-out); }
   .enemy.fast .body { --k: .8; }
@@ -222,9 +223,9 @@
   .mark { right: 2px; font-size: clamp(14px, 4.5vw, 26px); opacity: .85; animation: blink .8s infinite alternate; }
   .mark.stray-mark { opacity: .95; right: calc(100% / 7 + 2px); } /* 跟敵人腳印錯開一格，同排同時出現不會疊 */
   /* 看門的：每排門口左下角一個小人影，用掉就淡出往左退 */
-  .gate { position: absolute; left: 0; width: 24px; height: calc(100% / 5); transform: translateX(-32%); display: flex; align-items: flex-end; justify-content: center; pointer-events: none; z-index: 2; } /* 站在圍欄前面、露七成身子；10/18 James 真機：加圍欄後半身版看不見 */ /* 站在門口＝棋盤左緣，半個身子在外面，不蓋到第 0 欄的單位 */
-  .gate span { font-size: clamp(14px, 3.6vw, 20px); margin: 0 0 1px 2px; opacity: 1; filter: drop-shadow(0 0 2px #000) drop-shadow(0 1px 2px #000); transition: opacity 250ms cubic-bezier(.23, 1, .32, 1); } /* 退場只淡出：他是往右掃出去的，圖示不往左退 */
-  .gate.used span { opacity: 0; }
+  .gate { position: absolute; left: 0; width: var(--lane); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; cursor: pointer; } /* 站在棋盤外的門口走道，一排一位；點他看說明 */
+  .gate span { font-size: clamp(20px, 5.6vw, 30px); line-height: 1; filter: drop-shadow(0 0 2px #000) drop-shadow(0 2px 2px #000a); transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out); }
+  .gate.used span { opacity: .15; transform: scale(.8); } /* 用掉的留一個淡影：看得出這排的門沒人看了 */
   .gate-sweep { position: absolute; left: 0; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; animation: gateSweep .9s cubic-bezier(.3, 0, .7, 1) forwards; }
   .gate-sweep::before { content: ''; position: absolute; right: 55%; top: 38%; height: 24%; width: 260%; border-radius: 999px; background: linear-gradient(90deg, transparent, #e6b84a88); }
   @keyframes gateSweep { from { transform: translateX(-30%); opacity: 1; } 80% { opacity: 1; } to { transform: translateX(640%); opacity: 0; } }
@@ -383,7 +384,7 @@
   <select id="dev-enemy"><option value="">（關）</option></select>
 </div>
 
-<div id="board-wrap"><div id="shell"><div id="board"></div><div id="frame"></div></div></div>
+<div id="board-wrap"><div id="shell"><div id="lane"></div><div id="board"></div><div id="frame"></div></div></div>
 
 <div id="bottom">
   <div id="bar"><i></i></div>
@@ -497,6 +498,7 @@ let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf =
 const els = new Map();   // 引擎物件 id → 畫面元素
 let markerEl = null, strayMarkEl = null, moundEls = new Map();
 const gateEls = []; // 每排門口的看門的（跟著 G.gates 顯示／隱藏）
+const GATE_TIP = '🧍 看門的：第一隻摸到門口的地面敵人，會被他連同整排一起趕出去；用過一次他就走了，那排再漏就守不住。飛的不經過門';
 let toastTimer = 0;
 let cardEls = [], lastFood = -1, lastHand = 0, lastUnits = -1;
 // 開發者模式：網址加 ?dev，或連點左上角「糧」五下
@@ -650,19 +652,22 @@ function newThisNight(L) {
 }
 function showIntroNew(L) {
   const { fresh, upg } = newThisNight(L);
-  const box = $('#intro-new'), any = fresh.length || upg.length;
+  const gateNew = L.gates !== false && !introSeen().includes('gate'); // 看門的（全遊戲只介紹一次）
+  const box = $('#intro-new'), any = fresh.length || upg.length || gateNew;
   box.hidden = !any;
   $('#start').classList.toggle('quiet', !!any); // 有新夥伴時主按鈕讓給「先看圖鑑」
   if (!any) return;
   const parts = [];
   if (fresh.length) parts.push(`今晚有新夥伴：${fresh.map(k => `${UNITS[k].ico} ${UNITS[k].name}`).join('、')}`);
   if (upg.length) parts.push(`${upg.map(k => `${UNITS[k].ico} ${UNITS[k].name}`).join('、')}學會新招：${upg.map(k => UNITS[k].upgrade.name).join('、')}`);
+  if (gateNew) parts.push('每排門口站著一位 🧍 看門的：第一隻摸到門口的地面敵人會被他連整排趕出去，用過一次他就走了，那排再漏就守不住');
   $('#intro-new-text').textContent = parts.join('；') + '。先去圖鑑看一眼怎麼用，再開始守夜。';
   $('#intro-new-btn').onclick = () => {
     const focus = fresh[0] || upg[0];
-    try { const a = introSeen(); for (const k of [...fresh, ...upg]) a.push(`${L.id}:${k}`); localStorage.setItem(NKEY, JSON.stringify(a)); } catch (e) {}
+    try { const a = introSeen(); for (const k of [...fresh, ...upg]) a.push(`${L.id}:${k}`); if (gateNew) a.push('gate'); localStorage.setItem(NKEY, JSON.stringify(a)); } catch (e) {}
     openRoster(pickedFor(L) ? 'pick' : 'view', 'intro');
-    roster.focus = focus; renderRoster();
+    if (!focus) { roster.tab = 'effects'; roster.focus = String(GLOSSARY.findIndex(g => g.name === '看門的')); } else roster.focus = focus; // 只有看門的是新的：直接翻到效果頁籤那一格
+    renderRoster();
     const el = [...document.querySelectorAll('#roster-grid .rc')].find(x => x.dataset.key === focus); if (el) el.scrollIntoView({ block: 'nearest' });
   };
 }
@@ -873,7 +878,7 @@ function dusk(on) {
   requestAnimationFrame(() => { if (s.classList.contains('dusk')) s.className = 'fade'; });
 }
 // 天亮：金光罩上來、無月夜的暗罩退掉（filter 2s 漸亮）、看門的發亮；結算頁晚一點再出來讓人看到
-function dawn() { dawned = true; board.classList.remove('moonless'); board.classList.add('dawn'); const s = $('#sky'); if (s) s.className = 'dawn'; }
+function dawn() { dawned = true; board.classList.remove('moonless'); board.classList.add('dawn'); $('#shell').classList.add('dawn'); const s = $('#sky'); if (s) s.className = 'dawn'; }
 function lightning() {
   const w = $('#weather'); if (!w || REDUCE_MOTION.matches || speed > 1) return;
   w.animate([{ opacity: .5, backgroundColor: '#f4f0ff' }, { opacity: .14, backgroundColor: '#5a6a8a' }], { duration: 180, easing: 'ease-out' });
@@ -1019,7 +1024,7 @@ function draw() {
   // 看門的：每排門口一位，用掉的淡出
   for (let r = 0; r < ROWS; r++) {
     let g = gateEls[r];
-    if (!g) { g = document.createElement('div'); g.className = 'gate'; g.style.top = (r / ROWS * 100) + '%'; g.innerHTML = '<span>🧍</span>'; board.appendChild(g); gateEls[r] = g; }
+    if (!g) { g = document.createElement('div'); g.className = 'gate'; g.style.top = (r / ROWS * 100) + '%'; g.innerHTML = '<span>🧍</span>'; g.addEventListener('click', () => toast(G.gates.includes(r) ? GATE_TIP : '這排的看門的已經用掉了，再漏一隻地面敵人就守不住', true)); $('#shell').appendChild(g); gateEls[r] = g; }
     const on = G.gates.includes(r); if (g.classList.contains('used') === on) g.classList.toggle('used', !on);
   }
   if (biting) Sound.play('bite'); // sound.js 自己限流，每 0.45 秒最多一聲
@@ -1143,7 +1148,7 @@ function startGame(fromCp) {
   for (const k in G.units) renderUnit(G.units[k].r, G.units[k].c);
   for (let i = G.events.length - 1; i >= 0; i--) if (G.events[i].t === 'unit') G.events.splice(i, 1); // 單位已直接畫了，其餘事件留給第一幀
   toast(resumed ? `從第 ${G.wave + 1} 波繼續，場上的人都還在${devUsed ? '；開著開發者模式，這局不存檔' : ''}` : broken ? CP_BROKEN : '先點一張卡，再點草地放下去');
-  dawned = false; board.classList.remove('dawn'); board.classList.toggle('storm', diff === 'storm'); board.classList.toggle('fast', speed > 1); dusk(!resumed);
+  dawned = false; board.classList.remove('dawn'); $('#shell').classList.remove('dawn'); board.classList.toggle('storm', diff === 'storm'); board.classList.toggle('fast', speed > 1); dusk(!resumed);
   draw();
   if (!resumed && level.id === 1 && (!tutDone() || /[?&]tut/.test(location.search))) tutStart();
   last = performance.now();
