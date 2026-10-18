@@ -171,7 +171,6 @@
   #sky.dawn { background: linear-gradient(180deg, #fff3c0, #ffd98a 50%, #ffb45a); opacity: .42; transition: opacity 1.4s ease-out; }
   #weather { position: absolute; inset: 0; pointer-events: none; z-index: 4; opacity: 0; background: #5a6a8a; }
   #board.storm #weather { opacity: .14; }
-  .wild { position: absolute; right: 0; top: 0; bottom: 0; width: 14%; pointer-events: none; background: linear-gradient(90deg, #0000, #0a140f55); } /* 曠野暗邊：只在最右一格淡淡壓暗（James 10/18 真機：原本 a8 太黑） */
   .fence { position: absolute; left: 0; top: 0; bottom: 0; width: 9px; pointer-events: none; background: linear-gradient(90deg, #7a5a34, #a07a48 45%, #6a4a2a), repeating-linear-gradient(180deg, #0000 0 10px, #00000055 10px 13px); background-blend-mode: multiply; opacity: .92; box-shadow: 1px 0 4px #0008; }
   #board.dawn .gate span { opacity: 1; filter: drop-shadow(0 0 6px #ffd98a); }
   .enemy .body { --k: 1; width: 70%; height: 70%; border-radius: 50%; background: #5b5b66; display: flex; align-items: center; justify-content: center; position: relative;
@@ -223,8 +222,8 @@
   .mark { right: 2px; font-size: clamp(14px, 4.5vw, 26px); opacity: .85; animation: blink .8s infinite alternate; }
   .mark.stray-mark { opacity: .95; right: calc(100% / 7 + 2px); } /* 跟敵人腳印錯開一格，同排同時出現不會疊 */
   /* 看門的：每排門口左下角一個小人影，用掉就淡出往左退 */
-  .gate { position: absolute; left: 0; width: 24px; height: calc(100% / 5); transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; pointer-events: none; } /* 站在門口＝棋盤左緣，半個身子在外面，不蓋到第 0 欄的單位 */
-  .gate span { font-size: clamp(11px, 3.2vw, 18px); margin: 0 0 1px 2px; opacity: .8; filter: drop-shadow(0 0 2px #000); transition: opacity 250ms cubic-bezier(.23, 1, .32, 1); } /* 退場只淡出：他是往右掃出去的，圖示不往左退 */
+  .gate { position: absolute; left: 0; width: 24px; height: calc(100% / 5); transform: translateX(-32%); display: flex; align-items: flex-end; justify-content: center; pointer-events: none; z-index: 2; } /* 站在圍欄前面、露七成身子；10/18 James 真機：加圍欄後半身版看不見 */ /* 站在門口＝棋盤左緣，半個身子在外面，不蓋到第 0 欄的單位 */
+  .gate span { font-size: clamp(14px, 3.6vw, 20px); margin: 0 0 1px 2px; opacity: 1; filter: drop-shadow(0 0 2px #000) drop-shadow(0 1px 2px #000); transition: opacity 250ms cubic-bezier(.23, 1, .32, 1); } /* 退場只淡出：他是往右掃出去的，圖示不往左退 */
   .gate.used span { opacity: 0; }
   .gate-sweep { position: absolute; left: 0; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; animation: gateSweep .9s cubic-bezier(.3, 0, .7, 1) forwards; }
   .gate-sweep::before { content: ''; position: absolute; right: 55%; top: 38%; height: 24%; width: 260%; border-radius: 999px; background: linear-gradient(90deg, transparent, #e6b84a88); }
@@ -549,8 +548,8 @@ function buildBoard() {
   // 無月夜的黑霧一排一個，油燈照到的排才能單獨散掉
   fogEls.length = 0;
   for (let r = 0; r < ROWS; r++) { const f = document.createElement('div'); f.className = 'fog'; f.style.top = (r / ROWS * 100) + '%'; board.appendChild(f); fogEls.push(f); }
-  // 場地與天色層：圍欄、曠野暗邊在單位底下；暴風夜冷色罩、天色罩在最上面（都不吃點擊）
-  for (const id of ['wild', 'fence', 'weather', 'sky']) { const d = document.createElement('div'); d.id = id; d.className = id; board.appendChild(d); }
+  // 場地與天色層：圍欄在單位底下；暴風夜冷色罩、天色罩在最上面（都不吃點擊）
+  for (const id of ['fence', 'weather', 'sky']) { const d = document.createElement('div'); d.id = id; d.className = id; board.appendChild(d); }
 }
 function buildCards() {
   const wrap = $('#cards'); wrap.innerHTML = '';
