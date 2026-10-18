@@ -568,7 +568,7 @@
           let fired = false;
           for (let rr = Math.max(0, u.r - def.lanes); rr <= Math.min(ROWS - 1, u.r + def.lanes); rr++) {
             if (!byRow[rr].some(e => e.x > u.c - 0.2 && e.x - u.c <= range)) continue;
-            G.shots.push({ id: G.nextId++, kind: def.shot, r: rr, x: u.c + 0.6, ur: u.r, dmg: def.dmg, pierce: false, falloff: 1, hit: new Set(), burn: false }); fired = true; // ur：發射者那排，畫面層做出手回彈用
+            G.shots.push({ id: G.nextId++, kind: def.shot, r: rr, x: u.c + 0.6, ur: u.r, uc: u.c, dmg: def.dmg, pierce: false, falloff: 1, hit: new Set(), burn: false }); fired = true; // ur／uc：發射者的格子，畫面層做出手回彈用（不從投射物位置反推）
           }
           if (fired) u.timer = def.every;
           continue;
@@ -578,9 +578,9 @@
         u.timer = def.every;
         if (def.shot === 'lob') {
           const far = targets.reduce((a, b) => (a.x > b.x ? a : b));
-          G.shots.push({ id: G.nextId++, kind: 'lob', r: u.r, x: u.c + 0.5, from: u.c + 0.5, landX: far.x + 0.5, t: 0, dmg: def.dmg, splash: def.splash });
+          G.shots.push({ id: G.nextId++, kind: 'lob', r: u.r, x: u.c + 0.5, ur: u.r, uc: u.c, from: u.c + 0.5, landX: far.x + 0.5, t: 0, dmg: def.dmg, splash: def.splash });
         } else {
-          G.shots.push({ id: G.nextId++, kind: def.shot, r: u.r, x: u.c + 0.6, dmg: def.dmg, pierce: !!def.pierce, falloff: def.falloff || 1, hit: new Set(), burn: false });
+          G.shots.push({ id: G.nextId++, kind: def.shot, r: u.r, x: u.c + 0.6, ur: u.r, uc: u.c, dmg: def.dmg, pierce: !!def.pierce, falloff: def.falloff || 1, hit: new Set(), burn: false });
         }
       } else if (def.kind === 'dog') {
         dogAct(G, u, def, dt);
@@ -613,8 +613,9 @@
             const ground = (all ? G.enemies.filter(targetable) : inRow).filter(e => !ENEMIES[e.type].flying && !(e.vaulting > 0)); // 半空中的推不動
             if (!ground.length) continue;
             u.timer = def.every; u.cdLen = def.every;
-            for (const e of ground) { dropSheep(G, e, '被角聲推回去'); e.x = Math.min(COLS + 0.2, e.x + def.push); e.st.stun = def.stun; release(G, e); }
-            ev(G, { t: 'fx', kind: 'horn', r: u.r, x: u.c });
+            const moved = []; // 每隻實際被推了多遠（靠邊的會被夾住，推不到整格），畫面層照這個滑
+            for (const e of ground) { dropSheep(G, e, '被角聲推回去'); const x0 = e.x; e.x = Math.min(COLS + 0.2, e.x + def.push); e.st.stun = def.stun; release(G, e); moved.push({ id: e.id, dx: e.x - x0 }); }
+            ev(G, { t: 'fx', kind: 'horn', r: u.r, x: u.c, moved });
             ev(G, { t: 'toast', msg: all ? '銀號一響，五排的狼都退了一步' : '角聲一響，那排的狼退了一步' });
           }
         }
