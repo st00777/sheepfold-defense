@@ -110,3 +110,16 @@
 - Twemoji：iconify collections API（CC BY 4.0，3988 張）；六個新碼位以 jsdelivr twemoji@15.1.0 逐一 HTTP 200 驗過。
 - Recraft 餘額：MCP `get_user` 2026-10-18 回 41 點。
 - AI 單張可靠／動畫幀不可靠、Bad North 可讀性標準：`docs/research-faith-games-and-art-cost-2026-10-18.md` 題二。
+
+## 8. B1 試跑結果（2026-10-18 晚，James 看圖後）
+
+**否決。** 原話：「這個剪影版本的圖片我不喜歡。把原本還比較豐富的圖片變成平面單色，感覺更陽春了。」
+
+判讀：剪影是換風格不是升級。emoji 本來有臉、顏色、體積感，單色平面等於把資訊拿掉。這條路線不再考慮，feat/icons-trial 分支留著當紀錄不合併。
+
+B 層剩下的選項：
+- **B0 Twemoji**：只解決各家手機 emoji 長相不同，豐富度與現在持平，不會「更好看」。
+- **B2 全彩 AI 生圖**：唯一能比 emoji 更豐富的路，但 40 張風格一致難、1.5–3 天，pm-critic 原本就主張 10/24 問卷前不開。
+- **維持 emoji**：目前預設。
+
+處置：B 層退回待辦，等 10/24 問卷。若 James 想看「比 emoji 豐富」長什麼樣，可先用 Recraft（餘 41 點）試 3 張全彩圖對比，花費幾點，再決定開不開 B2。
