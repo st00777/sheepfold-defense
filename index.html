@@ -243,7 +243,7 @@
   .tips .new { color: var(--new); }
   #best { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
-  /* 首頁：一次只看一章，七夜塞進一屏不用捲（2026-10-17 James：選關要往下拉、圖鑑太下面） */
+  /* 首頁：一次只看一章，十夜塞進一屏不用捲（2026-10-17 James：選關要往下拉、圖鑑太下面；2026-10-18 補到十夜後列高再縮一點） */
   .dialog.home { padding: 18px 16px 14px; }
   .dialog.home h1 { font-size: 22px; }
   .dialog.home .ref { margin-bottom: 8px; }
@@ -253,7 +253,7 @@
   #ch-tabs .tab { padding: 7px 0; font-size: 14px; }
   #ch-tabs .tab.locked { opacity: .4; }
   .ch-sub { font-size: 12px; min-height: 16px; }
-  .lv { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 9px; padding: 6px 10px; margin-top: 5px; text-align: left; cursor: pointer; }
+  .lv { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 9px; padding: 5px 10px; margin-top: 4px; text-align: left; cursor: pointer; }
   .lv.locked { opacity: .45; cursor: default; }
   .lv.next { outline: 2px solid var(--gold); outline-offset: -2px; }
   .lv .n { font-size: 17px; width: 24px; text-align: center; color: var(--gold); }
@@ -463,7 +463,7 @@ function unlocked(id) { return unlockAll || Engine.isUnlocked(P.cleared, id); } 
 function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k); return all; }
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊' };
-const CHAPTERS = { 1: '七夜，學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來' };
+const CHAPTERS = { 1: '十夜，學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來' };
 const HOME_UPDATE = '最近更新 10/17：第二章七夜上線、加了音效（右上角 🔊）、卡片改兩排不用滑';
 
 // ====== 畫面建立 ======

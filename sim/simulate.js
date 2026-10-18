@@ -79,7 +79,7 @@ function decide(G, skill) {
       if (can('slinger')) { if (tryPlace(G, r, freeCell(G, r, 1), 'slinger')) return; }
     }
     if (big && !hasSling && can('sling')) { if (tryPlace(G, r, freeCell(G, r, 2), 'sling')) return; }
-    if (!hasDog && can('dog') && (strayHere || [...types].some(t => ['alpha', 'lion', 'bear', 'fox', 'rustler', 'thief', 'jackal', 'leopard'].includes(t)))) { if (tryPlace(G, r, freeCell(G, r, 3), 'dog')) return; }
+    if (!hasDog && can('dog') && (strayHere || (G.level.fresh.includes('dog') && types.has('fast')) || [...types].some(t => ['alpha', 'lion', 'bear', 'fox', 'rustler', 'thief', 'jackal', 'leopard'].includes(t)))) { if (tryPlace(G, r, freeCell(G, r, 3), 'dog')) return; }
     if (strayHere && can('cradle') && !has(G, r, u => u.type === 'cradle')) { if (tryPlace(G, r, freeCell(G, r, Number(process.env.SIM_CRADLE_COL || 2)), 'cradle')) return; }
     if (es.length >= 3 && r >= 1 && r <= 3 && can('patrol') && ![r - 1, r, r + 1].some(rr => has(G, rr, u => u.type === 'patrol'))) { if (tryPlace(G, r, freeCell(G, r, 2), 'patrol')) return; }
     if (needArcher && !has(G, r, u => u.type === 'archer') && can('archer')) { if (tryPlace(G, r, freeCell(G, r, 2), 'archer')) return; }
@@ -141,7 +141,7 @@ function play(levelId, diff, seed, skill) {
     const ban = (process.env.SIM_BAN || '').split(',').filter(Boolean), add = (process.env.SIM_ADD || '').split(',').filter(Boolean);
     pick = pick.filter(k => !ban.includes(k));
     for (const k of add) if (G.level.units.includes(k) && !pick.includes(k)) { pick.push(k); if (pick.length > MAX_CARDS) { const drop = pick.filter(x => x !== 'shepherd' && !add.includes(x)).pop(); if (drop) pick.splice(pick.indexOf(drop), 1); else { pick.pop(); console.warn('SIM_ADD：沒有可擠掉的卡，捨棄 ' + k); } } }
-    if (!E.validPick || !E.validPick(G.level, pick)) console.warn('SIM_BAN／SIM_ADD 後的隊伍不合規（少於下限或沒牧人），結果僅供參考：' + pick.join(' '));
+    if ((process.env.SIM_BAN || process.env.SIM_ADD) && (!E.validPick || !E.validPick(G.level, pick))) console.warn('SIM_BAN／SIM_ADD 後的隊伍不合規（少於下限或沒牧人），結果僅供參考：' + pick.join(' '));
     if (seed === 1000 && process.env.SIM_SHOW) console.log('  隊伍：' + pick.join(' '));
     E.applyPick(G, pick);
   }

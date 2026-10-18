@@ -25,6 +25,10 @@ const QUOTES = [
   { ref: '耶 5:6',    code: 'JER', ch: 5,  text: '晚上的豺狼必滅絕他們；豹子要在城外窺伺他們' },
   { ref: '詩 80:13',  code: 'PSA', ch: 80, text: '林中出來的野豬把它糟踏' },
   { ref: '詩 102:6',  code: 'PSA', ch: 102, text: '荒場的鴞鳥' },
+  // 第一章補夜（2026-10-18）
+  { ref: '創 30:30',  code: 'GEN', ch: 30, text: '我未來之先，你所有的很少，現今卻發大眾多' },
+  { ref: '歌 2:15',   code: 'SNG', ch: 2,  text: '要給我們擒拿狐狸，就是毀壞葡萄園的小狐狸，因為我們的葡萄正在開花。' },
+  { ref: '代下 26:10', code: '2CH', ch: 26, text: '又在曠野與高原和平原，建築望樓，挖了許多井，因他的牲畜甚多' },
 ];
 
 async function fetchChapter(code, ch) {
