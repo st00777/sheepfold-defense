@@ -16,6 +16,7 @@
 - `data.js` 單位／敵人／狀態／難度／關卡資料表（加內容只改這裡）
 - `engine.js` 純邏輯引擎，無 DOM，Node 可跑
 - `sound.js` 音效：Web Audio 現場合成，沒有音檔；頂欄與開場頁 🔊 一鍵靜音，暫停層有音效／蟲鳴／音量三檔（存 `sheepfold-sound`）
+- 星級：每夜三顆（守過／零損失／五位看門的都在），跨局累積、不解鎖任何東西；規則與邊界見 `docs/chapter-expansion-design-2026-10-18.md` §13。
 - `sim/simulate.js` 勝率模擬：`node sim/simulate.js [關|all] [calm|windy|storm|all] [局數] [good|basic]`（輸出含「最近幾格」＝敵人最靠近羊圈到哪，越小越驚險）；`node --test sim/*.test.js` 跑引擎測試
 - `docs/roster.md` 單位／敵人／關卡定案；`docs/level-design.md` 每關新鮮感與教學順序；`docs/chapter-2-design.md` 第二章完整規格
 
