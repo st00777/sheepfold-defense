@@ -39,7 +39,7 @@ const UNITS = {
               // 升級：銀號，吹一次五排地面敵人全部後退並暈眩（all＝全場）
               upgrade: { name: '銀號', ico: '🎺', cost: 75, fromId: 14, all: true, desc: '換成銀號，吹一次五排的地面敵人全部後退一格並暈眩', ref: '民 10:2' } },
   healer:   { name: '纏裹的牧人', ico: '🩹', cost: 100, hp: 60,  kind: 'support', every: 1, heal: 8, range: 1, brave: true,
-              desc: '不攻擊，持續回復周圍八格夥伴的血量，不怕獅子咆哮。再點一下膏油，範圍擴大到 5×5、回血更多', ref: '結 34:16',
+              desc: '不攻擊，持續回復周圍八格夥伴的血量，不怕獅子咆哮。第 {from} 夜起再點一下膏油，範圍擴大到 5×5、回復更多血量', ref: '結 34:16',
               // 升級：再點一下花糧膏油，範圍 1 格→2 格（5×5 共 24 格）、回血 8→12；brave＝獅子咆哮嚇不停它
               upgrade: { name: '膏油', ico: '🫗', cost: 50, fromId: 7, heal: 12, range: 2, desc: '膏油後周圍 5×5 共 24 格的夥伴每秒回復 12 血量，一位顧整條防線', ref: '詩 23:5' } },
   catapult: { name: '投石機',   ico: '🛞',   cost: 200, hp: 80,  kind: 'shooter', every: 4, dmg: 45, shot: 'lob', splash: 1.2,
@@ -315,7 +315,7 @@ const LEVELS = [
 
   // ====== 第二章「另外的羊」（id 8-14）：無月夜＋跨路徑 ======
   // chapter：關卡選單分章；moonless：第幾波起看不見腳印（油燈照到的排例外）；strays：這波開始後第幾秒走進一隻迷羊
-  // rest：波間休息秒數（預設 WAVE_REST）；startFood：開局糧（預設 START_FOOD）；maxUnits：{ 單位: 上限 } 這一夜某種單位最多放幾位；gates: false 關掉看門的（預設每排一位）
+  // rest：波間休息秒數（預設 WAVE_REST）；startFood：開局糧（預設 START_FOOD）；maxUnits：{ 單位: 上限 } 這一夜某種單位最多放幾位；gates: false 關掉看門的（預設每排一位）；shepherdScale：暴風夜產糧拉長的折扣，只動產糧（預設跟 diffScale）
   // conveyor：送卡模式（卡定時送到手上、費用 0、沒有糧；start 開局先給哪幾張、every 幾秒送一張、max 手上最多幾張、weights 抽卡權重）；give：這波開始時一定先送到的卡
   {
     id: 8, chapter: 2, name: '井邊的夜', title: '別的牧人', ref: '取材：出埃及記 2:16-20，西坡拉姊妹在井邊',
@@ -455,7 +455,7 @@ const LEVELS = [
   },
   {
     id: 20, chapter: 2, name: '歌珊的夜', title: '剛到的一家人', ref: '取材：創世記 46:32-34、47:3-6，雅各一家到歌珊牧羊',
-    speaker: '猶大', moonless: 2, startFood: 100, maxUnits: { shepherd: 3 }, diffScale: 0.3, // 牧人只能三位，暴風夜的產糧拉長再打更多折，不然雙重懲罰
+    speaker: '猶大', moonless: 2, startFood: 100, maxUnits: { shepherd: 3 }, shepherdScale: 0.3, // 牧人只能三位，暴風夜的產糧拉長再打更多折（只動產糧，敵人照一般 diffScale），不然雙重懲罰
     intro: '我們剛到歌珊，法老把最好的地給了我們，可是人手還沒到齊。今晚糧比平常少，牧人最多三位。羊是我們全家的本錢，守好牠們。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle'], fresh: [], must: ['sling', 'dog'],
     tips: ['🌾 今晚開局只有 100 糧，牧人最多三位；三位都升成老牧人，加快產糧', '🐆 豹會跳過石牆、每幾秒換一排，守望樓跳不過；狗咬住牠就不換排'],

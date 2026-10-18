@@ -183,9 +183,9 @@
   .dog-run.rest { opacity: .55; }
   .dog-run.rest .body::after { content: '💤'; position: absolute; top: -8px; right: -6px; font-size: .5em; }
   .mark { right: 2px; font-size: clamp(14px, 4.5vw, 26px); opacity: .85; animation: blink .8s infinite alternate; }
-  .mark.stray-mark { opacity: .95; }
+  .mark.stray-mark { opacity: .95; right: calc(100% / 7 + 2px); } /* 跟敵人腳印錯開一格，同排同時出現不會疊 */
   /* 看門的：每排門口左下角一個小人影，用掉就淡出往左退 */
-  .gate { position: absolute; left: 0; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: flex-end; justify-content: flex-start; pointer-events: none; }
+  .gate { position: absolute; left: 0; width: 24px; height: calc(100% / 5); transform: translateX(-50%); display: flex; align-items: flex-end; justify-content: center; pointer-events: none; } /* 站在門口＝棋盤左緣，半個身子在外面，不蓋到第 0 欄的單位 */
   .gate span { font-size: clamp(11px, 3.2vw, 18px); margin: 0 0 1px 2px; opacity: .8; filter: drop-shadow(0 0 2px #000); transition: opacity 250ms cubic-bezier(.23, 1, .32, 1); } /* 退場只淡出：他是往右掃出去的，圖示不往左退 */
   .gate.used span { opacity: 0; }
   .gate-sweep { position: absolute; left: 0; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; animation: gateSweep .9s cubic-bezier(.3, 0, .7, 1) forwards; }

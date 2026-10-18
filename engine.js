@@ -13,7 +13,7 @@
   const VAULT_TIME = 1.2; // 賊翻牆要幾秒：這段時間牠連續越過牆，畫面層用 lift 畫弧線
 
   // 牧人送糧間隔：暴風夜拉長，但後面的關卡一樣打折
-  function shepherdEvery(G) { const sc = G.level.diffScale ?? 0.6; return UNITS.shepherd.every + (DIFFS[G.diff].shepherdEvery - UNITS.shepherd.every) * sc; }
+  function shepherdEvery(G) { const sc = G.level.shepherdScale ?? G.level.diffScale ?? 0.6; return UNITS.shepherd.every + (DIFFS[G.diff].shepherdEvery - UNITS.shepherd.every) * sc; } // shepherdScale：只調產糧的折扣（歌珊的夜）
 
   function levelById(id) { return LEVELS.find(l => l.id === id) || LEVELS[0]; }
   const idxOf = id => LEVELS.findIndex(l => l.id === id); // 這一夜在 LEVELS 裡的位置（0 起算；找不到 -1）
@@ -22,6 +22,7 @@
   // 升級開放夜：data.js 寫 fromId（在哪一夜學會），這裡換算成 from（那一夜的顯示編號＝位置），卡片說明的 {from} 一併填入。只做一次
   for (const u of Object.values(UNITS)) if (u.upgrade && u.upgrade.fromId && u.upgrade.from === undefined) {
     u.upgrade.from = posOf(u.upgrade.fromId);
+    if (!u.upgrade.from) { console.error(`${u.name} 的升級 fromId ${u.upgrade.fromId} 不是任何一夜的 id`); u.upgrade.from = 999; } // 打錯 id 寧可永遠學不會，也不要第 1 夜就全開
     u.desc = u.desc.replace('{from}', u.upgrade.from);
   }
   // 場上某種單位有幾個（maxUnits 上限用；畫面層壓暗卡片也用這條）
@@ -76,7 +77,7 @@
     const G = {
       levelId: level.id, level, diff: diffKey, waves, rng: rng || Math.random,
       rocks: new Set((level.rocks || []).map(([r, c]) => r + ',' + c)),
-      food: level.startFood ?? START_FOOD, trickle: 0, // startFood：關卡可覆寫開局糧（歌珊的夜 75）
+      food: level.startFood ?? START_FOOD, trickle: 0, // startFood：關卡可覆寫開局糧（歌珊的夜 100）
       phase: 'prep', wave: 0, timer: level.prep || PREP_TIME,
       queue: [], spawnTimer: 0, spawnedTotal: 0, killed: 0,
       total: waves.reduce((n, w) => n + w.list.reduce((m, [, k]) => m + k, 0), 0),
@@ -277,6 +278,7 @@
 
   // 這格的單位能不能拿 k 這張卡直接換掉（同類、更貴）。畫面層用它亮格子，swap 用它守門
   function canSwap(G, r, c, k) {
+    { const cap = G.level.maxUnits && G.level.maxUnits[k]; if (cap !== undefined && countUnits(G, k) >= cap) return false; } // 數量上限：換卡也算放
     const u = G.units[key(r, c)], def = UNITS[k];
     if (!u || !def) return false;
     const old = UNITS[u.type];
@@ -869,10 +871,10 @@
   function win(G) {
     // 天亮了：還在路上的、還沒走到的迷羊都算回圈
     for (const s of G.strays) if (!s.dead) { s.dead = true; G.sheep++; }
-    G.sheep += G.strayQueue.length; G.strays = []; G.strayQueue = [];
+    G.sheep += G.strayQueue.length; G.strays = []; G.strayQueue = []; G.strayNextRow = null; ev(G, { t: 'strayMark', r: null });
     G.over = true; G.result = { win: true }; ev(G, { t: 'win' });
   }
-  function lose(G, reason) { G.over = true; G.result = { win: false, reason }; ev(G, { t: 'lose', reason }); }
+  function lose(G, reason) { G.over = true; G.result = { win: false, reason }; ev(G, { t: 'strayMark', r: null }); ev(G, { t: 'lose', reason }); }
 
   // ====== 開發者模式 ======
   const dev = {
