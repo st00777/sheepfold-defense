@@ -39,10 +39,10 @@ function decide(G, skill) {
   if (G.level.moonless && can('lamp') && count('lamp') < 2 && G.wave >= 1) { for (const r of [1, 3]) if (!has(G, r, u => u.type === 'lamp') && tryPlace(G, r, freeCell(G, r, 2), 'lamp')) return; }
   if (can('staff') && G.wave >= 1) { for (const r of [0, 4]) if (!has(G, r, u => u.type === 'staff' || kindOf(u) === 'shooter') && tryPlace(G, r, freeCell(G, r, 3), 'staff')) return; }
   // 吹角手升銀號、荊棘以外的升級
-  for (const k in G.units) { const u = G.units[k]; if (u.type === 'horn' && !u.upgraded && UNITS.horn.upgrade && G.level.id >= UNITS.horn.upgrade.from && G.food >= UNITS.horn.upgrade.cost && E.tapUnit(G, u.r, u.c).ok) return; }
+  for (const k in G.units) { const u = G.units[k]; if (u.type === 'horn' && !u.upgraded && UNITS.horn.upgrade && E.posOf(G.level.id) >= UNITS.horn.upgrade.from && G.food >= UNITS.horn.upgrade.cost && E.tapUnit(G, u.r, u.c).ok) return; }
 
   // 纏裹的牧人：糧夠就膏油（範圍 5×5）
-  for (const k in G.units) { const u = G.units[k]; if (u.type === 'healer' && !u.upgraded && UNITS.healer.upgrade && G.level.id >= UNITS.healer.upgrade.from && G.food >= UNITS.healer.upgrade.cost && E.tapUnit(G, u.r, u.c).ok) return; }
+  for (const k in G.units) { const u = G.units[k]; if (u.type === 'healer' && !u.upgraded && UNITS.healer.upgrade && E.posOf(G.level.id) >= UNITS.healer.upgrade.from && G.food >= UNITS.healer.upgrade.cost && E.tapUnit(G, u.r, u.c).ok) return; }
 
   // 修牆（那排已經有射手才修，不然先補射手）
   for (const k in G.units) { const u = G.units[k]; if (kindOf(u) === 'blocker' && u.hp < u.maxHp * 0.4 && G.food >= D.REPAIR_COST && has(G, u.r, v => kindOf(v) === 'shooter') && E.tapUnit(G, u.r, u.c).ok) return; }
@@ -88,7 +88,7 @@ function decide(G, skill) {
       if (dg && !G.units[key(r, dg.emergeX)] && tryPlace(G, r, dg.emergeX, 'thorns')) return;
     }
     // 荊棘學會撒蠍子就升級
-    for (let c = 0; c < COLS; c++) { const u = G.units[key(r, c)]; if (u && u.type === 'thorns' && !u.upgraded && G.level.id >= UNITS.thorns.upgrade.from && G.food >= UNITS.thorns.upgrade.cost + 50) { E.tapUnit(G, r, c); return; } }
+    for (let c = 0; c < COLS; c++) { const u = G.units[key(r, c)]; if (u && u.type === 'thorns' && !u.upgraded && E.posOf(G.level.id) >= UNITS.thorns.upgrade.from && G.food >= UNITS.thorns.upgrade.cost + 50) { E.tapUnit(G, r, c); return; } }
     if (types.has('bear') && can('thorns') && !has(G, r, u => u.type === 'thorns')) { if (tryPlace(G, r, freeCell(G, r, 4), 'thorns')) return; }
     if (es.length >= 4 && can('horn') && !has(G, r, u => u.type === 'horn')) { if (tryPlace(G, r, freeCell(G, r, 2), 'horn')) return; }
     if (es.length >= 4 && can('catapult') && !has(G, r, u => u.type === 'catapult')) { if (tryPlace(G, r, freeCell(G, r, 1), 'catapult')) return; }

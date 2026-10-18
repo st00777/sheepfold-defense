@@ -458,7 +458,7 @@ function loadProgress() {
 let P = loadProgress();
 function saveProgress(p) { try { localStorage.setItem(PKEY, JSON.stringify(p || P)); } catch (e) {} }
 const unlockAll = /[?&]all/.test(location.search);
-function unlocked(id) { return id === 1 || unlockAll || !!P.cleared[id - 1]; }
+function unlocked(id) { return unlockAll || Engine.isUnlocked(P.cleared, id); } // 規則在引擎（可測）：本夜／前一夜／任一後夜守過即開
 // 所有已開放關卡的卡總和（圖鑑用；也用來判斷玩家手上有沒有這一夜帶不了的卡）
 function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k); return all; }
 
@@ -516,7 +516,7 @@ function buildLevels() {
   const cur = chapters.includes(homeChapter) ? homeChapter : chapterOf(nx || LEVELS[LEVELS.length - 1]);
   // 接著守：一指跳到下一夜
   const cb = $('#continue-btn'); cb.hidden = !nx;
-  if (nx) { cb.textContent = `接著守：第 ${nx.id} 夜 ${nx.name}`; cb.onclick = () => openIntro(nx); }
+  if (nx) { cb.textContent = `接著守：第 ${Engine.posOf(nx.id)} 夜 ${nx.name}`; cb.onclick = () => openIntro(nx); }
   // 章節頁籤：第一夜還沒開的章壓暗
   const tabs = $('#ch-tabs'); tabs.innerHTML = '';
   for (const c of chapters) {
@@ -534,7 +534,7 @@ function buildLevels() {
     const d = document.createElement('div');
     d.className = 'lv' + (ok ? '' : ' locked') + (nx && nx.id === L.id ? ' next' : '');
     const done = P.cleared[L.id] ? Object.keys(P.cleared[L.id]).map(k => DIFFS[k].name.slice(0, 2)).join('・') + ' ✅' : '';
-    d.innerHTML = `<div class="n">${ok ? L.id : '🔒'}</div><div class="t"><b>${L.name}</b><span>${ok ? L.ref.replace('取材：', '') : '守過上一夜就會開'}</span></div><div class="s">${done}</div>`;
+    d.innerHTML = `<div class="n">${ok ? Engine.posOf(L.id) : '🔒'}</div><div class="t"><b>${L.name}</b><span>${ok ? L.ref.replace('取材：', '') : '守過上一夜就會開'}</span></div><div class="s">${done}</div>`;
     if (ok) d.addEventListener('click', () => openIntro(L));
     list.appendChild(d);
   }
@@ -571,7 +571,7 @@ function introSeen() { try { return JSON.parse(localStorage.getItem(NKEY) || '[]
 function newThisNight(L) {
   const seen = introSeen();
   const fresh = L.fresh.filter(k => !seen.includes(`${L.id}:${k}`));
-  const upg = L.units.filter(k => UNITS[k].upgrade && UNITS[k].upgrade.from === L.id && !L.fresh.includes(k) && !seen.includes(`${L.id}:${k}`));
+  const upg = L.units.filter(k => UNITS[k].upgrade && UNITS[k].upgrade.from === Engine.posOf(L.id) && !L.fresh.includes(k) && !seen.includes(`${L.id}:${k}`));
   return { fresh, upg };
 }
 function showIntroNew(L) {
@@ -900,7 +900,7 @@ function recordBest(cleared) {
 function onWin() {
   Sound.ambient(false); Sound.play('dawn');
   recordBest(true); clearCheckpoint(level.id);
-  const next = LEVELS.find(l => l.id === level.id + 1);
+  const next = Engine.nextOf(level.id);
   endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${level.outroWin}`);
   $('#next').hidden = !next;
   if (level.psalm) {
@@ -1123,7 +1123,7 @@ function renderRosterDetail() {
     const u = UNITS[k];
     const fresh = (roster.mode === 'pick' || roster.from === 'intro') && level.fresh.includes(k);
     const away = roster.mode !== 'pick' && roster.from === 'intro' && !level.units.includes(k);
-    const learns = roster.from === 'intro' && u.upgrade && u.upgrade.from === level.id;
+    const learns = roster.from === 'intro' && u.upgrade && u.upgrade.from === Engine.posOf(level.id);
     const note = away ? '<br><span class="new">這一夜還沒遇見，要到後面的夜才會同行</span>' : fresh ? `<br><span class="new">這一夜新開的卡${roster.mode === 'pick' ? '，建議帶上' : ''}</span>` : learns ? `<br><span class="new">這一夜起學會「${u.upgrade.name}」：放下後再點一下</span>` : roster.mode === 'pick' && k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : '';
     box.innerHTML = `<b>${u.ico} ${u.name}</b>　<span class="num">🌾 ${u.cost}</span><br>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${u.ref}${u.upgrade ? '・升級 ' + u.upgrade.ref : ''}</div>`;
   } else {
@@ -1253,7 +1253,7 @@ $('#start').addEventListener('click', () => { if (pickedFor(level) && !hasLoadou
 $('#intro-back').addEventListener('click', backToLevels);
 $('#retry').addEventListener('click', () => startGame());
 $('#back').addEventListener('click', backToLevels);
-$('#next').addEventListener('click', () => { const nx = LEVELS.find(l => l.id === level.id + 1); clearBoard(); if (nx) openIntro(nx); else backToLevels(); });
+$('#next').addEventListener('click', () => { const nx = Engine.nextOf(level.id); clearBoard(); if (nx) openIntro(nx); else backToLevels(); });
 </script>
 </body>
 </html>

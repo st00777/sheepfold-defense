@@ -7,7 +7,7 @@ const ROWS = 5, COLS = 7;
 // ====== 我方單位 ======
 // kind：producer 產糧／shooter 射手／blocker 牆／dog 牧羊犬／floor 鋪地／instant 一次性／support 輔助／deflector 趕路（第二章）／patrol 巡夜（第二章）
 // 第二章欄位：light 油燈照亮上下幾排（腳印預告回來）；lanes 射手同時打上下幾排；deflect 每趕一隻自己掉多少血；cradle 迷羊走到他那格就安全；walk 巡夜人每走一排要幾秒、reach 打前方幾格
-// upgrade：放下後「再點一下」花糧升級，欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）
+// upgrade：放下後「再點一下」花糧升級，欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）；from＝第幾夜起學會，算 LEVELS 裡的位置（顯示編號），不是 id
 // heal 每秒回血／range 回血範圍幾格（1＝周圍八格、2＝5×5）／brave 獅子咆哮嚇不停
 const UNITS = {
   shepherd: { name: '牧人',     ico: '🧑‍🌾', cost: 50,  hp: 60,  kind: 'producer', every: 7,   gives: 25,

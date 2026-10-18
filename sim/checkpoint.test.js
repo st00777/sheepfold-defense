@@ -13,7 +13,7 @@ function freeCell(G, r) { for (let c = 0; c < COLS; c++) if (!G.units[key(r, c)]
 
 // 第 2 關（有牧人、投石手、石牆、狗）起風夜，擺好幾個單位、升級牧人、把牆打傷並修補過
 function setup() {
-  const lv = LEVELS[1];
+  const lv = LEVELS.find(l => l.id === 2); // 用 id 找，插夜後 LEVELS[1] 可能變成別的夜
   const G = E.create(lv.id, 'windy');
   G.food = 999;
   const sc = freeCell(G, 2); assert.ok(E.place(G, 2, sc, 'shepherd').ok);

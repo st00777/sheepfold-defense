@@ -16,6 +16,17 @@
   function shepherdEvery(G) { const sc = G.level.diffScale ?? 0.6; return UNITS.shepherd.every + (DIFFS[G.diff].shepherdEvery - UNITS.shepherd.every) * sc; }
 
   function levelById(id) { return LEVELS.find(l => l.id === id) || LEVELS[0]; }
+  // 夜的「顯示編號」＝在 LEVELS 裡的位置（1 起算）。id 永遠不動、只當存檔的 key；中途插新夜時顯示編號會變、id 不變
+  function posOf(id) { const i = LEVELS.findIndex(l => l.id === id); return i < 0 ? 0 : i + 1; }
+  function nextOf(id) { const i = LEVELS.findIndex(l => l.id === id); return i < 0 ? null : LEVELS[i + 1] || null; }
+  // 解鎖規則：第一夜、本夜已守過、前一夜已守過、或任何更後面的夜已守過。
+  // 最後一條是給老玩家的：他已經破到第二章，後來插進第一章的新夜不能把他擋在門外；「本夜已守過」則是最後一夜前面變成新夜、後面又沒有夜時的保險
+  function isUnlocked(cleared, id) {
+    const i = LEVELS.findIndex(l => l.id === id); if (i < 0) return false;
+    if (i === 0 || (cleared && cleared[id])) return true;
+    if (cleared && cleared[LEVELS[i - 1].id]) return true;
+    return LEVELS.slice(i + 1).some(l => !!(cleared && cleared[l.id]));
+  }
 
   // ====== 點兵 ======
   // 這一關卡太多時預設帶哪幾張：牧人、新開的卡、關卡指定的 must 一定帶，其餘照 PICK_ORDER 補到上限
@@ -75,7 +86,7 @@
     return G;
   }
 
-  // ====== 送卡模式（第 11 夜「拉班的工價」）：卡片定時送到手上，費用 0，不能自己選 ======
+  // ====== 送卡模式（送卡夜「拉班的工價」，id 11）：卡片定時送到手上，費用 0，不能自己選 ======
   function dealCard(G) {
     const cv = G.level.conveyor; if (!cv || G.hand.length >= (cv.max || 6)) return false;
     const pool = Object.entries(cv.weights).filter(([k]) => UNITS[k] && G.level.units.includes(k));
@@ -190,7 +201,7 @@
     // 通用升級排在修補前：目前荊棘（撒蠍子）與纏裹的牧人（膏油）有 upgrade；日後若牆也能升級，受傷時要先修補再升級，這裡要調順序
     if (def.upgrade && !u.upgraded) {
       const up = def.upgrade;
-      if (G.level.id < up.from) return { ok: false, msg: `第 ${up.from} 夜起才學會${up.name}` };
+      if (posOf(G.level.id) < up.from) return { ok: false, msg: `第 ${up.from} 夜起才學會${up.name}` }; // from 是夜的位置，不是 id
       if (G.food < up.cost) return { ok: false, msg: `${up.name}要 ${up.cost} 糧` };
       G.food -= up.cost; u.upgraded = true;
       ev(G, { t: 'unit', r, c }); ev(G, { t: 'pop', r, c, text: up.name });
@@ -212,7 +223,7 @@
     const def = UNITS[u.type], f = Math.floor(G.food);
     if (def.kind === 'producer' && !u.elder && f >= ELDER_COST) return '升級';
     if (def.kind === 'blocker' && u.hp < u.maxHp * 0.7 && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) return '修補';
-    if (def.upgrade && !u.upgraded && G.level.id >= def.upgrade.from && f >= def.upgrade.cost) return '升級';
+    if (def.upgrade && !u.upgraded && posOf(G.level.id) >= def.upgrade.from && f >= def.upgrade.cost) return '升級';
     return '';
   }
 
@@ -450,7 +461,8 @@
         G.phase = 'rest'; G.timer = WAVE_REST;
         ev(G, { t: 'waveclear', wave: G.wave }); // 畫面層拿去存檢查點
         const next = G.waves[G.wave];
-        ev(G, { t: 'toast', msg: G.wave >= G.waves.length ? '最後一隻跑了……' : (next.hint ? `${G.level.speaker || '牧人'}：${next.hint}` : `第 ${G.wave} 波擋住了，喘口氣`) });
+        // 波間提醒一律由「牧人」說（2026-10-18 James 拍板：聖經人物只在開頭結尾說話）
+        ev(G, { t: 'toast', msg: G.wave >= G.waves.length ? '最後一隻跑了……' : (next.hint ? `牧人：${next.hint}` : `第 ${G.wave} 波擋住了，喘口氣`) });
       }
     }
 
@@ -829,6 +841,6 @@
     stray(G, r, x) { if (G.over) return; spawnStray(G, r, x); },
   };
 
-  const Engine = { create, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, scaleWaves, defaultPick, validPick, applyPick, rowLit, dev };
+  const Engine = { create, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, scaleWaves, defaultPick, validPick, applyPick, rowLit, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
