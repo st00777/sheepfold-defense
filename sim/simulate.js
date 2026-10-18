@@ -34,6 +34,9 @@ function decide(G, skill) {
   for (const s of G.strays) threat.add(s.r);
 
   // 開局三牧人（James 的打法）
+  // 牧人有上限的夜（歌珊）：放滿就先把牧人升成老牧人，不然糧追不上
+  const shepCap = G.level.maxUnits && G.level.maxUnits.shepherd;
+  if (shepCap !== undefined && count('shepherd') >= shepCap && G.food >= 100) for (const k in G.units) { const u = G.units[k]; if (u.type === 'shepherd' && !u.elder && E.tapUnit(G, u.r, u.c).ok) return; }
   if (count('shepherd') < (G.diff === 'storm' ? 4 : 3) && can('shepherd')) { for (const r of [2, 1, 3, 0]) if (!has(G, r, u => u.type === 'shepherd') && tryPlace(G, r, freeCell(G, r, 0), 'shepherd')) return; }
   // 第二章：無月夜先點燈（第 1、3 排各一盞就五排全亮）；邊排放牧人杖把狼趕進中間三排
   if (G.level.moonless && can('lamp') && count('lamp') < 2 && G.wave >= 1) { for (const r of [1, 3]) if (!has(G, r, u => u.type === 'lamp') && tryPlace(G, r, freeCell(G, r, 2), 'lamp')) return; }
@@ -70,7 +73,7 @@ function decide(G, skill) {
     const hasBlock = has(G, r, (u, c) => kindOf(u) === 'blocker' && c >= 3);
     const big = [...types].some(t => BIG.includes(t) || t === 'boar');
     const needArcher = types.has('locust');
-    const strayHere = G.strays.some(s => s.r === r);
+    const strayHere = G.strays.some(s => s.r === r) || G.strayNextRow === r; // 看到 🐑 腳印就先放狗（跟真人一樣）
 
     if (!hasShooter) {
       if (needArcher && can('archer')) { if (tryPlace(G, r, freeCell(G, r, 1), 'archer')) return; }

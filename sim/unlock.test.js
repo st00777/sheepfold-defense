@@ -54,9 +54,9 @@ test('中途插一夜：老檔的進度不被鎖、顯示編號跟著位置走',
     const c1 = clearedOf([1, 15, 2, 3, 16, 4, 5, 6, 17, 7]);
     assert.ok(E.isUnlocked(c1, 99));
     assert.ok(!E.isUnlocked(c1, 8));
-    // 半途（破到 id 10）：新夜與 8-10 都開，11 開（前一夜 10 守過）、12 不開
+    // 半途（老檔破到 id 10）：新夜 99 與 8-10 都開；第二章新插的 18 開（前一夜 10 守過），11 要等 18 守過
     const c2 = clearedOf([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    assert.ok(E.isUnlocked(c2, 99)); assert.ok(E.isUnlocked(c2, 11)); assert.ok(!E.isUnlocked(c2, 12));
+    assert.ok(E.isUnlocked(c2, 99)); assert.ok(E.isUnlocked(c2, 18)); assert.ok(!E.isUnlocked(c2, 11)); assert.ok(!E.isUnlocked(c2, 12));
     // 老玩家只破舊 1-7（沒碰過新插的 15-17）：新夜 15 開（前一夜 1 守過）、舊 2 開（本夜守過）、第二章第一夜開（前一夜 7 守過）
     const c3 = clearedOf([1, 2, 3, 4, 5, 6, 7]);
     assert.ok(E.isUnlocked(c3, 15)); assert.ok(E.isUnlocked(c3, 2)); assert.ok(E.isUnlocked(c3, 99)); assert.ok(!E.isUnlocked(c3, 8));

@@ -183,6 +183,15 @@
   .dog-run.rest { opacity: .55; }
   .dog-run.rest .body::after { content: '💤'; position: absolute; top: -8px; right: -6px; font-size: .5em; }
   .mark { right: 2px; font-size: clamp(14px, 4.5vw, 26px); opacity: .85; animation: blink .8s infinite alternate; }
+  .mark.stray-mark { opacity: .95; }
+  /* 看門的：每排門口左下角一個小人影，用掉就淡出往左退 */
+  .gate { position: absolute; left: 0; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: flex-end; justify-content: flex-start; pointer-events: none; }
+  .gate span { font-size: clamp(11px, 3.2vw, 18px); margin: 0 0 1px 2px; opacity: .8; filter: drop-shadow(0 0 2px #000); transition: opacity .5s, transform .5s; }
+  .gate.used span { opacity: 0; transform: translateX(-10px); }
+  .gate-sweep { position: absolute; left: 0; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; animation: gateSweep .9s cubic-bezier(.3, 0, .7, 1) forwards; }
+  .gate-sweep::before { content: ''; position: absolute; right: 55%; top: 38%; height: 24%; width: 260%; border-radius: 999px; background: linear-gradient(90deg, transparent, #e6b84a88); }
+  @keyframes gateSweep { from { transform: translateX(-30%); opacity: 1; } 80% { opacity: 1; } to { transform: translateX(640%); opacity: 0; } }
+  .card.capped { opacity: .45; }
   .mark.special span { display: flex; align-items: center; justify-content: center; width: 72%; height: 72%; border-radius: 50%; box-shadow: 0 0 0 2px #8a2f2c, 0 0 10px 2px #8a2f2c88; }
   .mark.boss span { box-shadow: 0 0 0 3px var(--gold), 0 0 12px 3px #e6b84a88; }
   @keyframes blink { from { opacity: .35; } to { opacity: .95; } }
@@ -293,6 +302,7 @@
   /* 減少動態：留透明度變化，拿掉位移與閃爍 */
   @media (prefers-reduced-motion: reduce) {
     .card.new::after, .cell.teach::before, .mark, .fx.stay, .unit .up { animation: none; }
+    .gate-sweep { animation: none; opacity: 0; }
     .card.new::after, .cell.teach::before { opacity: .8; }
     .pop, .fx { animation-name: fadeOut; animation-duration: .5s; }
     .dialog { transition: opacity 200ms; }
@@ -434,7 +444,8 @@ if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { boardSize.
 const cells = [], fogEls = [], litRows = [false, false, false, false, false];
 let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf = 0;
 const els = new Map();   // 引擎物件 id → 畫面元素
-let markerEl = null, moundEls = new Map();
+let markerEl = null, strayMarkEl = null, moundEls = new Map();
+const gateEls = []; // 每排門口的看門的（跟著 G.gates 顯示／隱藏）
 let toastTimer = 0;
 let cardEls = [], lastFood = -1, lastHand = 0, lastUnits = -1;
 // 開發者模式：網址加 ?dev，或連點左上角「糧」五下
@@ -463,8 +474,8 @@ function unlocked(id) { return unlockAll || Engine.isUnlocked(P.cleared, id); } 
 function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k); return all; }
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊' };
-const CHAPTERS = { 1: '十夜，學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來' };
-const HOME_UPDATE = '最近更新 10/17：第二章七夜上線、加了音效（右上角 🔊）、卡片改兩排不用滑';
+const CHAPTERS = { 1: '十夜，學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '十夜。沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來' };
+const HOME_UPDATE = '最近更新 10/18：兩章各補到十夜；每排門口多了看門的，漏一隻不再直接輸；迷羊進場前先印腳印';
 
 // ====== 畫面建立 ======
 function buildBoard() {
@@ -704,7 +715,14 @@ function fx(kind, r, x, id) {
   if (kind === 'bark') return;                      // 狗咬住狼已經看得到，不飄字
   if (kind === 'dodge') { flashDodge(r, x); return; } // 狐狸閃避：殘影，不飄字
   if (kind === 'hop') return;                       // 換排：敵人本身會滑過去，不飄字
+  if (kind === 'gate') { gateSweep(r); return; }     // 看門的把整排趕出去：一個人影從門口掃到右邊
   if (FX[kind]) spawnFx(FX[kind], r, x);
+}
+// 看門的掃排：人影從左邊門口衝到右邊，後面拖一道金色光，敵人在引擎裡已經消失
+function gateSweep(r) {
+  const d = document.createElement('div'); d.className = 'gate-sweep'; d.textContent = '🧍';
+  d.style.top = (r / ROWS * 100) + '%';
+  board.appendChild(d); Sound.play('horn'); setTimeout(() => d.remove(), 1000);
 }
 function ripple(r, x, color) {
   const d = document.createElement('div'); d.className = 'ripple'; d.style.setProperty('--ripple', color);
@@ -726,6 +744,13 @@ function pop(r, c, text) {
   const d = document.createElement('div'); d.className = 'pop'; d.textContent = text;
   d.style.left = ((c + 0.3) / COLS * 100) + '%'; d.style.top = ((r + 0.2) / ROWS * 100) + '%';
   board.appendChild(d); setTimeout(() => d.remove(), 1000);
+}
+// 迷羊的腳印：跟敵人腳印同一個位置，但是 🐑，不閃紅框；無月夜也看得到（羊不是敵人）
+function setStrayMark(r) {
+  if (strayMarkEl) { strayMarkEl.remove(); strayMarkEl = null; }
+  if (r === null || r === undefined) return;
+  const d = document.createElement('div'); d.className = 'mark stray-mark'; d.textContent = '🐑';
+  d.style.transform = `translateY(${r * 100}%)`; board.appendChild(d); strayMarkEl = d;
 }
 function setMarker(r, type) {
   if (markerEl) { markerEl.remove(); markerEl = null; }
@@ -751,6 +776,7 @@ function flushEvents() {
       case 'unit': renderUnit(e.r, e.c); break;
       case 'fx': fx(e.kind, e.r, e.x, e.id); if (FX_SFX[e.kind]) Sound.play(FX_SFX[e.kind]); break;
       case 'marker': setMarker(e.r, e.type); break;
+      case 'strayMark': setStrayMark(e.r); break;
       case 'sheep': $('#sheep-n').textContent = G.sheep; break;
       case 'hand': buildCards(); if (selected && selected !== 'shovel' && !G.hand.includes(selected)) clearSelection(); break; // 送卡模式：手上的卡變了；選著的那張已經不在就取消
       case 'stray': Sound.play('sheep'); break;
@@ -845,6 +871,12 @@ function draw() {
     el.style.transform = `translate(${(s.x * 100).toFixed(2)}%, ${s.r * 100}%)`;
   }
   for (const [id, el] of els) if (!alive.has(id)) { el.remove(); els.delete(id); }
+  // 看門的：每排門口一位，用掉的淡出
+  for (let r = 0; r < ROWS; r++) {
+    let g = gateEls[r];
+    if (!g) { g = document.createElement('div'); g.className = 'gate'; g.style.top = (r / ROWS * 100) + '%'; g.innerHTML = '<span>🧍</span>'; board.appendChild(g); gateEls[r] = g; }
+    const on = G.gates.includes(r); if (g.classList.contains('used') === on) g.classList.toggle('used', !on);
+  }
   if (biting) Sound.play('bite'); // sound.js 自己限流，每 0.45 秒最多一聲
   // 無月夜：腳印消失的那一波起棋盤變暗（跟引擎 markerVisible 同一個時間點）
   const dark = !!G.level.moonless && G.wave + (G.phase === 'wave' ? 0 : 1) >= G.level.moonless;
@@ -870,6 +902,7 @@ function draw() {
   if (nUnits !== lastUnits) { lastUnits = nUnits; if (selected) markHints(); }
   const f = Math.floor(G.food);
   if (f !== lastFood) { lastFood = f; for (const c of cardEls) c.classList.toggle('poor', !G.level.conveyor && f < UNITS[c.dataset.key].cost); }
+  if (G.level.maxUnits) for (const c of cardEls) { const cap = G.level.maxUnits[c.dataset.key]; if (cap !== undefined) c.classList.toggle('capped', Object.values(G.units).filter(u => u.type === c.dataset.key).length >= cap); }
   if (tut.on && tut.waiting && f >= TUT_STEPS[tut.step].need) tutShow();
   // 牧人可升級／石牆可修補：糧夠了才掛角標，點一下就知道
   for (const k in G.units) {
@@ -921,7 +954,7 @@ function onLose(reason) {
 function clearBoard() {
   cancelAnimationFrame(raf);
   for (const [, el] of els) el.remove(); els.clear();
-  board.querySelectorAll('.pop, .fx, .mark').forEach(x => x.remove()); moundEls.clear(); markerEl = null;
+  board.querySelectorAll('.pop, .fx, .mark, .gate-sweep').forEach(x => x.remove()); moundEls.clear(); markerEl = null; strayMarkEl = null;
   selected = null;
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
   tut.on = false; $('#tut-skip').classList.remove('on');
@@ -1110,6 +1143,7 @@ const GLOSSARY = [
   { name: '狂暴', ico: '🐻', text: `母熊血量低於 ${Math.round(ENEMIES.bear.enrage * 100)}% 時速度與傷害 ×2，直到被打倒` },
   { name: '厚皮', ico: '🛡', text: `石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%；機弦、投石機、火、毒全額。母熊、獅子、豹都是厚皮` },
   { name: '換排', ico: '↕️', text: `敵人從這排換到隔壁排，射手要跟著換。來源：牧人杖（趕的）、豺狼碰到牆繞路、豹每 ${ENEMIES.leopard.shiftEvery} 秒自己換、夜鴞在三排之間飄。油燈照到的排，敵人不會自己換排（杖還是趕得動）` },
+  { name: '看門的', ico: '🧍', text: '每排門口站一位（約 10:3「看門的就給他開門」）。第一隻走到門口的地面敵人會被他擋下，整排敵人一起趕出場，叼著的迷羊也放下；用過一次他就不在了，那排再漏就守不住。飛的不經過門' },
   { name: '無月夜', ico: '🌑', text: '第二章起第二波後看不到腳印預告，不知道下一隻從哪排來。油燈照到的三排例外' },
   { name: '迷羊', ico: '🐑', text: `不是敵人。從右邊走進來往羊圈走，走到最左邊或抱羊羔的牧人那格就回圈（羊數 +1、糧 +${STRAY.reward}）；地面敵人碰到就叼走，被叼出場算失落一隻；叼羊的被打倒，羊就從那裡繼續走。牧羊犬沒事時會走在牠旁邊護送` },
   { name: '撞牆', ico: '🐗', text: `野豬撞上每道牆的第一下傷害 ${ENEMIES.boar.slam}，之後正常咬；撞完自己暈 ${ENEMIES.boar.slamStun} 秒。踏過荊棘直接踩爛` },

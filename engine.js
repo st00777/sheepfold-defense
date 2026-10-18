@@ -16,6 +16,8 @@
   function shepherdEvery(G) { const sc = G.level.diffScale ?? 0.6; return UNITS.shepherd.every + (DIFFS[G.diff].shepherdEvery - UNITS.shepherd.every) * sc; }
 
   function levelById(id) { return LEVELS.find(l => l.id === id) || LEVELS[0]; }
+  const STRAY_LEAD = 3;                                   // 迷羊進場前幾秒先印 🐑 腳印（跟敵人腳印一樣提前量）
+  const restOf = G => G.level.rest ?? WAVE_REST;          // 波間休息秒數，關卡可覆寫（第二章「交託的羊」只歇 3 秒）
   // 夜的「顯示編號」＝在 LEVELS 裡的位置（1 起算）。id 永遠不動、只當存檔的 key；中途插新夜時顯示編號會變、id 不變
   function posOf(id) { const i = LEVELS.findIndex(l => l.id === id); return i < 0 ? 0 : i + 1; }
   function nextOf(id) { const i = LEVELS.findIndex(l => l.id === id); return i < 0 ? null : LEVELS[i + 1] || null; }
@@ -66,7 +68,7 @@
     const G = {
       levelId: level.id, level, diff: diffKey, waves, rng: rng || Math.random,
       rocks: new Set((level.rocks || []).map(([r, c]) => r + ',' + c)),
-      food: START_FOOD, trickle: 0,
+      food: level.startFood ?? START_FOOD, trickle: 0, // startFood：關卡可覆寫開局糧（歌珊的夜 75）
       phase: 'prep', wave: 0, timer: level.prep || PREP_TIME,
       queue: [], spawnTimer: 0, spawnedTotal: 0, killed: 0,
       total: waves.reduce((n, w) => n + w.list.reduce((m, [, k]) => m + k, 0), 0),
@@ -77,6 +79,9 @@
       nextId: 1, time: 0,
       // 第二章：nextVisible 無月夜時腳印看不看得見；strays 場上的迷羊、strayQueue 這波還沒出來的迷羊（秒）；hand 送卡模式手上的卡
       nextVisible: true, strays: [], strayQueue: [], waveT: 0, hand: [], convT: 0,
+      // 看門的（約 10:3）：每排門口一位，第一隻走到門口的地面敵人被他擋下、整排趕出場，用過就沒了；gates 存還在的排。關卡 gates: false 可關掉
+      gates: level.gates === false ? [] : Array.from({ length: ROWS }, (_, r) => r),
+      strayNextRow: null, // 下一隻迷羊要從哪排來（提前 STRAY_LEAD 秒決定並印腳印）
     };
     if (level.conveyor) { // 沒有糧：不教升級修補；開局先給固定幾張（至少有一個射手），之後才抽
       G.food = 0; G.taughtElder = G.taughtRepair = true;
@@ -114,6 +119,8 @@
     if (!G.level.units.includes(k)) return { ok: false, msg: '這一關還沒有這張卡' };
     if (G.rocks.has(key(r, c))) return { ok: false, msg: '這格是石頭' };
     if (G.units[key(r, c)]) return { ok: false, msg: '這格已經有人了' };
+    const cap = G.level.maxUnits && G.level.maxUnits[k]; // 關卡對某種單位的數量上限（歌珊的夜：牧人最多 3 位）
+    if (cap !== undefined && Object.values(G.units).filter(u => u.type === k).length >= cap) return { ok: false, msg: `${def.name}今晚最多 ${cap} 位` };
     if (G.level.conveyor) {
       const i = G.hand.indexOf(k); if (i < 0) return { ok: false, msg: `${def.name}還沒送到手上` };
       G.hand.splice(i, 1); ev(G, { t: 'hand' }); // 送來的卡不花糧，用掉就沒了
@@ -147,6 +154,9 @@
   // ====== 檢查點：每清完一波存一次，只存場上單位與糧，不存敵人，所以永遠從下一波的開頭接 ======
   function snapshot(G) {
     return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep, sheepLost: G.sheepLost, seen: [...G.seen], hand: G.hand.slice(),
+      gates: G.gates.slice(), // 還在的看門的
+      strays: G.strays.filter(s => !s.dead).map(s => ({ r: s.r, x: Math.round(s.x * 10) / 10 })), // 還在路上的迷羊
+      strayQueue: G.strayQueue.map(t => Math.max(0, Math.round((t - G.waveT) * 10) / 10)),       // 還沒出來的迷羊（距現在幾秒）
       units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded,
         cd: u.repairAt ? Math.max(0, Math.round((u.repairAt - G.time) * 10) / 10) : 0 })) };
   }
@@ -160,6 +170,9 @@
     if (snap.sheepLost !== undefined && !isInt(snap.sheepLost, 0, 99)) return false;
     if (snap.seen !== undefined && !Array.isArray(snap.seen)) return false;
     if (snap.hand !== undefined && !(Array.isArray(snap.hand) && snap.hand.length <= 12 && snap.hand.every(k => UNITS[k]))) return false;
+    if (snap.gates !== undefined && !(Array.isArray(snap.gates) && snap.gates.length <= ROWS && snap.gates.every(r => isInt(r, 0, ROWS - 1)))) return false;
+    if (snap.strays !== undefined && !(Array.isArray(snap.strays) && snap.strays.length <= 20 && snap.strays.every(s => s && isInt(s.r, 0, ROWS - 1) && Number.isFinite(s.x) && s.x >= -1 && s.x <= COLS + 1))) return false;
+    if (snap.strayQueue !== undefined && !(Array.isArray(snap.strayQueue) && snap.strayQueue.length <= 20 && snap.strayQueue.every(t => Number.isFinite(t) && t >= 0 && t <= 600))) return false;
     if (!Array.isArray(snap.units) || snap.units.length > ROWS * COLS) return false;
     return snap.units.every(s => s && UNITS[s.type] && isInt(s.r, 0, ROWS - 1) && isInt(s.c, 0, COLS - 1)
       && (s.hp === undefined || Number.isFinite(s.hp)) && (s.uses === undefined || isInt(s.uses, 0, 99)) && (s.cd === undefined || (Number.isFinite(s.cd) && s.cd >= 0)));
@@ -179,8 +192,11 @@
     if (G.level.conveyor && Array.isArray(snap.hand)) { G.hand = snap.hand.filter(k => UNITS[k] && G.level.units.includes(k)); ev(G, { t: 'hand' }); } // 送卡模式：手牌跟著存，續玩不會重發開局三張
     G.sheepLost = Number.isInteger(snap.sheepLost) ? snap.sheepLost : 0;
     if (Array.isArray(snap.seen)) for (const t of snap.seen) if (ENEMIES[t]) G.seen.add(t);
+    if (Array.isArray(snap.gates)) G.gates = snap.gates.slice(); // 舊存檔沒這欄：五位都在
+    if (Array.isArray(snap.strays) && snap.strays.length) { G.toldStray = true; for (const s of snap.strays) spawnStray(G, s.r, s.x); }
+    if (Array.isArray(snap.strayQueue)) { G.strayQueue = snap.strayQueue.slice().sort((a, b) => a - b); G.waveT = 0; G.strayNextRow = null; }
     G.wave = snap.wave;
-    G.phase = 'rest'; G.timer = WAVE_REST + 4; G.started = true; G.taughtElder = G.taughtRepair = true;
+    G.phase = 'rest'; G.timer = restOf(G) + 4; G.started = true; G.taughtElder = G.taughtRepair = true;
     G.killed = G.waves.slice(0, G.wave).reduce((n, w) => n + w.list.reduce((m, [, k]) => m + k, 0), 0);
     return true;
   }
@@ -458,7 +474,7 @@
         G.spawnTimer -= dt;
         if (G.spawnTimer <= 0) { spawn(G, G.queue.shift()); G.spawnTimer = G.waves[G.wave - 1].gap; }
       } else if (!G.enemies.length) {
-        G.phase = 'rest'; G.timer = WAVE_REST;
+        G.phase = 'rest'; G.timer = restOf(G);
         ev(G, { t: 'waveclear', wave: G.wave }); // 畫面層拿去存檢查點
         const next = G.waves[G.wave];
         // 波間提醒一律由「牧人」說（2026-10-18 James 拍板：聖經人物只在開頭結尾說話）
@@ -467,7 +483,12 @@
     }
 
     // 迷羊照時間走進來，休息中也算（波次提早清完也不會少）
-    if (G.phase !== 'prep' && !G.holdWaves) { G.waveT += dt; while (G.strayQueue.length && G.strayQueue[0] <= G.waveT) { G.strayQueue.shift(); spawnStray(G, null, COLS + 0.2); } }
+    if (G.phase !== 'prep' && !G.holdWaves) {
+      G.waveT += dt;
+      // 迷羊進場前 STRAY_LEAD 秒先決定排、印 🐑 腳印（不受無月夜影響：羊不是敵人），玩家來得及先放狗
+      if (G.strayQueue.length && G.strayNextRow === null && G.strayQueue[0] - G.waveT <= STRAY_LEAD) { G.strayNextRow = pickStrayRow(G); ev(G, { t: 'strayMark', r: G.strayNextRow }); }
+      while (G.strayQueue.length && G.strayQueue[0] <= G.waveT) { G.strayQueue.shift(); spawnStray(G, G.strayNextRow, COLS + 0.2); G.strayNextRow = null; ev(G, { t: 'strayMark', r: null }); }
+    }
 
     unitsAct(G, dt);
     shotsFly(G, dt);
@@ -636,10 +657,9 @@
   }
 
   // ====== 迷羊 ======
+  function pickStrayRow(G) { const w = G.waves[G.wave - 1]; const rows = (w && w.rows) || [0, 1, 2, 3, 4]; return rows[Math.floor(G.rng() * rows.length)]; }
   function spawnStray(G, r, x) {
-    const w = G.waves[G.wave - 1];
-    const rows = (w && w.rows) || [0, 1, 2, 3, 4];
-    const s = { id: G.nextId++, r: r === null || r === undefined ? rows[Math.floor(G.rng() * rows.length)] : r, x, dead: false };
+    const s = { id: G.nextId++, r: r === null || r === undefined ? pickStrayRow(G) : r, x, dead: false };
     G.strays.push(s); ev(G, { t: 'stray', s });
     if (!G.toldStray) { G.toldStray = true; ev(G, { t: 'toast', msg: '有一隻迷羊從東邊走過來了，別讓狼碰到牠' }); }
     return s;
@@ -810,9 +830,24 @@
       // 走到底
       if (e.x < -0.6) {
         if (def.steals && G.sheep > 0) { e.carrying = true; e.x = -0.5; ev(G, { t: 'toast', msg: '偷羊人抱起一隻羊往回跑了！' }); ev(G, { t: 'fx', kind: 'grab', r: e.r, x: 0 }); continue; }
+        if (!def.flying && G.gates.includes(e.r)) { useGate(G, e.r); continue; } // 看門的擋下：整排趕出去，這排的門用掉了。飛的不經過門
         return lose(G, def.flying ? 'bird' : 'wolf');
       }
     }
+  }
+
+  // 看門的（約 10:3）：第一隻走到門口的地面敵人觸發，整排地面敵人一起被趕出場；叼著迷羊的放下羊；用過這排就沒門了
+  function useGate(G, r) {
+    G.gates = G.gates.filter(x => x !== r);
+    let n = 0;
+    for (const e of G.enemies) {
+      if (e.r !== r || e.dead || ENEMIES[e.type].flying) continue;
+      release(G, e);
+      if (e.carrying && e.carryStray) spawnStray(G, r, Math.max(0, Math.min(COLS, e.x)));
+      e.carrying = false; e.carryStray = false; e.dead = true; n++;
+    }
+    ev(G, { t: 'fx', kind: 'gate', r, x: 0 });
+    ev(G, { t: 'toast', msg: `看門的把這一排的 ${n} 隻全趕了出去。這排的門沒人看了，再漏一隻就守不住` });
   }
 
   function biteDog(G, e, dt) {
@@ -834,13 +869,13 @@
   // ====== 開發者模式 ======
   const dev = {
     spawn(G, type, r, c) { if (G.over || !ENEMIES[type]) return; const w = G.waves[G.wave - 1]; spawnAt(G, type, r, c, w ? w.hpMul : 1); G.total++; },
-    clear(G) { for (const e of G.enemies) { release(G, e); e.dead = true; } G.total -= G.enemies.length; G.enemies = []; G.strays = []; G.strayQueue = []; G.queue = []; G.nextRow = null; G.nextType = null; ev(G, { t: 'marker', r: null }); if (G.phase === 'wave') { G.phase = 'rest'; G.timer = WAVE_REST; } },
+    clear(G) { for (const e of G.enemies) { release(G, e); e.dead = true; } G.total -= G.enemies.length; G.enemies = []; G.strays = []; G.strayQueue = []; G.strayNextRow = null; ev(G, { t: 'strayMark', r: null }); G.queue = []; G.nextRow = null; G.nextType = null; ev(G, { t: 'marker', r: null }); if (G.phase === 'wave') { G.phase = 'rest'; G.timer = WAVE_REST; } },
     nextWave(G) { if (G.over) return; G.started = true; G.holdWaves = false; if (G.phase === 'wave') { dev.clear(G); } G.timer = Math.min(G.timer, 0.5); },
     food(G, n) { G.food += n; },
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; if (G.level.conveyor) for (const k of Object.keys(UNITS)) if (!G.hand.includes(k)) G.hand.push(k); ev(G, { t: 'hand' }); },
     stray(G, r, x) { if (G.over) return; spawnStray(G, r, x); },
   };
 
-  const Engine = { create, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, scaleWaves, defaultPick, validPick, applyPick, rowLit, dev };
+  const Engine = { create, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, scaleWaves, defaultPick, validPick, applyPick, rowLit, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
