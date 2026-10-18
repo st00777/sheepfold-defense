@@ -662,7 +662,7 @@
     const t = G.enemies.find(e => e.r === row && targetable(e) && !ENEMIES[e.type].flying && e.x > u.c - 0.2 && e.x - u.c <= def.reach);
     if (t) {
       u.timer -= dt;
-      if (u.timer <= 0) { u.timer = def.every; hurt(G, t, def.dmg); ev(G, { t: 'fx', kind: 'strike', r: row, x: t.x }); }
+      if (u.timer <= 0) { u.timer = def.every; hurt(G, t, def.dmg); ev(G, { t: 'hit', id: t.id }); ev(G, { t: 'fx', kind: 'strike', r: row, x: t.x }); }
       return;
     }
     u.timer = Math.min(u.timer, def.every * 0.5);
@@ -707,7 +707,7 @@
         if (s.t >= 1) {
           s.dead = true;
           ev(G, { t: 'fx', kind: 'splash', r: s.r, x: s.landX - 0.5 });
-          for (const e of G.enemies) if (e.r === s.r && targetable(e) && Math.abs(e.x + 0.5 - s.landX) < s.splash) hurt(G, e, s.dmg);
+          for (const e of G.enemies) if (e.r === s.r && targetable(e) && Math.abs(e.x + 0.5 - s.landX) < s.splash) { hurt(G, e, s.dmg); ev(G, { t: 'hit', id: e.id }); }
         }
         continue;
       }
@@ -722,6 +722,7 @@
         const def = ENEMIES[e.type];
         if (def.dodge && G.rng() < def.dodge) { ev(G, { t: 'fx', kind: 'dodge', r: e.r, x: e.x }); continue; }
         hurt(G, e, (def.thick && (s.kind === 'stone' || s.kind === 'arrow')) ? s.dmg * THICK_MUL : s.dmg);
+        ev(G, { t: 'hit', id: e.id }); // 畫面閃白用；持續傷害不發這個事件
         if (s.burn) ignite(G, e);
         if (s.pierce) { s.dmg *= s.falloff; } else { s.dead = true; break; }
       }
