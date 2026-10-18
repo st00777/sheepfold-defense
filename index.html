@@ -171,7 +171,7 @@
   #sky.dawn { background: linear-gradient(180deg, #fff3c0, #ffd98a 50%, #ffb45a); opacity: .42; transition: opacity 1.4s ease-out; }
   #weather { position: absolute; inset: 0; pointer-events: none; z-index: 4; opacity: 0; background: #5a6a8a; }
   #board.storm #weather { opacity: .14; }
-  .wild { position: absolute; right: 0; top: 0; bottom: 0; width: 18%; pointer-events: none; background: linear-gradient(90deg, #0000, #0a140fa8); }
+  .wild { position: absolute; right: 0; top: 0; bottom: 0; width: 14%; pointer-events: none; background: linear-gradient(90deg, #0000, #0a140f55); } /* 曠野暗邊：只在最右一格淡淡壓暗（James 10/18 真機：原本 a8 太黑） */
   .fence { position: absolute; left: 0; top: 0; bottom: 0; width: 9px; pointer-events: none; background: linear-gradient(90deg, #7a5a34, #a07a48 45%, #6a4a2a), repeating-linear-gradient(180deg, #0000 0 10px, #00000055 10px 13px); background-blend-mode: multiply; opacity: .92; box-shadow: 1px 0 4px #0008; }
   #board.dawn .gate span { opacity: 1; filter: drop-shadow(0 0 6px #ffd98a); }
   .enemy .body { --k: 1; width: 70%; height: 70%; border-radius: 50%; background: #5b5b66; display: flex; align-items: center; justify-content: center; position: relative;
