@@ -60,3 +60,42 @@ test('狗在窩裡休息時存檔，續玩接著休息，不會帶著低血出�
   const plain = { ...snap, units: snap.units.map(u => { const { rest, ...o } = u; return o; }) };
   const G3 = E.create(2, 'calm', () => 0.5); assert.ok(E.restore(G3, plain)); assert.ok(!unitAt(G3, 1, 2).resting, '舊檔沒 rest 欄＝沒在休息');
 });
+
+// 第二輪（小居 10/19 複查）：火與毒的死亡時序、零血敵人吃石子、計時器跟著存
+test('被荊棘毒死、火燒死的狼，同一步不再往前走', () => {
+  for (const st of ['poison', 'burn']) {
+    const G = setup(1);
+    E.dev.spawn(G, 'wolf', 2, -0.59); const w = G.enemies[0]; w.hp = 0.001; w.st[st] = 2; // 這一步的毒／火就會把牠弄死
+    E.step(G, 0.05);
+    assert.ok(!G.over, st + '：不能輸'); assert.strictEqual(G.gates.length, D.ROWS, st + '：看門的不該被用掉'); assert.strictEqual(G.enemies.length, 0, st + '：屍體該清掉');
+  }
+});
+
+test('被燒死的領頭狼同一步不嚎叫；零血的狼不吃石子、不被狗咬', () => {
+  const G = setup(1);
+  E.dev.spawn(G, 'alpha', 2, 3); const a = G.enemies[0]; a.hp = 0.001; a.st.burn = 1; a.abilityT = 0.01;
+  E.dev.spawn(G, 'wolf', 2, 3.5); const w = G.enemies[1];
+  E.step(G, 0.05);
+  assert.ok(!w.st.howl, '死狼不該嚎叫鼓舞同伴');
+  const G2 = setup(1);
+  E.dev.spawn(G2, 'wolf', 2, 3); G2.enemies[0].hp = 0; E.dev.spawn(G2, 'wolf', 2, 3.15); const live = G2.enemies[1]; // 屍體在前、活狼緊貼在後，石子一步內兩隻都在命中範圍
+  G2.shots.push({ kind: 'stone', r: 2, x: 3.3, dmg: 10, hit: new Set(), dead: false });
+  E.step(G2, 1 / 30);
+  assert.ok(live.hp < live.maxHp, '石子該穿過屍體打到後面活著的狼');
+  const G3 = setup(1); assert.ok(E.place(G3, 2, 1, 'dog').ok); E.dev.spawn(G3, 'wolf', 2, 1.6); G3.enemies[0].hp = 0; E.step(G3, 1 / 30);
+  assert.ok(!unitAt(G3, 2, 1).holding, '狗不咬屍體');
+});
+
+test('吹角手、牧人的計時器跟著存檔，續玩不重設；舊檔沒這欄照剛放下的算', () => {
+  const G = setup(2); G.wave = 2;
+  assert.ok(E.place(G, 2, 1, 'horn').ok); assert.ok(E.place(G, 1, 1, 'shepherd').ok);
+  unitAt(G, 2, 1).timer = 14.3; unitAt(G, 1, 1).timer = 2.5;
+  const snap = JSON.parse(JSON.stringify(E.snapshot(G)));
+  assert.ok(E.checkSnapshot(snap, 2)); assert.ok(!E.checkSnapshot({ ...snap, units: [{ ...snap.units[0], t: -1 }] }, 2));
+  const G2 = E.create(2, 'calm', () => 0.5); assert.ok(E.restore(G2, snap));
+  assert.ok(Math.abs(unitAt(G2, 2, 1).timer - 14.3) < 1e-9, '吹角手冷卻接著算'); assert.ok(Math.abs(unitAt(G2, 1, 1).timer - 2.5) < 1e-9, '牧人產糧接著算');
+  const big = { ...snap, units: snap.units.map(u => ({ ...u, t: 500 })) };
+  const G3 = E.create(2, 'calm', () => 0.5); assert.ok(E.restore(G3, big)); assert.ok(unitAt(G3, 2, 1).timer <= D.UNITS.horn.every, '超過全長就壓回全長');
+  const plain = { ...snap, units: snap.units.map(u => { const { t, ...o } = u; return o; }) };
+  const G4 = E.create(2, 'calm', () => 0.5); assert.ok(E.restore(G4, plain)); assert.strictEqual(unitAt(G4, 2, 1).timer, 6, '舊檔＝剛放下的 6 秒');
+});

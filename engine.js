@@ -168,7 +168,8 @@
       strayQueue: G.strayQueue.map(t => Math.max(0, Math.round((t - G.waveT) * 10) / 10)),       // 還沒出來的迷羊（距現在幾秒）
       units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded,
         cd: u.repairAt ? Math.max(0, Math.round((u.repairAt - G.time) * 10) / 10) : 0,
-        rest: u.resting ? Math.max(0.1, Math.round(u.restT * 10) / 10) : 0 })) }; // 狗在窩裡休息還剩幾秒；0＝沒在休息
+        rest: u.resting ? Math.max(0.1, Math.round(u.restT * 10) / 10) : 0,
+        t: Math.max(0, Math.round((u.timer || 0) * 10) / 10) })) }; // 產糧／射擊／吹角的計時器剩幾秒，續玩不重設（吹角手冷卻 20 秒比波間休息長，重設等於白送一次） // 狗在窩裡休息還剩幾秒；0＝沒在休息
   }
   // 存檔長得對不對：關卡、難度、波數、糧、每個單位的種類與座標都要在範圍內（localStorage 可能被改壞或版本變了）
   const isInt = (n, lo, hi) => Number.isInteger(n) && n >= lo && n <= hi;
@@ -186,7 +187,7 @@
     if (snap.strayQueue !== undefined && !(Array.isArray(snap.strayQueue) && snap.strayQueue.length <= 20 && snap.strayQueue.every(t => Number.isFinite(t) && t >= 0 && t <= 600))) return false;
     if (!Array.isArray(snap.units) || snap.units.length > ROWS * COLS) return false;
     return snap.units.every(s => s && UNITS[s.type] && isInt(s.r, 0, ROWS - 1) && isInt(s.c, 0, COLS - 1)
-      && (s.hp === undefined || Number.isFinite(s.hp)) && (s.uses === undefined || isInt(s.uses, 0, 99)) && (s.cd === undefined || (Number.isFinite(s.cd) && s.cd >= 0)) && (s.rest === undefined || (Number.isFinite(s.rest) && s.rest >= 0 && s.rest <= 600)));
+      && (s.hp === undefined || Number.isFinite(s.hp)) && (s.uses === undefined || isInt(s.uses, 0, 99)) && (s.cd === undefined || (Number.isFinite(s.cd) && s.cd >= 0)) && (s.rest === undefined || (Number.isFinite(s.rest) && s.rest >= 0 && s.rest <= 600)) && (s.t === undefined || (Number.isFinite(s.t) && s.t >= 0 && s.t <= 600)));
   }
   function restore(G, snap) {
     if (!checkSnapshot(snap, G.levelId) || snap.diff !== G.diff || snap.wave >= G.waves.length) return false;
@@ -195,6 +196,7 @@
       const def = UNITS[s.type];
       const u = makeUnit(G, s.r, s.c, s.type);
       if (s.elder && def.every) { u.elder = true; u.timer = Math.min(u.timer, def.every * ELDER_MUL); }
+      if (typeof s.t === 'number' && s.t >= 0 && def.every) u.timer = Math.min(s.t, def.every * (u.elder ? ELDER_MUL : 1)); // 舊檔沒這欄就照剛放下的算
       if (s.upgraded && def.upgrade) u.upgraded = true;
       if (typeof s.cd === 'number' && s.cd > 0) u.repairAt = G.time + s.cd;
       if (def.kind === 'dog' && typeof s.rest === 'number' && s.rest > 0) { u.resting = true; u.restT = Math.min(def.rest, s.rest); } // 存檔時狗在休息，續玩接著休息，不會帶著低血直接出動
@@ -452,7 +454,7 @@
     if (e.enraged) b *= 2;
     return b;
   }
-  const targetable = e => !e.underground && !e.dead;
+  const targetable = e => !e.underground && !e.dead && e.hp > 0; // 零血的（這一步剛被打死、還沒清掉）不當目標：不吃石子、不被狗咬、不叼羊、不被嚎叫鼓舞
   // 偷雞摸狗的：狗專咬（翻牆、偷羊、閃避、鑽地）
   const sneaky = e => { const d = ENEMIES[e.type]; return !!(d.vaults || d.steals || d.dodge || d.digs); };
 
@@ -758,6 +760,7 @@
         for (const o of G.enemies) if (o !== e && o.r === e.r && targetable(o) && !o.st.burn && Math.abs(o.x - e.x) < 0.6) ignite(G, o);
       }
       if (e.st.poison) hurt(G, e, STATUS.poison.dps * dt);
+      if (e.hp <= 0) continue; // 被燒死、毒死的這一步也不走、不咬、不嚎叫（跟步首的零血檢查同一個道理）
       if (def.enrage && !e.enraged && e.hp < e.maxHp * def.enrage) { e.enraged = true; ev(G, { t: 'fx', kind: 'enrage', r: e.r, x: e.x }); ev(G, { t: 'toast', msg: '熊狂暴了！' }); }
 
       // 能力：嚎叫／咆哮
