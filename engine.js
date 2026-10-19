@@ -16,6 +16,8 @@
   function shepherdEvery(G) { const sc = G.level.shepherdScale ?? G.level.diffScale ?? 0.6; return UNITS.shepherd.every + (DIFFS[G.diff].shepherdEvery - UNITS.shepherd.every) * sc; } // shepherdScale：只調產糧的折扣（歌珊的夜）
 
   function levelById(id) { return LEVELS.find(l => l.id === id) || LEVELS[0]; }
+  // 這一夜、這個難度哪幾排門口有看門的：關卡 gates: false 一律沒有；否則看難度表（2026-10-20：寧靜五、起風三、暴風二），難度表沒寫就五位都在
+  function gateRows(level, diffKey) { if (level.gates === false) return []; const d = DIFFS[diffKey]; return (d && Array.isArray(d.gates) ? d.gates : Array.from({ length: ROWS }, (_, r) => r)).slice(); }
   const idxOf = id => LEVELS.findIndex(l => l.id === id); // 這一夜在 LEVELS 裡的位置（0 起算；找不到 -1）
   const STRAY_LEAD = 3;                                   // 迷羊進場前幾秒先印 🐑 腳印（跟敵人腳印一樣提前量）
   const restOf = G => G.level.rest ?? WAVE_REST;          // 波間休息秒數，關卡可覆寫（第二章「交託的羊」只歇 3 秒）
@@ -89,7 +91,8 @@
       // 第二章：nextVisible 無月夜時腳印看不看得見；strays 場上的迷羊、strayQueue 這波還沒出來的迷羊（秒）；hand 送卡模式手上的卡
       nextVisible: true, strays: [], strayQueue: [], waveT: 0, hand: [], convT: 0,
       // 看門的（約 10:3）：每排門口一位，第一隻走到門口的地面敵人被他擋下、整排趕出場，用過就沒了；gates 存還在的排。關卡 gates: false 可關掉
-      gates: level.gates === false ? [] : Array.from({ length: ROWS }, (_, r) => r),
+      gates: gateRows(level, diffKey).slice(),
+      gateRows: gateRows(level, diffKey), // 這一局一開始哪幾排有看門的（星級「看門的都在」與畫面用；用掉的從 gates 拿掉、這裡不動）
       strayNextRow: null, // 下一隻迷羊要從哪排來（提前 STRAY_LEAD 秒決定並印腳印）
     };
     if (level.conveyor) { // 沒有糧：不教升級修補；開局先給固定幾張（至少有一個射手），之後才抽
@@ -207,7 +210,7 @@
     G.sheepLost = Number.isInteger(snap.sheepLost) ? snap.sheepLost : 0;
     G.unitsLost = Number.isInteger(snap.unitsLost) ? snap.unitsLost : null; // 舊存檔沒這欄：這局不知道有沒有損失，「零損失」那顆星不給
     if (Array.isArray(snap.seen)) for (const t of snap.seen) if (ENEMIES[t]) G.seen.add(t);
-    if (Array.isArray(snap.gates)) G.gates = snap.gates.slice(); // 舊存檔沒這欄：五位都在
+    if (Array.isArray(snap.gates)) G.gates = snap.gates.filter(r => G.gateRows.includes(r)); // 舊存檔沒這欄：這個難度該有的都在；存檔裡多出這難度沒有的排就丟掉
     if (Array.isArray(snap.strays) && snap.strays.length) { G.toldStray = true; for (const s of snap.strays) spawnStray(G, s.r, s.x); }
     if (Array.isArray(snap.strayQueue)) { G.strayQueue = snap.strayQueue.slice().sort((a, b) => a - b); G.waveT = 0; G.strayNextRow = null; }
     G.wave = snap.wave;
@@ -248,12 +251,12 @@
     return { ok: false, msg: def.kind === 'producer' ? '已經是老牧人了' : def.kind === 'blocker' ? '牆還好好的' : u.upgraded ? '已經升級過了' : '這格已經有人了' };
   }
 
-  // 單位角標：糧夠了才提示「升級」或「修補」。規則放這裡，畫面層只負責畫（跟 tapUnit 同一套條件）
+  // 單位角標：糧夠了才提示「升級」或「修補」。規則放這裡，畫面層只負責畫（跟 tapUnit 同一套條件；修補的提示門檻 REPAIR_HINT 在 data.js，點了任何受傷的牆都修得了，角標只在傷到那個比例以下才掛）
   function tapHint(G, u) {
     if (G.level.conveyor) return '';
     const def = UNITS[u.type], f = Math.floor(G.food);
     if (def.kind === 'producer' && !u.elder && f >= ELDER_COST) return '升級';
-    if (def.kind === 'blocker' && u.hp < u.maxHp * 0.7 && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) return '修補';
+    if (def.kind === 'blocker' && u.hp < u.maxHp * (D.REPAIR_HINT ?? 0.7) && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) return '修補';
     if (def.upgrade && !u.upgraded && posOf(G.level.id) >= def.upgrade.from && f >= def.upgrade.cost) return '升級';
     return '';
   }
@@ -886,7 +889,7 @@
     G.over = true; G.result = { win: true, stars: starsOf(G) }; ev(G, { t: 'win' });
   }
   // 星級：每夜三顆，自動累積、不解鎖任何東西。守過／零損失（沒失羊、沒有人被咬倒或逃走；舊存檔續玩的那局 unitsLost 是 null，不給）／五位看門的都在（關卡關掉看門的就只有兩顆）
-  function starsOf(G) { return { win: true, noLoss: G.sheepLost === 0 && G.unitsLost === 0, gates: G.level.gates !== false && G.gates.length === ROWS }; }
+  function starsOf(G) { return { win: true, noLoss: G.sheepLost === 0 && G.unitsLost === 0, gates: G.level.gates !== false && G.gates.length === G.gateRows.length }; }
   function starSlots(level) { return level.gates === false ? 2 : 3; }
   function lose(G, reason) { G.over = true; G.result = { win: false, reason }; ev(G, { t: 'strayMark', r: null }); ev(G, { t: 'lose', reason }); }
 
@@ -900,6 +903,6 @@
     stray(G, r, x) { if (G.over) return; spawnStray(G, r, x); },
   };
 
-  const Engine = { create, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, rowLit, starSlots, dev };
+  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, rowLit, starSlots, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);

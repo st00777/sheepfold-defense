@@ -36,12 +36,14 @@
   body { display: flex; flex-direction: column; min-height: 100dvh; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
 
   /* 上方資源列 */
+  /* 字級底線（2026-10-20 多視角審查 U2）：介面文字最小 13px；暫停層「大字」開關把整頁放大 1.18 倍（html.big） */
+  html.big body { zoom: 1.18; }
   #top { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--panel); font-size: 15px; }
   #top b { font-size: 18px; }
   #food { color: var(--gold); }
   #sheep[hidden] { display: none; }
   #wave-info { color: var(--muted); }
-  #pause-btn, #snd-btn { font: inherit; font-size: 16px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 2px 9px; margin-left: 8px; cursor: pointer; }
+  #pause-btn, #snd-btn, #fast-btn { font: inherit; font-size: 16px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 2px 9px; margin-left: 8px; cursor: pointer; }
   /* 聲音設定（暫停層）：一列一個選項，右邊是開關或三檔 */
   .snd { text-align: left; margin: 12px 0 4px; }
   .snd-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-top: 1px solid #0004; font-size: 15px; }
@@ -50,7 +52,7 @@
   .snd-row button { font: inherit; font-size: 14px; background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 8px; padding: 5px 14px; cursor: pointer; min-width: 52px; }
   .snd-row button.on { border-color: var(--gold); background: var(--card-on); }
   .snd-row.off { opacity: .4; pointer-events: none; } /* 音效關著時，蟲鳴與音量先壓暗 */
-  .snd-note { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: left; }
+  .snd-note { font-size: 13px; color: var(--muted); margin-top: 6px; text-align: left; }
   /* 開場頁右上角的喇叭：第一次進來就看得到，聲音響起前就能關 */
   #levels .dialog { position: relative; }
   .corner { position: absolute; right: 12px; top: 12px; font: inherit; font-size: 18px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 3px 9px; cursor: pointer; }
@@ -68,9 +70,9 @@
   .card .tag { position: absolute; right: 4px; top: 3px; font-size: 10px; color: #2b2a26; background: var(--new); border-radius: 6px; padding: 0 4px; }
   #cards-wrap { background: var(--panel); }
   .card .ico { font-size: 24px; line-height: 1; }
-  .card .name { font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .card .cost { font-size: 11px; color: var(--gold); white-space: nowrap; }
-  @media (min-width: 560px) { .card .ico { font-size: 26px; } .card .name, .card .cost { font-size: 12px; } }
+  .card .name { font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .cost { font-size: 12px; color: var(--gold); white-space: nowrap; }
+  @media (min-width: 560px) { .card .ico { font-size: 26px; } .card .name, .card .cost { font-size: 13px; } }
   .card.selected { border-color: var(--gold); background: var(--card-on); }
   .card.poor { opacity: .45; }
   .card.shovel { background: #3f3b31; }
@@ -229,6 +231,9 @@
   /* 看門的：每排門口左下角一個小人影，用掉就淡出往左退 */
   .gate { position: absolute; left: 0; width: var(--lane); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; cursor: pointer; } /* 站在棋盤外的門口走道，一排一位；點他看說明 */
   .gate span { font-size: clamp(20px, 5.6vw, 30px); line-height: 1; filter: drop-shadow(0 0 2px #000) drop-shadow(0 2px 2px #000a); transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out); }
+  .gate.flash::before { content: ''; position: absolute; inset: 2px 0; border-radius: 6px; background: var(--danger); animation: gateFlash 1.1s ease-out forwards; pointer-events: none; } /* 用掉那一刻門口閃紅：讓新手看見「這排少了一條命」 */
+  @keyframes gateFlash { from { opacity: .75; } to { opacity: 0; } }
+  .gate.none { display: none; } /* 這個難度本來就沒有的排：不畫（跟「用掉了」的灰影分開） */
   .gate.used span { opacity: .38; transform: scale(.85); filter: grayscale(1) drop-shadow(0 0 2px #000); } /* 用掉的留灰影：分得出「用掉了」和「本來沒有」 */
   .gate-sweep { position: absolute; left: 0; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; animation: gateSweep .9s cubic-bezier(.3, 0, .7, 1) forwards; }
   .gate-sweep::before { content: ''; position: absolute; right: 55%; top: 38%; height: 24%; width: 260%; border-radius: 999px; background: linear-gradient(90deg, transparent, #e6b84a88); }
@@ -253,14 +258,14 @@
   #dev { display: none; flex-wrap: wrap; gap: 6px; padding: 6px 12px; background: #1f1e1a; border-top: 1px solid #000; font-size: 12px; align-items: center; }
   #dev.on { display: flex; }
   #dev button, #dev select { font: inherit; font-size: 12px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 6px; padding: 4px 8px; }
-  #dev button.on { background: var(--gold); color: #2b2a26; }
+  #dev button.on, #fast-btn.on { background: var(--gold); color: #2b2a26; }
   #dev .lab { color: var(--muted); }
 
   /* 底部進度條 */
   #bottom { padding: 8px 12px 14px; background: var(--panel); }
   #bar { height: 8px; background: #0006; border-radius: 4px; overflow: hidden; }
   #bar > i { display: block; height: 100%; width: 100%; background: var(--gold); transform: scaleX(0); transform-origin: left; transition: transform .3s var(--ease-out); }
-  #toast { text-align: center; font-size: 13px; color: var(--muted); min-height: 18px; margin-top: 6px; }
+  #toast { text-align: center; font-size: 15px; color: var(--muted); min-height: 20px; margin-top: 6px; }
   #toast.tip { color: var(--new); }
 
   /* 蓋在上面的對話／結果畫面 */
@@ -274,26 +279,26 @@
   #board.paused, #board.paused * { animation-play-state: paused; }
   .dialog { background: var(--panel); border-radius: 14px; padding: 22px 20px; max-width: 420px; width: 100%; text-align: center; margin: auto; }
   .dialog h1 { margin: 0 0 6px; font-size: 24px; }
-  .dialog .ref { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+  .dialog .ref { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
   .dialog p { line-height: 1.7; font-size: 15px; text-align: left; }
   .dialog .who { color: var(--gold); }
   .dialog .verse { background: #0004; border-left: 3px solid var(--gold); padding: 8px 10px; border-radius: 4px; }
   #diffs { display: flex; gap: 6px; margin: 10px 0 4px; }
   .diff { flex: 1; background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 10px; padding: 9px 0; font-size: 15px; font-family: inherit; cursor: pointer; }
   .diff.selected { border-color: var(--gold); background: var(--card-on); }
-  #diff-hint { font-size: 12px; color: var(--muted); min-height: 16px; margin-bottom: 8px; }
+  #diff-hint { font-size: 13px; color: var(--muted); min-height: 16px; margin-bottom: 8px; }
   .btn.alt { background: transparent; color: var(--muted); border: 1px solid var(--muted); margin-top: 8px; }
   .btn { display: inline-block; margin-top: 12px; padding: 12px 28px; font-size: 17px; border-radius: 10px; border: 0; background: var(--gold); color: #2b2a26; font-weight: bold; cursor: pointer; font-family: inherit; }
   .btn[hidden] { display: none; }
   .btn:disabled { opacity: .4; cursor: default; }
-  .tips { font-size: 13px; color: var(--muted); text-align: left; margin-top: 10px; line-height: 1.6; }
+  .tips { font-size: 14px; color: var(--muted); text-align: left; margin-top: 10px; line-height: 1.6; }
   /* 今晚有新夥伴：先引去圖鑑看一眼再開打（只提醒一次） */
   .newbox { background: #0004; border: 1px solid var(--new); border-radius: 10px; padding: 10px 12px 12px; margin-top: 8px; font-size: 14px; line-height: 1.6; }
   .newbox[hidden] { display: none; }
   .newbox .btn { margin-top: 6px; padding: 9px 22px; font-size: 15px; }
   .btn.quiet { background: transparent; color: var(--text); border: 1px solid var(--muted); }
   .tips .new { color: var(--new); }
-  #best { font-size: 12px; color: var(--muted); margin-top: 8px; white-space: pre-line; }
+  #best { font-size: 13px; color: var(--muted); margin-top: 8px; white-space: pre-line; }
 
   /* 首頁：一次只看一章，十夜塞進一屏不用捲（2026-10-17 James：選關要往下拉、圖鑑太下面；2026-10-18 補到十夜後列高再縮一點） */
   .dialog.home { padding: 18px 16px 14px; }
@@ -304,15 +309,15 @@
   #ch-tabs { margin: 10px 0 4px; }
   #ch-tabs .tab { padding: 7px 0; font-size: 14px; }
   #ch-tabs .tab.locked { opacity: .4; }
-  .ch-sub { font-size: 12px; min-height: 16px; }
+  .ch-sub { font-size: 13px; min-height: 16px; }
   .lv { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 9px; padding: 5px 10px; margin-top: 4px; text-align: left; cursor: pointer; }
   .lv.locked { opacity: .45; cursor: default; }
   .lv.next { outline: 2px solid var(--gold); outline-offset: -2px; }
   .lv .n { font-size: 17px; width: 24px; text-align: center; color: var(--gold); }
   .lv .t { flex: 1; min-width: 0; }
   .lv .t b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .lv .t span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-  .lv .s { font-size: 11px; color: var(--ok); white-space: nowrap; text-align: right; }
+  .lv .t span { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  .lv .s { font-size: 12px; color: var(--ok); white-space: nowrap; text-align: right; }
   .lv .s .stars { font-size: 14px; color: var(--gold); letter-spacing: 1px; line-height: 1.1; }
   .lv .s .stars.none { color: var(--muted); opacity: .6; }
   .tab.full { border-color: var(--gold); }
@@ -320,11 +325,12 @@
   #stars { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 4px 0 2px; }
   #stars .st { font-size: 13px; padding: 4px 9px; border-radius: 999px; background: var(--card); color: var(--muted); opacity: 0; animation: starIn 320ms var(--ease-out) forwards; animation-delay: calc(var(--i) * 180ms + 350ms); }
   #stars .st.on { color: var(--gold); background: var(--card-on); }
-  #stars-note { font-size: 12px; color: var(--muted); margin: 0 0 8px; min-height: 1em; }
+  #stars-note { font-size: 13px; color: var(--muted); margin: 0 0 8px; min-height: 1em; }
   @keyframes starIn { from { opacity: 0; transform: scale(.6); } 70% { transform: scale(1.08); } to { opacity: 1; transform: scale(1); } }
-  .upd { margin-top: 10px; font-size: 11px; color: var(--muted); }
+  .upd { margin-top: 10px; font-size: 12px; color: var(--muted); }
   #psalm { text-align: left; font-size: 15px; line-height: 1.9; margin-top: 10px; }
   #psalm div { opacity: 0; transition: opacity 1.2s; }
+  #psalm .ref { text-align: center; margin-bottom: 4px; }
   #psalm div.on { opacity: 1; }
 
   /* 點兵與圖鑑 */
@@ -337,18 +343,18 @@
   .rc .dot { position: absolute; left: 5px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--u, #888); }
   .rc .tag { position: absolute; right: 4px; top: 3px; font-size: 10px; color: #2b2a26; background: var(--new); border-radius: 6px; padding: 0 4px; }
   .rc .ico { font-size: 26px; line-height: 1; }
-  .rc .name { font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rc .cost { font-size: 11px; color: var(--gold); }
+  .rc .name { font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rc .cost { font-size: 12px; color: var(--gold); }
   .rc.on { border-color: var(--gold); background: var(--card-on); }
   .rc.off { opacity: .45; }
   .rc.locked { opacity: .35; cursor: default; }
   .rc.focus { outline: 2px solid var(--text); outline-offset: 1px; }
   .rc.on::after { content: '✓'; position: absolute; right: 4px; bottom: 2px; font-size: 11px; color: var(--gold); }
-  #roster-count { font-size: 12px; color: var(--muted); margin-top: 8px; min-height: 16px; }
+  #roster-count { font-size: 13px; color: var(--muted); margin-top: 8px; min-height: 16px; }
   #roster-detail { text-align: left; background: #0004; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.6; height: 122px; overflow-y: auto; }
   #roster-detail b { color: var(--gold); }
   #roster-detail .ref { margin: 0; }
-  #roster-detail .num { color: var(--muted); font-size: 12px; }
+  #roster-detail .num { color: var(--muted); font-size: 13px; }
   #roster-detail .new { color: var(--new); font-size: 13px; }
 
   /* 減少動態：留透明度變化，拿掉位移與閃爍 */
@@ -357,6 +363,7 @@
     #board .ico { animation: none !important; }
     #sky.fade { transition: none; }
     .gate.used span { transform: none; }
+    .gate.flash::before { animation-duration: .6s; }
     .gate-sweep { animation: gateSweepFade .9s ease-out forwards; } /* 減少動態：不位移，只淡出，事件仍看得到 */
     .card.new::after, .cell.teach::before { opacity: .8; }
     .pop, .fx { animation-name: fadeOut; animation-duration: .5s; }
@@ -372,7 +379,7 @@
 <div id="top">
   <span>🌾 糧 <b id="food">0</b></span>
   <span id="sheep" hidden>🐑 <b id="sheep-n">3</b></span>
-  <span><span id="wave-info">準備中</span><button id="snd-btn" class="snd-btn" title="聲音">🔊</button><button id="pause-btn" title="暫停">⏸</button></span>
+  <span><span id="wave-info">準備中</span><button id="fast-btn" title="加速">⏩</button><button id="snd-btn" class="snd-btn" title="聲音">🔊</button><button id="pause-btn" title="暫停">⏸</button></span>
 </div>
 
 <div id="cards-wrap"><div id="cards"></div></div>
@@ -423,13 +430,13 @@
       <button class="btn" id="intro-new-btn">先看圖鑑</button>
     </div>
     <div class="tips" id="intro-tips"></div>
+    <div class="tips" id="intro-loadout"></div>
     <div id="diffs">
       <button class="diff" data-key="calm">寧靜夜</button>
       <button class="diff" data-key="windy">起風夜</button>
       <button class="diff" data-key="storm">暴風夜</button>
     </div>
     <div id="diff-hint"></div>
-    <div class="tips" id="intro-loadout"></div>
     <div class="tips" id="resume-line" hidden><span class="new" id="resume-text"></span></div>
     <button class="btn" id="resume-cp" hidden>繼續上次</button>
     <button class="btn" id="start">開始守夜</button>
@@ -457,8 +464,9 @@
 <div class="overlay" id="pause" hidden>
   <div class="dialog">
     <h1>暫停中</h1>
-    <p>狼也在等。回來再按繼續。</p>
+    <p>狼也在等。回來再按繼續。清完的波已經存下，回關卡之後還能從那裡接著守。</p>
     <div class="snd" id="snd-panel">
+      <div class="snd-row"><span>大字</span><button id="big-btn">關</button></div>
       <div class="snd-row"><span>音效</span><button data-snd="sfx">開</button></div>
       <div class="snd-row"><span>蟲鳴</span><button data-snd="amb">關</button></div>
       <div class="snd-row"><span>音量</span><div class="seg"><button data-vol="0">小</button><button data-vol="1">中</button><button data-vol="2">大</button></div></div>
@@ -483,8 +491,8 @@
   </div>
 </div>
 
-<script src="data.js?v=10"></script>
-<script src="engine.js?v=13"></script>
+<script src="data.js?v=11"></script>
+<script src="engine.js?v=14"></script>
 <script src="sound.js?v=7"></script>
 <script>
 'use strict';
@@ -503,11 +511,11 @@ let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf =
 const els = new Map();   // 引擎物件 id → 畫面元素
 let markerEl = null, strayMarkEl = null, moundEls = new Map();
 const gateEls = []; // 每排門口的看門的（跟著 G.gates 顯示／隱藏）
-const GATE_TIP = '🧍 看門的：第一隻摸到門口的地面敵人，會被他連同整排一起趕出去；用過一次他就走了，那排再漏就守不住。飛的不經過門';
+const GATE_TIP = '🧍 看門的：第一隻摸到門口的地面敵人，會被他連同整排一起趕出去；用過一次他就走了，那排再漏就守不住。飛的不經過門。寧靜夜每排一位、起風夜中間三排、暴風夜第 2、4 排';
 let toastTimer = 0;
 let cardEls = [], lastFood = -1, lastHand = 0, lastUnits = -1;
-// 開發者模式：網址加 ?dev，或連點左上角「糧」五下
-let devOn = /[?&]dev/.test(location.search), speed = 1, paused = false, devEnemy = '', foodTaps = 0, dawned = false;
+// 開發者模式：網址加 ?dev，或長按左上角「糧」1.5 秒（2026-10-20：原本連點五下，小孩手滑就會開，開了這局就不存檔不記星）
+let devOn = /[?&]dev/.test(location.search), speed = 1, paused = false, devEnemy = '', dawned = false;
 let devUsed = false;   // 這一局有沒有開過開發者面板；開過就不存檔，免得作弊狀態被續玩帶走
 let pendingCp = null;  // 續玩前要先點兵時，先把存檔記著
 const CP_BROKEN = '上次的存檔讀不出來，這一夜要從頭守。';
@@ -528,11 +536,11 @@ function loadProgress() {
 let P = loadProgress();
 function saveProgress(p) { try { localStorage.setItem(PKEY, JSON.stringify(p || P)); } catch (e) {} }
 const unlockAll = /[?&]all/.test(location.search);
-// 星級：每夜三顆——守過／零損失（沒失羊、沒有人被咬倒或逃走）／五位看門的都在。自動累積（不同局拿到的可以合起來）、不解鎖任何東西，只是看得見的完整度
+// 星級：每夜三顆——守過／零損失（沒失羊、沒有人被咬倒或逃走）／看門的都在（這個難度一開始有幾位就要幾位都在）。自動累積（不同局拿到的可以合起來）、不解鎖任何東西，只是看得見的完整度
 function starsOf(id) { const s = P.stars[id] || {}; return { win: !!P.cleared[id], noLoss: !!s.noLoss, gates: !!s.gates }; }
 function starCount(id) { const s = starsOf(id); return (s.win ? 1 : 0) + (s.noLoss ? 1 : 0) + (s.gates ? 1 : 0); }
 function starText(L) { const n = starCount(L.id), tot = Engine.starSlots(L); return '★'.repeat(n) + '☆'.repeat(Math.max(0, tot - n)); }
-function starMissing(L) { const s = starsOf(L.id), m = []; if (!s.win) m.push('守過'); if (!s.noLoss) m.push('零損失'); if (!s.gates && Engine.starSlots(L) > 2) m.push('五位看門的都在'); return m; }
+function starMissing(L) { const s = starsOf(L.id), m = []; if (!s.win) m.push('守過'); if (!s.noLoss) m.push('零損失'); if (!s.gates && Engine.starSlots(L) > 2) m.push('看門的都在'); return m; }
 function chapterStars(c) { const ls = LEVELS.filter(L => chapterOf(L) === c); return { got: ls.reduce((n, L) => n + starCount(L.id), 0), tot: ls.reduce((n, L) => n + Engine.starSlots(L), 0) }; }
 function unlocked(id) { return unlockAll || Engine.isUnlocked(P.cleared, id); } // 規則在引擎（可測）：本夜／前一夜／任一後夜守過即開
 // 所有已開放關卡的卡總和（圖鑑用；也用來判斷玩家手上有沒有這一夜帶不了的卡）
@@ -540,7 +548,7 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊' };
 const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來' };
-const HOME_UPDATE = '最近更新 10/18：兩章各補到十夜、每排門口多了看門的；每夜三顆星——守過、零損失、五位看門的都在，自動累積，星不換任何東西';
+const HOME_UPDATE = '最近更新 10/20：右上角 ⏩ 可以二倍速；暫停層有「大字」；看門的依難度五位／三位／兩位；圖鑑出處改全名、敵方也有出處';
 
 // ====== 畫面建立 ======
 function buildBoard() {
@@ -627,8 +635,10 @@ function openIntro(L) {
   $('#intro-ref').textContent = L.ref;
   const t = $('#intro-text');
   t.innerHTML = L.speaker ? `<span class="who">${L.speaker}：</span>${L.intro}` : `<div class="verse">${L.intro}</div>`;
-  $('#intro-tips').innerHTML = L.fresh.map(k => `<div class="new">${UNITS[k].ico} ${UNITS[k].name}：${UNITS[k].desc}</div>`).join('') + (L.tips || []).map(x => `<div>${x}</div>`).join('');
-  showIntroNew(L);
+  // 第一次玩第 1 夜：教學會手把手帶，開場頁只留台詞，不先丟一面字牆（2026-10-20 多視角審查 N4）
+  const firstNight = L.id === 1 && !tutDone() && !/[?&]tut/.test(location.search);
+  $('#intro-tips').innerHTML = firstNight ? '<div class="new">按「開始守夜」，會一步一步帶你放下第一批人手。</div>' : L.fresh.map(k => `<div class="new">${UNITS[k].ico} ${UNITS[k].name}：${UNITS[k].desc}</div>`).join('') + (L.tips || []).map(x => `<div>${x}</div>`).join('');
+  showIntroNew(L, firstNight);
   applyDiff(savedDiff()); // 回開場頁一律用平常的預設難度（續玩那一局可能臨時換過）
   showBest();
   const lo = pickedFor(L);
@@ -648,6 +658,7 @@ function openIntro(L) {
 }
 // 這一夜新開的卡、或舊卡在這一夜學會的新招（升級 from＝這一夜），第一次來先引去圖鑑看
 const NKEY = 'sheepfold-intro-seen';
+let markIntroSeen = () => {}; // 開場頁有新夥伴框時由 showIntroNew 換成真的；開始守夜也會叫
 function introSeen() { try { return JSON.parse(localStorage.getItem(NKEY) || '[]'); } catch (e) { return []; } }
 function newThisNight(L) {
   const seen = introSeen();
@@ -655,21 +666,24 @@ function newThisNight(L) {
   const upg = L.units.filter(k => UNITS[k].upgrade && UNITS[k].upgrade.from === Engine.posOf(L.id) && !L.fresh.includes(k) && !seen.includes(`${L.id}:${k}`));
   return { fresh, upg };
 }
-function showIntroNew(L) {
+function showIntroNew(L, quiet) {
+  markIntroSeen = () => {};
   const { fresh, upg } = newThisNight(L);
   const gateNew = L.gates !== false && !introSeen().includes('gate'); // 看門的（全遊戲只介紹一次）
-  const box = $('#intro-new'), any = fresh.length || upg.length || gateNew;
+  const box = $('#intro-new'), any = !quiet && (fresh.length || upg.length || gateNew);
   box.hidden = !any;
   $('#start').classList.toggle('quiet', !!any); // 有新夥伴時主按鈕讓給「先看圖鑑」
   if (!any) return;
   const parts = [];
   if (fresh.length) parts.push(`今晚有新夥伴：${fresh.map(k => `${UNITS[k].ico} ${UNITS[k].name}`).join('、')}`);
   if (upg.length) parts.push(`${upg.map(k => `${UNITS[k].ico} ${UNITS[k].name}`).join('、')}學會新招：${upg.map(k => UNITS[k].upgrade.name).join('、')}`);
-  if (gateNew) parts.push('每排門口站著一位 🧍 看門的：第一隻摸到門口的地面敵人會被他連整排趕出去，用過一次他就走了，那排再漏就守不住');
+  if (gateNew) parts.push('門口站著 🧍 看門的（寧靜夜每排一位、起風夜三位、暴風夜兩位）：第一隻摸到門口的地面敵人會被他連整排趕出去，用過一次他就走了，那排再漏就守不住');
   $('#intro-new-text').textContent = parts.join('；') + '。先去圖鑑看一眼怎麼用，再開始守夜。';
+  // 不管是按「先看圖鑑」還是直接「開始守夜」，這一夜的新夥伴介紹都只跳一次（2026-10-20 U3：以前只有按圖鑑才記）
+  markIntroSeen = () => { try { const a = introSeen(); for (const k of [...fresh, ...upg]) if (!a.includes(`${L.id}:${k}`)) a.push(`${L.id}:${k}`); if (gateNew && !a.includes('gate')) a.push('gate'); localStorage.setItem(NKEY, JSON.stringify(a)); } catch (e) {} };
   $('#intro-new-btn').onclick = () => {
     const focus = fresh[0] || upg[0];
-    try { const a = introSeen(); for (const k of [...fresh, ...upg]) a.push(`${L.id}:${k}`); if (gateNew) a.push('gate'); localStorage.setItem(NKEY, JSON.stringify(a)); } catch (e) {}
+    markIntroSeen();
     openRoster(pickedFor(L) ? 'pick' : 'view', 'intro');
     if (!focus) { roster.tab = 'effects'; roster.focus = String(GLOSSARY.findIndex(g => g.name === '看門的')); } else roster.focus = focus; // 只有看門的是新的：直接翻到效果頁籤那一格
     renderRoster();
@@ -964,10 +978,27 @@ function tick(now) {
   if (paused) return;
   // 加速時分成小步跑，數值行為才跟 1× 一樣
   const wasWave = G.phase === 'wave';
-  for (let i = 0; i < speed; i++) { Engine.step(G, dt); flushEvents(); if (G.over) break; }
-  if (!wasWave && G.phase === 'wave') { Sound.play('wave'); if (diff === 'storm' && Math.random() < .35) lightning(); } // 暴風夜：波開始時偶爾閃一次電
-  draw();
+  try {
+    for (let i = 0; i < speed; i++) { Engine.step(G, dt); flushEvents(); if (G.over) break; }
+    if (!wasWave && G.phase === 'wave') { Sound.play('wave'); if (diff === 'storm' && Math.random() < .35) lightning(); } // 暴風夜：波開始時偶爾閃一次電
+    draw();
+  } catch (err) {
+    // 引擎或畫面丟例外：以前 rAF 迴圈會就此停掉、畫面定格沒有任何提示（2026-10-20 P3）。現在停下這一局、說一聲、回關卡；清完的波已存，可以「繼續上次」
+    console.error(err);
+    cancelAnimationFrame(raf); if (G) G.over = true;
+    toast('出了點狀況，這一局先停下。清完的波已經存著，回來可以繼續上次', true);
+    setTimeout(backToLevels, 1800);
+  }
 }
+// 速度：玩家用右上角 ⏩ 在 1× 與 2× 之間切（存 sheepfold-speed）；開發者列的 1／2／4／8× 走同一條
+function setSpeed(n) {
+  speed = n; board.classList.toggle('fast', speed > 1);
+  document.querySelectorAll('#dev [data-speed]').forEach(x => x.classList.toggle('on', Number(x.dataset.speed) === speed));
+  const fb = $('#fast-btn'); fb.classList.toggle('on', speed > 1); fb.textContent = speed > 1 ? `⏩${speed}×` : '⏩'; fb.title = speed > 1 ? `加速中 ${speed}×，點一下回正常` : '加速（二倍速）';
+  try { localStorage.setItem('sheepfold-speed', String(speed)); } catch (e) {}
+}
+$('#fast-btn').addEventListener('click', () => { setSpeed(speed > 1 ? 1 : 2); Sound.play('tap'); });
+try { const sp = Number(localStorage.getItem('sheepfold-speed')); if (sp === 2) setSpeed(2); } catch (e) {}
 
 // 頭上最多兩個圖示，依重要性；緩速與嚎叫不顯示（荊棘腳下看得到、領頭狼本身在場）
 function statusText(e) {
@@ -1045,8 +1076,10 @@ function draw() {
     let g = gateEls[r];
     if (!g) { g = document.createElement('div'); g.className = 'gate'; g.style.top = (r / ROWS * 100) + '%'; g.innerHTML = '<span>🧍</span>'; g.addEventListener('click', () => toast(G.gates.includes(r) ? GATE_TIP : '這排的看門的已經用掉了，再漏一隻地面敵人就守不住', true)); $('#shell').appendChild(g); gateEls[r] = g; }
     const on = G.gates.includes(r);
+    g.classList.toggle('none', !G.gateRows.includes(r)); // 這個難度本來就沒有的排
     if (g.classList.contains('used') === on) {
       g.classList.toggle('used', !on);
+      if (!on && G.gateRows.includes(r)) { g.classList.remove('flash'); void g.offsetWidth; g.classList.add('flash'); } // 用掉：門口閃紅一下（減少動態也閃，只是短）
       if (!on && !REDUCE_MOTION.matches && speed <= 1) g.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(45%)', offset: .35 }, { transform: 'translateX(0)' }], { duration: 520, easing: EASE_OUT }); // 用掉那一刻：往門裡跨一步再退回來變灰
     }
   }
@@ -1109,12 +1142,12 @@ function recordBest(cleared) {
 }
 function showStars() {
   const st = (G.result && G.result.stars) || {}, slots = Engine.starSlots(level);
-  const items = [['win', '守過'], ['noLoss', '零損失'], ['gates', '五位看門的都在']].slice(0, slots);
+  const items = [['win', '守過'], ['noLoss', '零損失'], ['gates', '看門的都在']].slice(0, slots);
   const box = $('#stars'); box.innerHTML = '';
   items.forEach(([k, name], i) => { const d = document.createElement('span'); d.className = 'st' + (st[k] ? ' on' : ''); d.style.setProperty('--i', i); d.textContent = (st[k] ? '★ ' : '☆ ') + name; box.appendChild(d); });
   const why = [];
   if (!st.noLoss) { const parts = []; if (G.sheepLost) parts.push(`失了 ${G.sheepLost} 隻羊`); if (G.unitsLost) parts.push(`${G.unitsLost} 位被咬倒或逃走`); if (G.unitsLost === null) parts.push('續玩的存檔不知道前面有沒有損失'); if (parts.length) why.push(parts.join('、')); }
-  if (slots > 2 && !st.gates) why.push(`用掉了 ${ROWS - G.gates.length} 位看門的`);
+  if (slots > 2 && !st.gates) why.push(`用掉了 ${G.gateRows.length - G.gates.length} 位看門的`);
   const got = items.filter(([k]) => st[k]).length;
   $('#stars-note').textContent = devUsed ? '開著開發者模式，這局的星不記' : got >= slots ? '這一夜的星全拿了' : why.length ? `差的：${why.join('；')}` : '';
   if (!devUsed) items.forEach(([k], i) => { if (st[k]) setTimeout(() => Sound.play('food'), 350 + i * 180 + 120); }); // 每顆星一聲叮，跟著跳出
@@ -1127,9 +1160,10 @@ function onWin() {
   setTimeout(() => { // 先讓人看到天亮，結算頁慢 0.9 秒出來（減少動態：立刻）
     endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${level.outroWin}`);
     showStars();
-    $('#next').hidden = !next;
+    $('#next').hidden = !next; $('#retry').textContent = '再守這一夜';
     if (level.psalm) {
       const box = $('#psalm');
+      if (level.psalmTitle) { const h = document.createElement('div'); h.className = 'ref'; h.textContent = level.psalmTitle; box.appendChild(h); setTimeout(() => h.classList.add('on'), 300); } // 不認識的人也知道這是哪一篇（2026-10-20 G2）
       level.psalm.forEach((line, i) => { const d = document.createElement('div'); d.textContent = line; box.appendChild(d); setTimeout(() => d.classList.add('on'), 600 + i * 1500); });
     }
   }, REDUCE_MOTION.matches ? 0 : 900);
@@ -1140,7 +1174,7 @@ function onLose(reason) {
   const titles = { wolf: '狼闖進羊圈了', bird: '鷙鳥飛進羊圈了', sheep: '羊被偷光了' };
   const text = (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
   nightfall();
-  setTimeout(() => { endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`); $('#next').hidden = true; }, REDUCE_MOTION.matches ? 0 : 900);
+  setTimeout(() => { endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`); $('#next').hidden = true; $('#retry').textContent = '再守一夜'; }, REDUCE_MOTION.matches ? 0 : 900);
 }
 
 // ====== 開始／重來 ======
@@ -1282,6 +1316,9 @@ function tapRoster(k) {
   }
   renderRoster();
 }
+// 書卷縮寫 → 全名（圖鑑出處行用；data.js 裡維持縮寫，卡片與文案不動）。不認識聖經的人看「摩 3:8」不知道是書名（2026-10-20 多視角審查 G1）
+const BOOKS = { 創: '創世記', 出: '出埃及記', 利: '利未記', 民: '民數記', 申: '申命記', 書: '約書亞記', 士: '士師記', 得: '路得記', 撒上: '撒母耳記上', 撒下: '撒母耳記下', 王上: '列王紀上', 王下: '列王紀下', 代上: '歷代志上', 代下: '歷代志下', 拉: '以斯拉記', 尼: '尼希米記', 斯: '以斯帖記', 伯: '約伯記', 詩: '詩篇', 箴: '箴言', 傳: '傳道書', 歌: '雅歌', 賽: '以賽亞書', 耶: '耶利米書', 哀: '耶利米哀歌', 結: '以西結書', 但: '但以理書', 何: '何西阿書', 珥: '約珥書', 摩: '阿摩司書', 俄: '俄巴底亞書', 拿: '約拿書', 彌: '彌迦書', 鴻: '那鴻書', 哈: '哈巴谷書', 番: '西番雅書', 該: '哈該書', 亞: '撒迦利亞書', 瑪: '瑪拉基書', 太: '馬太福音', 可: '馬可福音', 路: '路加福音', 約: '約翰福音', 徒: '使徒行傳', 羅: '羅馬書', 林前: '哥林多前書', 林後: '哥林多後書', 加: '加拉太書', 弗: '以弗所書', 腓: '腓立比書', 西: '歌羅西書', 帖前: '帖撒羅尼迦前書', 帖後: '帖撒羅尼迦後書', 提前: '提摩太前書', 提後: '提摩太後書', 多: '提多書', 門: '腓利門書', 來: '希伯來書', 雅: '雅各書', 彼前: '彼得前書', 彼後: '彼得後書', 約一: '約翰一書', 約二: '約翰二書', 約三: '約翰三書', 猶: '猶大書', 啟: '啟示錄' };
+function fullRef(ref) { return String(ref || '').replace(/^([\u4e00-\u9fff]{1,2}) /, (m, ab) => (BOOKS[ab] ? BOOKS[ab] + ' ' : m)); } // '摩 3:8' → '阿摩司書 3:8'；認不得的縮寫原樣留著
 // 白話數字：每個單位一句，數字全部從資料表帶，改數值不用改文案
 function unitNums(k) {
   const u = UNITS[k], s = [];
@@ -1338,7 +1375,7 @@ const GLOSSARY = [
   { name: '狂暴', ico: '🐻', text: `母熊血量低於 ${Math.round(ENEMIES.bear.enrage * 100)}% 時速度與傷害 ×2，直到被打倒` },
   { name: '厚皮', ico: '🛡', text: `石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%；機弦、投石機、火、毒全額。母熊、獅子、豹都是厚皮` },
   { name: '換排', ico: '↕️', text: `敵人從這排換到隔壁排，射手要跟著換。來源：牧人杖（趕的）、豺狼碰到牆繞路、豹每 ${ENEMIES.leopard.shiftEvery} 秒自己換、夜鴞在三排之間飄。油燈照到的排，敵人不會自己換排（杖還是趕得動）` },
-  { name: '看門的', ico: '🧍', text: '每排門口站一位（約 10:3「看門的就給他開門」）。第一隻走到門口的地面敵人會被他擋下，把這排的地面敵人一起趕出場，叼著的迷羊也放下；用過一次他就不在了，那排再漏就守不住。飛的不經過門' },
+  { name: '看門的', ico: '🧍', text: '門口站的人（約 10:3「看門的就給他開門」；約翰福音裡看門的只認牧人的聲音，這裡借他的名字做一次性的門）。第一隻走到門口的地面敵人會被他擋下，把這排的地面敵人一起趕出場，叼著的迷羊也放下；用過一次他就不在了，那排再漏就守不住。飛的不經過門。寧靜夜每排一位、起風夜中間三排、暴風夜第 2、4 排' },
   { name: '無月夜', ico: '🌑', text: '第二章起第二波後看不到腳印預告，不知道下一隻從哪排來。油燈照到的三排例外' },
   { name: '迷羊', ico: '🐑', text: `不是敵人。從右邊走進來往羊圈走，走到最左邊或抱羊羔的牧人那格就回圈（羊數 +1、糧 +${STRAY.reward}）；地面敵人碰到就叼走，被叼出場算失落一隻；叼羊的被打倒，羊就從那裡繼續走。牧羊犬沒事時會走在牠旁邊護送` },
   { name: '撞牆', ico: '🐗', text: `野豬撞上每道牆的第一下傷害 ${ENEMIES.boar.slam}，之後正常咬；撞完自己暈 ${ENEMIES.boar.slamStun} 秒。踏過荊棘直接踩爛` },
@@ -1354,10 +1391,10 @@ function renderRosterDetail() {
     const away = roster.mode !== 'pick' && roster.from === 'intro' && !level.units.includes(k);
     const learns = roster.from === 'intro' && u.upgrade && u.upgrade.from === Engine.posOf(level.id);
     const note = away ? '<br><span class="new">這一夜還沒遇見，要到後面的夜才會同行</span>' : fresh ? `<br><span class="new">這一夜新開的卡${roster.mode === 'pick' ? '，建議帶上' : ''}</span>` : learns ? `<br><span class="new">這一夜起學會「${u.upgrade.name}」：放下後再點一下</span>` : roster.mode === 'pick' && k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : '';
-    box.innerHTML = `<b>${u.ico} ${u.name}</b>　<span class="num">🌾 ${u.cost}</span><br>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${u.ref}${u.upgrade ? '・升級 ' + u.upgrade.ref : ''}</div>`;
+    box.innerHTML = `<b>${u.ico} ${u.name}</b>　<span class="num">🌾 ${u.cost}</span><br>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${fullRef(u.ref)}${u.upgrade ? '・升級 ' + fullRef(u.upgrade.ref) : ''}</div>`;
   } else {
     const e = ENEMIES[k];
-    box.innerHTML = `<b>${e.ico} ${e.name}</b><br>${e.tip || '最普通的一隻，走到最左邊就闖進羊圈'}<br><span class="num">${enemyNums(k)}</span>`;
+    box.innerHTML = `<b>${e.ico} ${e.name}</b><br>${e.tip || '最普通的一隻，走到最左邊就闖進羊圈'}<br><span class="num">${enemyNums(k)}</span>${e.ref ? `<div class="ref">${fullRef(e.ref)}</div>` : ''}`;
   }
 }
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { roster.tab = b.dataset.tab; roster.focus = null; renderRoster(); }));
@@ -1385,7 +1422,7 @@ function tutShow() {
 }
 function tutAdvance() {
   tut.step++;
-  if (tut.step >= TUT_STEPS.length) return tutEnd('做得好。狼要來了，腳印出現在哪一排，狼就從那排來');
+  if (tut.step >= TUT_STEPS.length) return tutEnd('做得好。狼要來了，腳印出現在哪一排，狼就從那排來；每排都要有射手。走到門口的狼會被 🧍 看門的趕走，但每排只能幫你一次');
   tutShow();
 }
 function tutEnd(msg) {
@@ -1431,13 +1468,17 @@ function syncSoundUI() {
   document.querySelectorAll('.snd-btn').forEach(b => { b.textContent = p.sfx ? '🔊' : '🔇'; b.title = p.sfx ? '聲音：開（點一下靜音）' : '聲音：關（點一下打開）'; });
   document.querySelectorAll('#snd-panel [data-snd]').forEach(b => { const on = !!p[b.dataset.snd]; b.textContent = on ? '開' : '關'; b.classList.toggle('on', on); });
   document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.classList.toggle('on', Number(b.dataset.vol) === p.vol));
-  document.querySelectorAll('#snd-panel .snd-row').forEach((row, i) => row.classList.toggle('off', i > 0 && !p.sfx));
+  document.querySelectorAll('#snd-panel .snd-row').forEach((row, i) => row.classList.toggle('off', i > 1 && !p.sfx)); // 第 0 列是大字、第 1 列是音效開關，之後的才跟著音效壓暗
 }
 document.querySelectorAll('.snd-btn').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); Sound.set('sfx', !Sound.prefs.sfx); syncSoundUI(); Sound.play('tap'); }));
 document.querySelectorAll('#snd-panel [data-snd]').forEach(b => b.addEventListener('click', () => { Sound.set(b.dataset.snd, !Sound.prefs[b.dataset.snd]); syncSoundUI(); Sound.play('tap'); }));
 document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.addEventListener('click', () => { Sound.set('vol', Number(b.dataset.vol)); syncSoundUI(); Sound.play('clear'); }));
 // iOS 要有一次手勢才能出聲：第一次點任何地方就把聲音打開
 document.addEventListener('pointerdown', () => Sound.unlock(), { capture: true, passive: true });
+// 大字：整頁放大 1.18 倍（html.big，CSS zoom），存 sheepfold-bigtext
+function applyBig(on, save = true) { document.documentElement.classList.toggle('big', !!on); const b = $('#big-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) try { localStorage.setItem('sheepfold-bigtext', on ? '1' : '0'); } catch (e) {} }
+$('#big-btn').addEventListener('click', () => { applyBig(!document.documentElement.classList.contains('big')); Sound.play('tap'); });
+try { applyBig(localStorage.getItem('sheepfold-bigtext') === '1', false); } catch (e) {}
 syncSoundUI();
 
 // 檢查點：每清完一波存一次，每關各存一份（去玩別關不會蓋掉）；守完、輸了、重新開始同一關只清自己這關的
@@ -1472,20 +1513,34 @@ function buildDevEnemies() {
   const so = document.createElement('option'); so.value = 'stray'; so.textContent = STRAY.ico + ' ' + STRAY.name + '（中立）'; sel.appendChild(so);
   sel.addEventListener('change', () => { devEnemy = sel.value; if (devEnemy) { selected = null; document.querySelectorAll('.card').forEach(x => x.classList.remove('selected')); cells.forEach(x => x.classList.remove('hint')); toast(`點任一格，放一隻${devEnemy === 'stray' ? STRAY.name : ENEMIES[devEnemy].name}`); } });
 }
-document.querySelectorAll('#dev [data-speed]').forEach(b => b.addEventListener('click', () => { speed = Number(b.dataset.speed); board.classList.toggle('fast', speed > 1); document.querySelectorAll('#dev [data-speed]').forEach(x => x.classList.toggle('on', x === b)); }));
+document.querySelectorAll('#dev [data-speed]').forEach(b => b.addEventListener('click', () => setSpeed(Number(b.dataset.speed))));
 $('#dev-pause').addEventListener('click', () => { paused = !paused; syncPause(); if (!paused) last = performance.now(); });
 $('#dev-food').addEventListener('click', () => { if (G) { Engine.dev.food(G, 500); draw(); } });
 $('#dev-all').addEventListener('click', () => { if (G) { Engine.dev.allCards(G); buildCards(); toast('這一局全部的卡都能用'); } });
 $('#dev-next').addEventListener('click', () => { if (G) { Engine.dev.nextWave(G); flushEvents(); draw(); } });
 $('#dev-clear').addEventListener('click', () => { if (G) { Engine.dev.clear(G); flushEvents(); draw(); } });
-$('#top span:first-child').addEventListener('click', () => { foodTaps++; if (foodTaps >= 5) { foodTaps = 0; setDev(!devOn); } });
+{ let holdT = 0; const fs = $('#top span:first-child'); const stop = () => { clearTimeout(holdT); holdT = 0; };
+  fs.addEventListener('pointerdown', () => { stop(); holdT = setTimeout(() => { holdT = 0; setDev(!devOn); }, 1500); });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) fs.addEventListener(ev, stop);
+  fs.addEventListener('contextmenu', e => e.preventDefault()); } // 長按時手機會跳選單，擋掉
 buildDevEnemies(); setDev(devOn);
 
+// 組合字 emoji（🧑‍🌾、🐕‍🦺 這種用零寬連接符拼的）在舊 Android／Windows 會拆成兩個字：量一下寬度，拆開的就換成單一碼位的替身（2026-10-20 P2）
+(function emojiFallback() {
+  try {
+    const cv = document.createElement('canvas').getContext('2d'); if (!cv) return;
+    cv.font = '32px -apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    const w = t => cv.measureText(t).width;
+    const broken = t => t.includes('\u200d') && w(t) > w(t.split('\u200d')[0]) * 1.5; // 拼不起來＝比第一個字寬太多
+    const FALLBACK = { shepherd: '🧑', digger: '🐩' };
+    for (const [k, alt] of Object.entries(FALLBACK)) { const d = UNITS[k] || ENEMIES[k]; if (d && broken(d.ico)) d.ico = alt; }
+  } catch (e) {}
+})();
 buildBoard(); buildLevels();
 try { diff = localStorage.getItem('sheepfold-diff') || 'calm'; } catch (e) {}
 if (!DIFFS[diff]) diff = 'calm';
 document.querySelectorAll('.diff').forEach(b => b.addEventListener('click', () => applyDiff(b.dataset.key)));
-$('#start').addEventListener('click', () => { if (pickedFor(level) && !hasLoadout(level)) { openRoster('pick', 'intro'); return; } $('#intro').hidden = true; startGame(); });
+$('#start').addEventListener('click', () => { markIntroSeen(); if (pickedFor(level) && !hasLoadout(level)) { openRoster('pick', 'intro'); return; } $('#intro').hidden = true; startGame(); });
 $('#intro-back').addEventListener('click', backToLevels);
 $('#retry').addEventListener('click', () => startGame());
 $('#back').addEventListener('click', backToLevels);

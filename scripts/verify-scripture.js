@@ -34,6 +34,12 @@ const QUOTES = [
   { ref: '撒上 17:20', code: '1SA', ch: 17,  text: '將羊交託一個看守的人' },
   { ref: '創 47:3',   code: 'GEN', ch: 47,  text: '你僕人是牧羊的，連我們的祖宗也是牧羊的。' },
   { ref: '約 10:3',   code: 'JHN', ch: 10,  text: '看門的就給他開門' },
+  // 2026-10-20 多視角審查改引文
+  { ref: '約 10:1',   code: 'JHN', ch: 10,  text: '人進羊圈，不從門進去，倒從別處爬進去，那人就是賊，就是強盜。' },
+  { ref: '約 10:12',  code: 'JHN', ch: 10,  text: '若是雇工，不是牧人，羊也不是他自己的，他看見狼來，就撇下羊逃走' },
+  { ref: '撒上 17:37', code: '1SA', ch: 17,  text: '耶和華救我脫離獅子和熊的爪，也必救我脫離這非利士人的手。' },
+  { ref: '創 29:11',  code: 'GEN', ch: 29,  text: '就放聲而哭' },
+  { ref: '摩 3:12',   code: 'AMO', ch: 3,   text: '兩條羊腿或半個耳朵' },
 ];
 
 async function fetchChapter(code, ch) {

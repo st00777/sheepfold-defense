@@ -94,3 +94,22 @@ test('第二章十夜在正確位置', () => {
   assert.strictEqual(LEVELS.length, 20);
   assert.strictEqual(E.posOf(14), 20); assert.strictEqual(D.UNITS.horn.upgrade.from, 20);
 });
+
+// 2026-10-20：看門的依難度——寧靜五位、起風中間三排、暴風第 2、4 排；星級「看門的都在」以這一局開局的人數為準
+test('看門的依難度：人數、星級、存檔都跟著難度', () => {
+  const C = E.create(1, 'calm'), W = E.create(1, 'windy'), S = E.create(1, 'storm');
+  assert.deepStrictEqual(C.gates, [0, 1, 2, 3, 4]); assert.deepStrictEqual(W.gates, [1, 2, 3]); assert.deepStrictEqual(S.gates, [1, 3]);
+  assert.deepStrictEqual(E.gateRows(E.levelById(1), 'storm'), [1, 3]);
+  // 暴風夜第 0 排沒有看門的：狼走到門口直接輸
+  E.dev.spawn(S, 'wolf', 0, 0.2); S.started = true; S.phase = 'wave'; S.queue = []; S.wave = 1;
+  for (let i = 0; i < 200 && !S.over; i++) E.step(S, 0.05);
+  assert.ok(S.over && S.result.reason === 'wolf');
+  // 暴風夜兩位都在就有「看門的」那顆星；用掉一位就沒有
+  const S2 = E.create(1, 'storm'); E.dev.spawn(S2, 'wolf', 3, 0.2); S2.started = true; S2.phase = 'wave'; S2.queue = []; S2.wave = 1;
+  for (let i = 0; i < 200 && S2.enemies.length; i++) E.step(S2, 0.05);
+  assert.deepStrictEqual(S2.gates, [1]);
+  const snap = E.snapshot(S2); snap.wave = 1;
+  const S3 = E.create(1, 'storm'); assert.ok(E.restore(S3, snap)); assert.deepStrictEqual(S3.gates, [1]);
+  // 存檔裡寫了這個難度沒有的排（例如從寧靜夜的舊檔改難度）：丟掉，不會多出一位
+  const S4 = E.create(1, 'storm'); assert.ok(E.restore(S4, { ...snap, gates: [0, 1, 3] })); assert.deepStrictEqual(S4.gates, [1, 3]);
+});

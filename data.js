@@ -59,6 +59,7 @@ const UNITS = {
 const ELDER_MUL = 0.6;    // 老牧人送糧間隔倍數
 const ELDER_COST = 75;
 const REPAIR_COST = 25, REPAIR_HP = 120, REPAIR_CD = 8; // 修補一次要隔 8 秒，不能一直點
+const REPAIR_HINT = 0.7;  // 牆血低於這個比例（且糧夠）才掛「修補」角標；點了任何受傷的牆都修得了
 const MAX_CARDS = 8;      // 一關最多帶幾張卡上場，超過就要點兵
 const MIN_CARDS = 4;      // 點兵至少要帶幾張（只帶牧人等於沒得打）
 const SELL_RATE = 0.5;    // 鏟子拆掉單位退幾成糧（含升老牧人花的）
@@ -74,36 +75,37 @@ const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'volley', 'st
 // boss 頭目：腳印預告用牠的圖示並放大；同一波第二隻頭目走不同排
 // thick 厚皮：石子和箭只打 THICK_MUL（35%），機弦、投石機、火、毒全額（所以「石子打不痛牠」）；prio 狗優先咬誰（越大越先）
 const ENEMIES = {
-  wolf:    { name: '狼',     ico: '🐺', hp: 60,  speed: 0.22, bite: 12 },
-  fast:    { name: '快狼',   ico: '🐺', hp: 40,  speed: 0.40, bite: 10, cls: 'fast' },
-  alpha:   { name: '領頭狼', ico: '🐺', hp: 200, speed: 0.20, bite: 15, cls: 'alpha', howl: 8, prio: 4, boss: true,
+  // ref：經文出處（圖鑑敵方頁顯示；正本對照表在 docs/roster.md）
+  wolf:    { name: '狼',     ico: '🐺', hp: 60,  speed: 0.22, bite: 12, ref: '創 31:39' },
+  fast:    { name: '快狼',   ico: '🐺', hp: 40,  speed: 0.40, bite: 10, cls: 'fast', ref: '哈 1:8' },
+  alpha:   { name: '領頭狼', ico: '🐺', hp: 200, speed: 0.20, bite: 15, cls: 'alpha', howl: 8, prio: 4, boss: true, ref: '哈 1:8',
              tip: '嚎叫讓附近狼群加速。派牧羊犬咬住牠' },
-  bear:    { name: '母熊',   ico: '🐻', hp: 420, speed: 0.15, bite: 25, cls: 'big', enrage: 0.5, thick: true, prio: 2, boss: true,
+  bear:    { name: '母熊',   ico: '🐻', hp: 420, speed: 0.15, bite: 25, cls: 'big', enrage: 0.5, thick: true, prio: 2, boss: true, ref: '撒下 17:8',
              tip: '血量高，半血狂暴。石子傷害低，改用機弦手' },
-  lion:    { name: '獅子',   ico: '🦁', hp: 600, speed: 0.15, bite: 30, cls: 'big lion', roar: 12, wallMul: 4, thick: true, prio: 2, boss: true,
+  lion:    { name: '獅子',   ico: '🦁', hp: 600, speed: 0.15, bite: 30, cls: 'big lion', roar: 12, wallMul: 4, thick: true, prio: 2, boss: true, ref: '摩 3:8',
              tip: '咆哮讓附近夥伴停手，拆牆很快。狗拖住，機弦手集中攻擊' },
-  thief:   { name: '賊',     ico: '🥷', hp: 70,  speed: 0.25, bite: 10, cls: 'human', vaults: true, prio: 3,
+  thief:   { name: '賊',     ico: '🥷', hp: 70,  speed: 0.25, bite: 10, cls: 'human', vaults: true, prio: 3, ref: '約 10:1',
              tip: '會翻過石牆，改用守望樓攔截' },
-  rustler: { name: '偷羊人', ico: '🧔', hp: 90,  speed: 0.30, bite: 4,  cls: 'human light', steals: true, fleeSpeed: 0.45, prio: 5,
+  rustler: { name: '偷羊人', ico: '🧔', hp: 90,  speed: 0.30, bite: 4,  cls: 'human light', steals: true, fleeSpeed: 0.45, prio: 5, ref: '創 31:39',
              tip: '不攻擊，走到底就抱羊逃跑。派牧羊犬追捕救羊' },
-  fox:     { name: '小狐狸', ico: '🦊', hp: 30,  speed: 0.35, bite: 6,  cls: 'small', dodge: 0.7, prio: 3,
+  fox:     { name: '小狐狸', ico: '🦊', hp: 30,  speed: 0.35, bite: 6,  cls: 'small', dodge: 0.7, prio: 3, ref: '歌 2:15',
              tip: '十顆石子閃掉七顆。改用牧羊犬或荊棘' },
-  locust:  { name: '蝗群',   ico: '🦗', hp: 8,   speed: 0.30, bite: 2,  cls: 'swarm',
+  locust:  { name: '蝗群',   ico: '🦗', hp: 8,   speed: 0.30, bite: 2,  cls: 'swarm', ref: '箴 30:27',
              tip: '成群出現，用弓箭手穿透，一箭打多隻' },
-  digger:  { name: '野狗',   ico: '🐕‍🦺', hp: 80, speed: 0.22, bite: 12, cls: 'dig', digs: true, digSpeed: 0.35,
+  digger:  { name: '野狗',   ico: '🐕‍🦺', hp: 80, speed: 0.22, bite: 12, cls: 'dig', digs: true, digSpeed: 0.35, ref: '瑪 1:3',
              tip: '鑽地繞過前排。土堆是牠冒出來的地方，在土堆左邊放牆或狗' },
-  bird:    { name: '鷙鳥',   ico: '🦅', hp: 50,  speed: 0.20, bite: 0,  cls: 'fly', flying: true,
+  bird:    { name: '鷙鳥',   ico: '🦅', hp: 50,  speed: 0.20, bite: 0,  cls: 'fly', flying: true, ref: '創 15:11',
              tip: '飛越牆與狗，射手的投射和瓦瓶火把才打得到' },
   // ====== 第二章「另外的羊」 ======
   // detour 繞路：前面是牆、隔壁排同一格沒牆就跳過去（冷卻秒數）；slam 撞牆第一下傷害、slamStun 撞完自己暈幾秒、trample 踩爛荊棘
   // drift 在上下幾排之間飄、driftT 飄一圈幾秒；shiftEvery 每幾秒換一排；crouchAt 走到第幾格蹲、crouch 蹲幾秒、dash 之後衝幾格
-  jackal:  { name: '豺狼',   ico: '🐺', hp: 70,  speed: 0.26, bite: 12, cls: 'sly', detour: 6, prio: 3,
+  jackal:  { name: '豺狼',   ico: '🐺', hp: 70,  speed: 0.26, bite: 12, cls: 'sly', detour: 6, prio: 3, ref: '耶 5:6',
              tip: '碰到牆就繞到隔壁排。光靠牆攔不住，派牧羊犬咬住牠' },
-  boar:    { name: '野豬',   ico: '🐗', hp: 320, speed: 0.30, bite: 20, cls: 'big boar', slam: 100, slamStun: 1.5, trample: true, prio: 2,
+  boar:    { name: '野豬',   ico: '🐗', hp: 320, speed: 0.30, bite: 20, cls: 'big boar', slam: 100, slamStun: 1.5, trample: true, prio: 2, ref: '詩 80:13',
              tip: '撞牆第一下很重，還會踩爛荊棘。守望樓擋得住，機弦手打得快' },
-  owl:     { name: '夜鴞',   ico: '🦉', hp: 60,  speed: 0.18, bite: 0,  cls: 'fly owl', flying: true, drift: 1, driftT: 4,
+  owl:     { name: '夜鴞',   ico: '🦉', hp: 60,  speed: 0.18, bite: 0,  cls: 'fly owl', flying: true, drift: 1, driftT: 4, ref: '詩 102:6',
              tip: '在排與排之間飄，單排射手常打空。投石隊一次打三排' },
-  leopard: { name: '豹',     ico: '🐆', hp: 650, speed: 0.28, bite: 28, cls: 'big leopard', thick: true, vaults: true, shiftEvery: 7, crouchAt: 5, crouch: 2, dash: 2, prio: 2, boss: true,
+  leopard: { name: '豹',     ico: '🐆', hp: 650, speed: 0.28, bite: 28, cls: 'big leopard', thick: true, vaults: true, shiftEvery: 7, crouchAt: 5, crouch: 2, dash: 2, prio: 2, boss: true, ref: '耶 5:6',
              tip: '跳過牆、每隔幾秒換一排走，蹲下來就要衝了。牧羊犬咬住牠，投石隊三排盯著' },
 };
 
@@ -128,10 +130,11 @@ const STATUS = {
 };
 
 // ====== 難度（對每一關都有效；只影響第二波起） ======
+// gates：這個難度哪幾排門口有看門的（2026-10-20：寧靜夜五位、起風夜中間三位、暴風夜第 2、4 排兩位；關卡 gates: false 一律沒有）
 const DIFFS = {
-  calm:  { name: '寧靜夜', hint: '敵人較少，先熟悉怎麼守',  shepherdEvery: 7,  countMul: 1,   hpMul: 1,    gapMul: 1 },
-  windy: { name: '起風夜', hint: '敵人更多、血量更高，守法自己想', shepherdEvery: 7,  countMul: 1.3, hpMul: 1.25, gapMul: 0.77 },
-  storm: { name: '暴風夜', hint: '產糧較慢，敵人又多又壯',  shepherdEvery: 10, countMul: 1.3, hpMul: 1.25, gapMul: 0.77 },
+  calm:  { name: '寧靜夜', hint: '敵人較少，先熟悉怎麼守',  shepherdEvery: 7,  countMul: 1,   hpMul: 1,    gapMul: 1,    gates: [0, 1, 2, 3, 4] },
+  windy: { name: '起風夜', hint: '敵人更多、血量更高，看門的只剩中間三排', shepherdEvery: 7,  countMul: 1.3, hpMul: 1.25, gapMul: 0.77, gates: [1, 2, 3] },
+  storm: { name: '暴風夜', hint: '產糧較慢，敵人又多又壯，看門的只剩兩位',  shepherdEvery: 10, countMul: 1.3, hpMul: 1.25, gapMul: 0.77, gates: [1, 3] },
 };
 
 const PREP_TIME = 18;      // 第一波來之前的準備秒數（關卡可覆寫）
@@ -187,13 +190,13 @@ const LEVELS = [
       { list: [['bear', 1], ['wolf', 5]],                gap: 3.0, rows: [0, 1, 2, 3, 4], hpMul: 1.3, ordered: true, say: '熊來了', hint: '聽見了嗎，是熊。石子傷害低，機弦手準備' },
       { list: [['lion', 1], ['wolf', 8], ['fast', 4]],   gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.5, ordered: true, say: '獅子來了，最後一波', hint: '最後一波有獅子，拆牆很快。牧羊犬拖住，機弦手集中攻擊' },
     ],
-    outroWin: '天亮了。大衛說：「耶和華救我脫離獅子和熊的爪，也必救我。」（撒上 17:37）',
+    outroWin: '天亮了。大衛說：「耶和華救我脫離獅子和熊的爪，也必救我脫離這非利士人的手。」（撒上 17:37）',
     outroLose: { wolf: '大衛說：「有時來了獅子，有時來了熊。」碰上牠們，光靠牆撐不了多久，得讓機弦手多打幾發。明晚再來。' },
   },
   {
     id: 3, name: '雇工與賊', title: '羊的門', ref: '取材：約翰福音 10 章',
     speaker: null,
-    intro: '「從門進去的，才是羊的牧人；從別處爬進去的，那人就是賊，就是強盜。」「雇工不是牧人，羊也不是他自己的，他看見狼來，就撇下羊逃走。」（約 10:1、12）今晚羊圈裡有三隻羊，被偷光就守不住了。',
+    intro: '「人進羊圈，不從門進去，倒從別處爬進去，那人就是賊，就是強盜。」（約 10:1）「若是雇工，不是牧人，羊也不是他自己的，他看見狼來，就撇下羊逃走。」（約 10:12）今晚羊圈裡有三隻羊，被偷光就守不住了。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower'], fresh: ['hireling', 'tower'],
     tips: ['🐑 羊圈裡有三隻羊，偷羊人抱著羊往回跑時，追上牠羊就回來', '🗼 拿著守望樓的卡直接點石牆，原地換掉；石牆退一半糧，跟鏟子一樣'],
     sheep: 3,
@@ -256,7 +259,7 @@ const LEVELS = [
       { list: [['wolf', 12], ['fast', 4]],                    gap: 1.2, rows: [2],             hpMul: 1.4, say: '狼擠在同一排', hint: '這波集中走中排，用火盆讓燃燒在狼群間蔓延' },
       { list: [['bear', 1], ['wolf', 8], ['bird', 3], ['bear', 1]], gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.7, ordered: true, say: '躲避獅子又遇見熊', hint: '熊來了。荊棘減速，讓機弦手多打幾發' },
     ],
-    outroWin: '天亮了。阿摩司說，牧人從獅子口中只能搶回兩條羊腿或半個耳朵（摩 3:12），他講的是以色列的審判。今晚你搶回的是整群，別忘了那句話。',
+    outroWin: '天亮了。阿摩司說，牧人從獅子口中只能搶回兩條羊腿或半個耳朵（摩 3:12）。今晚你搶回的是整群。',
     outroLose: { wolf: '阿摩司說：「躲避獅子又遇見熊。」（摩 5:19）明晚再守。把火盆放在射手前面，讓石子穿過火。', bird: '鷙鳥飛過牆，闖進羊圈了。天上的敵人得靠射手攔下，每排都要有人。' },
   },
   {
@@ -280,7 +283,7 @@ const LEVELS = [
     speaker: '烏西雅的牧人',
     intro: '王在曠野建了望樓、挖了井，因為牲畜甚多。王的巧匠做的機器，也送了一台到這座望樓。今晚牆會被咬得很慘，纏裹的人也來了。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult'], fresh: ['healer', 'catapult'], must: ['sling'],
-    tips: ['🩹 纏裹的牧人不攻擊，周圍八格受傷的夥伴每秒回復血量，放在牆後一格', '🛞 投石機拋到該排最遠的敵人，濺射傷害波及落點周圍，專打擠成一串的狼'],
+    tips: ['🩹 纏裹的牧人放在牆後一格；🛞 投石機專打擠成一串的狼'],
     waves: [
       { list: [['wolf', 6]],                                              gap: 4.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['wolf', 10], ['fast', 4]],                                gap: 1.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '五排一起咬牆', hint: '下一波狼從五排來，會一直咬牆。纏裹的牧人放在牆後一格，周圍八格的夥伴每秒回復血量' },
@@ -305,6 +308,7 @@ const LEVELS = [
       { list: [['lion', 1], ['wolf', 10], ['lion', 1], ['fast', 8], ['locust', 20]], gap: 1.5, rows: [0, 1, 2, 3, 4], hpMul: 2,   ordered: true, say: '兩隻獅子，最後一波', hint: '最後兩隻獅子。獅子交給狗和機弦手，纏裹的牧人膏油後顧住整排石牆' },
     ],
     outroWin: '天亮了。',
+    psalmTitle: '詩篇二十三篇',
     psalm: ['耶和華是我的牧者，我必不致缺乏。', '他使我躺臥在青草地上，領我在可安歇的水邊。', '他使我的靈魂甦醒，為自己的名引導我走義路。', '我雖然行過死蔭的幽谷，也不怕遭害，因為你與我同在；你的杖，你的竿，都安慰我。', '在我敵人面前，你為我擺設筵席；你用油膏了我的頭，使我的福杯滿溢。', '我一生一世必有恩惠慈愛隨著我；我且要住在耶和華的殿中，直到永遠。'],
     outroLose: {
       wolf: '「失喪的，我必尋找。」（結 34:16）天還沒亮，再守一夜。',
@@ -322,7 +326,7 @@ const LEVELS = [
     speaker: '西坡拉', moonless: 2,
     intro: '我們姊妹七個，天天來打水給父親的羊喝，別的牧人總把我們趕走。今天有一個埃及人站出來替我們打水。今晚羊群在井邊過夜，月亮快下山了，父親把杖交給你。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff'], fresh: ['staff'], must: ['dog'],
-    tips: ['🌑 月亮下山後看不到腳印預告，每排都要顧', '🦯 牧人杖不攻擊，敵人走到它面前就被趕到隔壁排。放在沒有射手的排，把敵人趕進有射手的那排'],
+    tips: ['🌑 月亮下山後看不到腳印預告，每排都要顧'],
     waves: [
       { list: [['wolf', 5]],                                   gap: 4.5, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['wolf', 8], ['fast', 3]],                      gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.3, say: '月亮下山了', hint: '月亮快下山了，之後看不見腳印。狼會散開五排來，用牧人杖把牠們趕到同一排打' },
@@ -337,14 +341,14 @@ const LEVELS = [
     speaker: '拉結', moonless: 2,
     intro: '父親的羊是我牧放的。今晚沒有月亮，井邊有野豬的腳印。燈給你，點著放在羊圈前面，看得見才守得住。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp'], fresh: ['lamp'], must: ['sling', 'tower'],
-    tips: ['🪔 油燈照亮自己那排和上下兩排：光裡的敵人不換排，那三排的腳印預告也會回來', '🐗 野豬撞牆第一下很重，還會踩爛荊棘'],
+    tips: ['🐗 野豬撞牆第一下很重，還會踩爛荊棘'],
     waves: [
       { list: [['wolf', 6]],                                               gap: 4.5, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['wolf', 8], ['fast', 4]],                                  gap: 2.2, rows: [0, 1, 2, 3, 4], hpMul: 1.2, say: '月亮下山了', hint: '沒有月亮了。油燈放中間，照亮三排，腳印就看得見，光裡的敵人也不會換排' },
       { list: [['boar', 1], ['wolf', 6]],                                  gap: 2.8, rows: [0, 1, 2, 3, 4], hpMul: 1.45, ordered: true, say: '聽，有東西在撞', hint: '是野豬。牠撞石牆第一下很重，還會踩爛荊棘。守望樓擋得住，機弦手打得快' },
       { list: [['boar', 2], ['wolf', 9], ['jackal', 3], ['fast', 3]],      gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.7, say: '最後一波', hint: '兩頭野豬，看燈下的腳印決定機弦手放哪排' },
     ],
-    outroWin: '天亮了，父親的羊一隻沒少。拉結說：雅各看見我，就放聲哭了。（創 29:11）',
+    outroWin: '天亮了，父親的羊一隻沒少。拉結說：那天雅各見到我，就放聲而哭。（創 29:11）',
     outroLose: { wolf: '拉結說：看不見的，就先點燈。油燈放中間那排，三排都亮。' },
   },
   {
@@ -352,7 +356,7 @@ const LEVELS = [
     speaker: '迦密的牧人', moonless: 2, sheep: 3,
     intro: '我們在迦密放羊，大衛的少年人在田野與我們來往，晝夜作我們的保障，我們未曾失落甚麼。今晚山上有別人家的羊迷了路，會從東邊下來。牠們不是我們的羊，也一隻都不能少。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol'], fresh: ['patrol'], must: ['dog', 'staff'],
-    tips: ['🐑 迷羊從右邊走進來，狼碰到就叼走；走到最左邊就回圈，羊數加一。被叼出去就少一隻', '🚶 巡夜人在三排之間來回走，放中間那排'],
+    tips: ['🐑 迷羊從右邊走進來，狼碰到就叼走；走到最左邊就回圈，羊數加一。被叼出去就少一隻', ],
     waves: [
       { list: [['wolf', 6]],                                               gap: 4.5, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['wolf', 8]],                                               gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.2, strays: [10, 25], say: '有羊迷路了', hint: '山上有別人的羊迷了路，會從右邊走過來，狼碰到就叼走。牧羊犬會護著牠走回來' },
@@ -406,7 +410,7 @@ const LEVELS = [
     speaker: '以撒', moonless: 2,
     intro: '我的僕人挖井，基拉耳人就來爭。爭了，我們就再挖一口。今晚夜鴞在井上飄，不走直線。投石隊左右兩手都能甩石，一次顧三排。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley'], fresh: ['volley'], must: ['tower'],
-    tips: ['🥌 投石隊同時打自己這排和上下兩排，放中間最划算', '🦉 夜鴞在排與排之間飄，單排射手常打空'],
+    tips: ['🦉 夜鴞在排與排之間飄，單排射手常打空'],
     waves: [
       { list: [['wolf', 6]],                                               gap: 4.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['owl', 1], ['wolf', 6], ['owl', 2]],                       gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, ordered: true, say: '天上有東西在飄', hint: '夜鴞不走直線，單排射手打不準。投石隊一次打三排，放中間' },
@@ -439,7 +443,7 @@ const LEVELS = [
     speaker: '亞伯拉罕', moonless: 2, sheep: 3,
     intro: '我的牧人和羅得的牧人相爭，兩家的羊在山裡混成一群。明天就要分開：你向左，我就向右。今晚先把走散的一隻隻帶回來。草叢裡有東西伏著，小心。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle'], fresh: ['cradle'], must: ['dog', 'volley'],
-    tips: ['🫂 抱羊羔的牧人放前面一點，迷羊走到他那格就安全', '🐆 豹會跳過牆、每隔幾秒換一排走，蹲下來就是要衝了'],
+    tips: ['🐆 豹會跳過牆、每隔幾秒換一排走，蹲下來就是要衝了'],
     waves: [
       { list: [['wolf', 6], ['fast', 2]],                                  gap: 3.5, rows: [1, 2, 3],       hpMul: 1.1, say: '第 1 波' },
       { list: [['wolf', 8], ['jackal', 2]],                                gap: 2.2, rows: [0, 1, 2, 3, 4], hpMul: 1.3, strays: [6, 16, 28], say: '羊從山上下來了', hint: '羅得的羊會一隻隻下來。抱羊羔的牧人放前面一點，羊走到他那格就安全' },
@@ -465,7 +469,7 @@ const LEVELS = [
       { list: [['boar', 1], ['owl', 2], ['wolf', 8]],                       gap: 2.0, rows: [0, 1, 2, 3, 4], hpMul: 1.5,  ordered: true, say: '野豬和夜鴞', hint: '野豬撞牆、夜鴞飄排。守望樓擋豬，投石隊打鴞' },
       { list: [['leopard', 1], ['jackal', 3], ['wolf', 10], ['fast', 4]],   gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.75, ordered: true, say: '豹來了，最後一波', hint: '豹又來了。守望樓擋牠，狗咬住牠就不換排，機弦手集中打' },
     ],
-    outroWin: '天亮了。猶大對法老說的話算數：「你僕人是牧羊的，連我們的祖宗也是牧羊的。」（創 47:3）',
+    outroWin: '天亮了。雅各的兒子們對法老說的話算數：「你僕人是牧羊的，連我們的祖宗也是牧羊的。」（創 47:3）',
     outroLose: { wolf: '糧少的時候，先放牧人再放射手，牆晚一點補。三位牧人都升成老牧人，產糧會更快。', bird: '夜鴞飄進羊圈了。投石隊三排都打得到，放中排。' },
   },
   {
@@ -491,5 +495,5 @@ const LEVELS = [
   },
 ];
 
-const DATA = { THICK_MUL, SPEED_FAST, SPEED_SLOW, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
+const DATA = { THICK_MUL, REPAIR_HINT, SPEED_FAST, SPEED_SLOW, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
 if (typeof module !== 'undefined') module.exports = DATA; else window.DATA = DATA;
