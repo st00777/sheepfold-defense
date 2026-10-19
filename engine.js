@@ -162,12 +162,13 @@
 
   // ====== 檢查點：每清完一波存一次，只存場上單位與糧，不存敵人，所以永遠從下一波的開頭接 ======
   function snapshot(G) {
-    return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep, sheepLost: G.sheepLost, unitsLost: G.unitsLost, seen: [...G.seen], hand: G.hand.slice(),
+    return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep, sheepLost: G.sheepLost, unitsLost: G.unitsLost ?? undefined, seen: [...G.seen], hand: G.hand.slice(),
       gates: G.gates.slice(), // 還在的看門的
       strays: G.strays.filter(s => !s.dead).map(s => ({ r: s.r, x: Math.round(s.x * 10) / 10 })), // 還在路上的迷羊
       strayQueue: G.strayQueue.map(t => Math.max(0, Math.round((t - G.waveT) * 10) / 10)),       // 還沒出來的迷羊（距現在幾秒）
       units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded,
-        cd: u.repairAt ? Math.max(0, Math.round((u.repairAt - G.time) * 10) / 10) : 0 })) };
+        cd: u.repairAt ? Math.max(0, Math.round((u.repairAt - G.time) * 10) / 10) : 0,
+        rest: u.resting ? Math.max(0.1, Math.round(u.restT * 10) / 10) : 0 })) }; // 狗在窩裡休息還剩幾秒；0＝沒在休息
   }
   // 存檔長得對不對：關卡、難度、波數、糧、每個單位的種類與座標都要在範圍內（localStorage 可能被改壞或版本變了）
   const isInt = (n, lo, hi) => Number.isInteger(n) && n >= lo && n <= hi;
@@ -177,7 +178,7 @@
     if (!DIFFS[snap.diff] || !isInt(snap.wave, 1, level.waves.length - 1) || !Number.isFinite(snap.food) || snap.food < 0) return false;
     if (snap.sheep !== undefined && !isInt(snap.sheep, 0, 99)) return false;
     if (snap.sheepLost !== undefined && !isInt(snap.sheepLost, 0, 99)) return false;
-    if (snap.unitsLost !== undefined && !isInt(snap.unitsLost, 0, 999)) return false;
+    if (snap.unitsLost !== undefined && snap.unitsLost !== null && !isInt(snap.unitsLost, 0, 999)) return false; // null＝舊檔續玩後不知道，放行
     if (snap.seen !== undefined && !Array.isArray(snap.seen)) return false;
     if (snap.hand !== undefined && !(Array.isArray(snap.hand) && snap.hand.length <= 12 && snap.hand.every(k => UNITS[k]))) return false;
     if (snap.gates !== undefined && !(Array.isArray(snap.gates) && snap.gates.length <= ROWS && snap.gates.every(r => isInt(r, 0, ROWS - 1)))) return false;
@@ -185,7 +186,7 @@
     if (snap.strayQueue !== undefined && !(Array.isArray(snap.strayQueue) && snap.strayQueue.length <= 20 && snap.strayQueue.every(t => Number.isFinite(t) && t >= 0 && t <= 600))) return false;
     if (!Array.isArray(snap.units) || snap.units.length > ROWS * COLS) return false;
     return snap.units.every(s => s && UNITS[s.type] && isInt(s.r, 0, ROWS - 1) && isInt(s.c, 0, COLS - 1)
-      && (s.hp === undefined || Number.isFinite(s.hp)) && (s.uses === undefined || isInt(s.uses, 0, 99)) && (s.cd === undefined || (Number.isFinite(s.cd) && s.cd >= 0)));
+      && (s.hp === undefined || Number.isFinite(s.hp)) && (s.uses === undefined || isInt(s.uses, 0, 99)) && (s.cd === undefined || (Number.isFinite(s.cd) && s.cd >= 0)) && (s.rest === undefined || (Number.isFinite(s.rest) && s.rest >= 0 && s.rest <= 600)));
   }
   function restore(G, snap) {
     if (!checkSnapshot(snap, G.levelId) || snap.diff !== G.diff || snap.wave >= G.waves.length) return false;
@@ -196,6 +197,7 @@
       if (s.elder && def.every) { u.elder = true; u.timer = Math.min(u.timer, def.every * ELDER_MUL); }
       if (s.upgraded && def.upgrade) u.upgraded = true;
       if (typeof s.cd === 'number' && s.cd > 0) u.repairAt = G.time + s.cd;
+      if (def.kind === 'dog' && typeof s.rest === 'number' && s.rest > 0) { u.resting = true; u.restT = Math.min(def.rest, s.rest); } // 存檔時狗在休息，續玩接著休息，不會帶著低血直接出動
       u.hp = Math.min(u.maxHp, Math.max(1, Number.isFinite(s.hp) ? s.hp : u.maxHp));
     }
     G.food = Math.max(0, snap.food); if (G.level.sheep) G.sheep = Math.max(1, Math.min(99, Number.isInteger(snap.sheep) ? snap.sheep : G.sheep)); // 迷羊回圈後會超過開局的隻數，不壓回去
@@ -734,7 +736,7 @@
   // 敵人走路、咬東西、特殊能力
   function enemiesMove(G, dt) {
     for (const e of G.enemies) {
-      if (e.dead) continue;
+      if (e.dead || e.hp <= 0) continue; // 這一步剛被打死的也不走不咬（以前只跳 dead，零血的狼還能再走一小步越線）
       const def = ENEMIES[e.type];
 
       // 狀態倒數
