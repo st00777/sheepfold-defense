@@ -172,7 +172,8 @@
       units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded,
         cd: u.repairAt ? Math.max(0, Math.round((u.repairAt - G.time) * 10) / 10) : 0,
         rest: u.resting ? Math.max(0.1, Math.round(u.restT * 10) / 10) : 0,
-        t: Math.max(0, Math.round((u.timer || 0) * 10) / 10) })) }; // 產糧／射擊／吹角的計時器剩幾秒，續玩不重設（吹角手冷卻 20 秒比波間休息長，重設等於白送一次） // 狗在窩裡休息還剩幾秒；0＝沒在休息
+        t: Math.max(0, Math.round((u.timer || 0) * 10) / 10),
+        ...(UNITS[u.type].push ? { cdLen: u.cdLen || UNITS[u.type].every } : {}) })) };
   }
   // 存檔長得對不對：關卡、難度、波數、糧、每個單位的種類與座標都要在範圍內（localStorage 可能被改壞或版本變了）
   const isInt = (n, lo, hi) => Number.isInteger(n) && n >= lo && n <= hi;
@@ -190,7 +191,8 @@
     if (snap.strayQueue !== undefined && !(Array.isArray(snap.strayQueue) && snap.strayQueue.length <= 20 && snap.strayQueue.every(t => Number.isFinite(t) && t >= 0 && t <= 600))) return false;
     if (!Array.isArray(snap.units) || snap.units.length > ROWS * COLS) return false;
     return snap.units.every(s => s && UNITS[s.type] && isInt(s.r, 0, ROWS - 1) && isInt(s.c, 0, COLS - 1)
-      && (s.hp === undefined || Number.isFinite(s.hp)) && (s.uses === undefined || isInt(s.uses, 0, 99)) && (s.cd === undefined || (Number.isFinite(s.cd) && s.cd >= 0)) && (s.rest === undefined || (Number.isFinite(s.rest) && s.rest >= 0 && s.rest <= 600)) && (s.t === undefined || (Number.isFinite(s.t) && s.t >= 0 && s.t <= 600)));
+      && (s.hp === undefined || Number.isFinite(s.hp)) && (s.uses === undefined || isInt(s.uses, 0, 99)) && (s.cd === undefined || (Number.isFinite(s.cd) && s.cd >= 0)) && (s.rest === undefined || (Number.isFinite(s.rest) && s.rest >= 0 && s.rest <= 600)) && (s.t === undefined || (Number.isFinite(s.t) && s.t >= 0 && s.t <= 600))
+      && (s.cdLen === undefined || (Number.isFinite(s.cdLen) && s.cdLen > 0 && s.cdLen <= 600)));
   }
   function restore(G, snap) {
     if (!checkSnapshot(snap, G.levelId) || snap.diff !== G.diff || snap.wave >= G.waves.length) return false;
@@ -199,7 +201,15 @@
       const def = UNITS[s.type];
       const u = makeUnit(G, s.r, s.c, s.type);
       if (s.elder && def.every) { u.elder = true; u.timer = Math.min(u.timer, def.every * ELDER_MUL); }
-      if (typeof s.t === 'number' && s.t >= 0 && def.every) u.timer = Math.min(s.t, def.every * (u.elder ? ELDER_MUL : 1)); // 舊檔沒這欄就照剛放下的算
+      if (typeof s.t === 'number' && s.t >= 0 && def.every) {
+        const interval = (s.type === 'shepherd' ? shepherdEvery(G) : def.every) * (u.elder ? ELDER_MUL : 1);
+        // 快照以 0.1 秒四捨五入，保留合法間隔的同等精度。
+        u.timer = Math.min(s.t, Math.round(interval * 10) / 10);
+        if (def.push) {
+          const full = Number.isFinite(s.cdLen) && s.cdLen > 0 ? s.cdLen : def.every;
+          u.cdLen = Math.min(def.every, Math.max(u.timer, full));
+        }
+      } // 舊檔沒計時器＝剛放下的第一輪冷卻
       if (s.upgraded && def.upgrade) u.upgraded = true;
       if (typeof s.cd === 'number' && s.cd > 0) u.repairAt = G.time + s.cd;
       if (def.kind === 'dog' && typeof s.rest === 'number' && s.rest > 0) { u.resting = true; u.restT = Math.min(def.rest, s.rest); } // 存檔時狗在休息，續玩接著休息，不會帶著低血直接出動
@@ -663,7 +673,7 @@
     }
   }
 
-  // 巡夜人：在自己這排和上下兩排之間來回走；當前那排前方有敵人就停下來打
+  // 巡夜人：先完成當前排交戰；空閒時往三排內最靠近羊圈的近戰目標走，沒有目標才巡邏。
   function patrolAct(G, u, def, dt) {
     const lo = Math.max(0, u.r - 1), hi = Math.min(ROWS - 1, u.r + 1);
     const row = Math.round(u.rv);
@@ -674,6 +684,13 @@
       return;
     }
     u.timer = Math.min(u.timer, def.every * 0.5);
+    const nearby = G.enemies.filter(e => targetable(e) && !ENEMIES[e.type].flying && e.r >= lo && e.r <= hi && e.x > u.c - 0.2 && e.x - u.c <= def.reach);
+    nearby.sort((a, b) => a.x - b.x || Math.abs(a.r - u.rv) - Math.abs(b.r - u.rv));
+    if (nearby.length) {
+      const delta = nearby[0].r - u.rv;
+      u.rv += Math.sign(delta) * Math.min(Math.abs(delta), dt / def.walk);
+      return;
+    }
     u.rv += u.dir * dt / def.walk;
     if (u.rv >= hi) { u.rv = hi; u.dir = -1; } else if (u.rv <= lo) { u.rv = lo; u.dir = 1; }
   }
@@ -695,8 +712,9 @@
     for (const s of G.strays) {
       if (s.dead) continue;
       s.x -= STRAY.speed * dt;
-      const c = Math.round(s.x), u = G.units[key(s.r, c)];
-      if ((u && UNITS[u.type].cradle && Math.abs(s.x - c) < 0.3) || s.x < -0.4) { strayHome(G, s, c); continue; }
+      const c = Math.round(s.x);
+      const receiver = Object.values(G.units).find(u => UNITS[u.type].cradle && Math.abs(u.r - s.r) <= 1 && Math.abs(s.x - u.c) < 0.3);
+      if (receiver || s.x < -0.4) { strayHome(G, s, receiver ? receiver.c : c); continue; }
       // 地面敵人碰到就叼走（被咬住、嚇退、暈眩、翻牆中的不會）
       for (const e of G.enemies) {
         if (e.r !== s.r || !targetable(e) || ENEMIES[e.type].flying || e.carrying || e.heldBy || e.st.panic || e.st.stun || e.vaulting > 0 || e.crouchT > 0) continue;

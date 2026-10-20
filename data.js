@@ -6,7 +6,7 @@ const ROWS = 5, COLS = 7;
 
 // ====== 我方單位 ======
 // kind：producer 產糧／shooter 射手／blocker 牆／dog 牧羊犬／floor 鋪地／instant 一次性／support 輔助／deflector 趕路（第二章）／patrol 巡夜（第二章）
-// 第二章欄位：light 油燈照亮上下幾排（腳印預告回來）；lanes 射手同時打上下幾排；deflect 每趕一隻自己掉多少血；cradle 迷羊走到他那格就安全；walk 巡夜人每走一排要幾秒、reach 打前方幾格
+// 第二章欄位：light 油燈照亮上下幾排（腳印預告回來）；lanes 射手同時打上下幾排；deflect 每趕一隻自己掉多少血；cradle 本排及上下鄰排的迷羊走到他的欄位就安全；walk 巡夜人每走一排要幾秒、reach 打前方幾格
 // upgrade：放下後「再點一下」花糧升級，欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）；fromId＝在哪一夜（id）學會，engine.js 載入時換算成 from＝那一夜的位置（顯示編號），desc 裡的 {from} 一併填入
 // heal 每秒回血／range 回血範圍幾格（1＝周圍八格、2＝5×5）／brave 獅子咆哮嚇不停
 const UNITS = {
@@ -50,11 +50,11 @@ const UNITS = {
   lamp:     { name: '油燈',     ico: '🪔',   cost: 50,  hp: 60,  kind: 'support', light: 1,
               desc: '不攻擊。照亮自己這排和上下兩排：光裡的敵人不換排（豺狼不繞路、豹不跳排、夜鴞不飄），無月夜裡那三排的腳印預告也會回來。放中間那排最划算', ref: '箴 31:18' },
   patrol:   { name: '巡夜人',   ico: '🚶',   cost: 125, hp: 140, kind: 'patrol', every: 0.8, dmg: 18, walk: 1.2, reach: 1.3,
-              desc: '在自己這排和上下兩排之間來回走，近戰打前方一格的敵人。放中間那排，幫狗看著隔壁', ref: '撒上 25:16' },
+              desc: '在本排與上下鄰排巡邏，空閒時優先趕往近戰範圍內受威脅的排；接敵後留在那排攻擊', ref: '撒上 25:16' },
   volley:   { name: '投石隊',   ico: '🥌',   cost: 175, hp: 60,  kind: 'shooter', every: 1.6, dmg: 14, shot: 'stone', lanes: 1,
               desc: '同時投石攻擊自己這排和上下兩排。放中間一次顧三排，夜鴞飄到哪排都打得到', ref: '代上 12:2' },
   cradle:   { name: '抱羊羔的牧人', ico: '🫂', cost: 75, hp: 100, kind: 'support', cradle: true,
-              desc: '不攻擊。迷羊走到他那一格就立刻安全，不必走到最左邊。放前面一點羊回來得快，但他自己會先被咬', ref: '賽 40:11' },
+              desc: '不攻擊。本排與上下鄰排的迷羊走到他所在的那一欄，就立刻安全。放前面接得早，但仍需保護他', ref: '賽 40:11' },
 };
 const ELDER_MUL = 0.6;    // 老牧人送糧間隔倍數
 const ELDER_COST = 75;
@@ -446,7 +446,7 @@ const LEVELS = [
     tips: ['🐆 豹會跳過牆、每隔幾秒換一排走，蹲下來就是要衝了'],
     waves: [
       { list: [['wolf', 6], ['fast', 2]],                                  gap: 3.5, rows: [1, 2, 3],       hpMul: 1.1, say: '第 1 波' },
-      { list: [['wolf', 8], ['jackal', 2]],                                gap: 2.2, rows: [0, 1, 2, 3, 4], hpMul: 1.3, strays: [6, 16, 28], say: '羊從山上下來了', hint: '羅得的羊會一隻隻下來。抱羊羔的牧人放前面一點，羊走到他那格就安全' },
+      { list: [['wolf', 8], ['jackal', 2]],                                gap: 2.2, rows: [0, 1, 2, 3, 4], hpMul: 1.3, strays: [6, 16, 28], say: '羊從山上下來了', hint: '羅得的羊會一隻隻下來。抱羊羔的牧人放中排前面一點，本排與上下鄰排的羊走到他的欄位就安全' },
       { list: [['owl', 3], ['wolf', 10], ['boar', 1]],                     gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.5, strays: [12, 26], say: '天上地上都來', hint: '夜鴞和野豬一起來，投石隊顧天上、守望樓擋豬' },
       { list: [['leopard', 1], ['wolf', 8], ['fast', 4]],                  gap: 2.4, rows: [0, 1, 2, 3, 4], hpMul: 1.7, ordered: true, say: '草叢裡的東西出來了', hint: '是豹。牠會跳過牆、每隔幾秒換一排，蹲下來就要衝。牧羊犬咬住牠，投石隊三排盯著' },
     ],

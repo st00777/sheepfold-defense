@@ -33,17 +33,25 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
     font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; overscroll-behavior: none; }
-  body { display: flex; flex-direction: column; min-height: 100dvh; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  body { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
 
   /* 上方資源列 */
-  /* 字級底線（2026-10-20 多視角審查 U2）：介面文字最小 13px；暫停層「大字」開關把整頁放大 1.18 倍（html.big） */
-  html.big body { zoom: 1.18; }
+  /* 核心閱讀文字至少 13px；大字模式只調字級，不放大整頁與視窗高度。 */
+  html.big .card .name, html.big .card .cost, html.big .rc .name, html.big .rc .cost { font-size: 15px; }
+  html.big .dialog p, html.big .tips, html.big .newbox, html.big #roster-detail { font-size: 17px; }
+  html.big .dialog .ref, html.big #diff-hint, html.big #best, html.big .lv .t span, html.big #roster-detail .num { font-size: 15px; }
+  html.big #toast, html.big .snd-row { font-size: 17px; }
+  #top, #cards-wrap, #bottom, #dev { flex-shrink: 0; }
+  #top { gap: 6px; }
+  #top > span:first-child, #sheep { white-space: nowrap; }
+  #top > span:last-child { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; flex: 1; }
+  #wave-info { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   #top { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--panel); font-size: 15px; }
   #top b { font-size: 18px; }
   #food { color: var(--gold); }
   #sheep[hidden] { display: none; }
   #wave-info { color: var(--muted); }
-  #pause-btn, #snd-btn, #fast-btn { font: inherit; font-size: 16px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 2px 9px; margin-left: 8px; cursor: pointer; }
+  #pause-btn, #snd-btn, #fast-btn { font: inherit; font-size: 16px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 6px; min-width: 36px; min-height: 36px; flex-shrink: 0; cursor: pointer; }
   /* 聲音設定（暫停層）：一列一個選項，右邊是開關或三檔 */
   .snd { text-align: left; margin: 12px 0 4px; }
   .snd-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-top: 1px solid #0004; font-size: 15px; }
@@ -70,8 +78,8 @@
   .card .tag { position: absolute; right: 4px; top: 3px; font-size: 10px; color: #2b2a26; background: var(--new); border-radius: 6px; padding: 0 4px; }
   #cards-wrap { background: var(--panel); }
   .card .ico { font-size: 24px; line-height: 1; }
-  .card .name { font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .card .cost { font-size: 12px; color: var(--gold); white-space: nowrap; }
+  .card .name { font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .cost { font-size: 13px; color: var(--gold); white-space: nowrap; }
   @media (min-width: 560px) { .card .ico { font-size: 26px; } .card .name, .card .cost { font-size: 13px; } }
   .card.selected { border-color: var(--gold); background: var(--card-on); }
   .card.poor { opacity: .45; }
@@ -96,7 +104,7 @@
   .card:active, .btn:not(:disabled):active, .diff:active, .tab:active, .lv:not(.locked):active, .rc:not(.locked):active, #pause-btn:active, #snd-btn:active, .corner:active, .snd-row button:active, #tut-skip:active { transform: scale(.97); }
 
   /* 棋盤 */
-  #board-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px; }
+  #board-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px; }
   #shell { position: relative; width: 100%; max-width: 640px; padding-left: var(--lane); --lane: 28px; } /* 左邊留一條「門口」走道給看門的，不跟第 0 欄搶位置 */
   #lane { position: absolute; left: 0; top: 0; bottom: 0; width: var(--lane); border-radius: 8px 0 0 8px; background: linear-gradient(90deg, #2f2c24, #3d3929); box-shadow: inset -2px 0 4px #0006; }
   #board { position: relative; width: 100%; aspect-ratio: 7 / 5; display: grid;
@@ -278,12 +286,23 @@
   /* 暫停時棋盤上的循環動畫也停 */
   #board.paused, #board.paused * { animation-play-state: paused; }
   .dialog { background: var(--panel); border-radius: 14px; padding: 22px 20px; max-width: 420px; width: 100%; text-align: center; margin: auto; }
+  #intro .dialog { display: flex; flex-direction: column; max-height: calc(100dvh - 40px); padding: 0; overflow: hidden; }
+  .intro-content { min-height: 0; overflow-y: auto; padding: 20px 20px 12px; }
+  .intro-actions { flex-shrink: 0; padding: 0 16px 14px; background: var(--panel); border-top: 1px solid #ffffff20; }
+  .intro-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .intro-buttons .btn { width: 100%; margin: 0; padding: 10px 8px; }
+  #start, #resume-cp { grid-column: 1 / -1; }
+  #best:empty, #intro-tips:empty { display: none; }
+  @media (max-height: 540px) { .overlay { padding: 8px; } #intro .dialog { max-height: calc(100dvh - 16px); } .intro-actions { padding-bottom: 8px; } .intro-buttons { grid-template-columns: repeat(3, 1fr); } #start { grid-column: auto; } #diffs { margin-top: 6px; } }
   .dialog h1 { margin: 0 0 6px; font-size: 24px; }
   .dialog .ref { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
   .dialog p { line-height: 1.7; font-size: 15px; text-align: left; }
   .dialog .who { color: var(--gold); }
   .dialog .verse { background: #0004; border-left: 3px solid var(--gold); padding: 8px 10px; border-radius: 4px; }
   #diffs { display: flex; gap: 6px; margin: 10px 0 4px; }
+  #gate-preview { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 6px 0; font-size: 13px; }
+  #gate-preview span { padding: 4px 0; border-radius: 5px; background: #0003; color: var(--muted); }
+  #gate-preview .protected { background: #e6b84a25; color: var(--gold); outline: 1px solid #e6b84a66; }
   .diff { flex: 1; background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 10px; padding: 9px 0; font-size: 15px; font-family: inherit; cursor: pointer; }
   .diff.selected { border-color: var(--gold); background: var(--card-on); }
   #diff-hint { font-size: 13px; color: var(--muted); min-height: 16px; margin-bottom: 8px; }
@@ -343,8 +362,8 @@
   .rc .dot { position: absolute; left: 5px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--u, #888); }
   .rc .tag { position: absolute; right: 4px; top: 3px; font-size: 10px; color: #2b2a26; background: var(--new); border-radius: 6px; padding: 0 4px; }
   .rc .ico { font-size: 26px; line-height: 1; }
-  .rc .name { font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rc .cost { font-size: 12px; color: var(--gold); }
+  .rc .name { font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rc .cost { font-size: 13px; color: var(--gold); }
   .rc.on { border-color: var(--gold); background: var(--card-on); }
   .rc.off { opacity: .45; }
   .rc.locked { opacity: .35; cursor: default; }
@@ -422,6 +441,7 @@
 <!-- 開場 -->
 <div class="overlay" id="intro" hidden>
   <div class="dialog">
+    <div class="intro-content">
     <h1 id="intro-title"></h1>
     <div class="ref" id="intro-ref"></div>
     <p id="intro-text"></p>
@@ -431,18 +451,24 @@
     </div>
     <div class="tips" id="intro-tips"></div>
     <div class="tips" id="intro-loadout"></div>
+    <div id="best"></div>
+    </div>
+    <div class="intro-actions">
     <div id="diffs">
       <button class="diff" data-key="calm">寧靜夜</button>
       <button class="diff" data-key="windy">起風夜</button>
       <button class="diff" data-key="storm">暴風夜</button>
     </div>
+    <div id="gate-preview" aria-label="各排看門的配置"></div>
     <div id="diff-hint"></div>
     <div class="tips" id="resume-line" hidden><span class="new" id="resume-text"></span></div>
+    <div class="intro-buttons">
     <button class="btn" id="resume-cp" hidden>繼續上次</button>
     <button class="btn" id="start">開始守夜</button>
     <button class="btn alt" id="intro-roster">隊伍</button>
     <button class="btn alt" id="intro-back">回關卡</button>
-    <div id="best"></div>
+    </div>
+    </div>
   </div>
 </div>
 
@@ -464,7 +490,7 @@
 <div class="overlay" id="pause" hidden>
   <div class="dialog">
     <h1>暫停中</h1>
-    <p>狼也在等。回來再按繼續。清完的波已經存下，回關卡之後還能從那裡接著守。</p>
+    <p id="pause-note">狼也在等。回來再按繼續。</p>
     <div class="snd" id="snd-panel">
       <div class="snd-row"><span>大字</span><button id="big-btn">關</button></div>
       <div class="snd-row"><span>音效</span><button data-snd="sfx">開</button></div>
@@ -491,8 +517,8 @@
   </div>
 </div>
 
-<script src="data.js?v=11"></script>
-<script src="engine.js?v=14"></script>
+<script src="data.js?v=12"></script>
+<script src="engine.js?v=16"></script>
 <script src="sound.js?v=7"></script>
 <script>
 'use strict';
@@ -506,6 +532,16 @@ document.addEventListener('touchstart', () => {}, { passive: true }); // iOS 要
 const board = $('#board');
 const boardSize = { w: 0, h: 0 }; // 棋盤大小變了才量一次，畫投射物時直接用，不每幀量
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { boardSize.w = board.clientWidth; boardSize.h = board.clientHeight; }).observe(board);
+function fitBoard() {
+  const wrap = $('#board-wrap'), shell = $('#shell');
+  const style = getComputedStyle(wrap);
+  const height = wrap.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  const lane = parseFloat(getComputedStyle(shell).getPropertyValue('--lane')) || 28;
+  shell.style.maxWidth = Math.min(640, Math.max(0, height) * COLS / ROWS + lane) + 'px';
+}
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fitBoard).observe($('#board-wrap'));
+else window.addEventListener('resize', fitBoard);
+fitBoard();
 const cells = [], fogEls = [], litRows = [false, false, false, false, false];
 let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf = 0;
 const els = new Map();   // 引擎物件 id → 畫面元素
@@ -637,7 +673,7 @@ function openIntro(L) {
   t.innerHTML = L.speaker ? `<span class="who">${L.speaker}：</span>${L.intro}` : `<div class="verse">${L.intro}</div>`;
   // 第一次玩第 1 夜：教學會手把手帶，開場頁只留台詞，不先丟一面字牆（2026-10-20 多視角審查 N4）
   const firstNight = L.id === 1 && !tutDone() && !/[?&]tut/.test(location.search);
-  $('#intro-tips').innerHTML = firstNight ? '<div class="new">按「開始守夜」，會一步一步帶你放下第一批人手。</div>' : L.fresh.map(k => `<div class="new">${UNITS[k].ico} ${UNITS[k].name}：${UNITS[k].desc}</div>`).join('') + (L.tips || []).map(x => `<div>${x}</div>`).join('');
+  $('#intro-tips').innerHTML = firstNight ? '<div class="new">按「開始守夜」，會一步一步帶你放下第一批人手。</div>' : L.fresh.map(k => `<div class="new">${UNITS[k].ico} ${UNITS[k].name}：${UNITS[k].desc}</div>`).join('') + [...new Set(L.tips || [])].map(x => `<div>${x}</div>`).join('');
   showIntroNew(L, firstNight);
   applyDiff(savedDiff()); // 回開場頁一律用平常的預設難度（續玩那一局可能臨時換過）
   showBest();
@@ -677,8 +713,8 @@ function showIntroNew(L, quiet) {
   const parts = [];
   if (fresh.length) parts.push(`今晚有新夥伴：${fresh.map(k => `${UNITS[k].ico} ${UNITS[k].name}`).join('、')}`);
   if (upg.length) parts.push(`${upg.map(k => `${UNITS[k].ico} ${UNITS[k].name}`).join('、')}學會新招：${upg.map(k => UNITS[k].upgrade.name).join('、')}`);
-  if (gateNew) parts.push('門口站著 🧍 看門的（寧靜夜每排一位、起風夜三位、暴風夜兩位）：第一隻摸到門口的地面敵人會被他連整排趕出去，用過一次他就走了，那排再漏就守不住');
-  $('#intro-new-text').textContent = parts.join('；') + '。先去圖鑑看一眼怎麼用，再開始守夜。';
+  if (gateNew) parts.push('🧍 看門的可替受保護的排救場一次，配置見下方');
+  $('#intro-new-text').textContent = parts.join('；') + '。完整能力與數值可在圖鑑查看。';
   // 不管是按「先看圖鑑」還是直接「開始守夜」，這一夜的新夥伴介紹都只跳一次（2026-10-20 U3：以前只有按圖鑑才記）
   markIntroSeen = () => { try { const a = introSeen(); for (const k of [...fresh, ...upg]) if (!a.includes(`${L.id}:${k}`)) a.push(`${L.id}:${k}`); if (gateNew && !a.includes('gate')) a.push('gate'); localStorage.setItem(NKEY, JSON.stringify(a)); } catch (e) {} };
   $('#intro-new-btn').onclick = () => {
@@ -691,10 +727,18 @@ function showIntroNew(L, quiet) {
   };
 }
 function savedDiff() { try { const k = localStorage.getItem('sheepfold-diff'); return DIFFS[k] ? k : diff; } catch (e) { return diff; } }
+function gateAdvice(L, key) {
+  const rows = Engine.gateRows(L, key);
+  if (!rows.length) return '今晚沒有看門的，任何一排都不能漏。';
+  if (rows.length === ROWS) return '每排有一位看門的，各能救場一次。';
+  return `只有第 ${rows.map(r => r + 1).join('、')} 排有看門的，各能救場一次；其餘排不能漏。`;
+}
 function applyDiff(key, save = true) {
   diff = key;
   document.querySelectorAll('.diff').forEach(b => b.classList.toggle('selected', b.dataset.key === key));
-  $('#diff-hint').textContent = DIFFS[key].hint;
+  $('#diff-hint').textContent = `${DIFFS[key].hint}。${gateAdvice(level, key)}`;
+  const rows = Engine.gateRows(level, key);
+  $('#gate-preview').innerHTML = Array.from({ length: ROWS }, (_, r) => `<span class="${rows.includes(r) ? 'protected' : ''}" aria-label="第 ${r + 1} 排${rows.includes(r) ? '有看門的' : '沒有看門的'}">${r + 1} 排 ${rows.includes(r) ? '🧍' : '—'}</span>`).join('');
   if (save) try { localStorage.setItem('sheepfold-diff', key); } catch (e) {}
 }
 function showBest() {
@@ -962,7 +1006,7 @@ function flushEvents() {
       case 'sheep': $('#sheep-n').textContent = G.sheep; break;
       case 'hand': buildCards(); if (selected && selected !== 'shovel' && !G.hand.includes(selected)) clearSelection(); break; // 送卡模式：手上的卡變了；選著的那張已經不在就取消
       case 'stray': Sound.play('sheep'); break;
-      case 'waveclear': if (e.wave < G.waves.length) { Sound.play('clear'); if (!devUsed) saveCheckpoint(Engine.snapshot(G)); } break; // 最後一波不播，讓天亮的和弦乾淨
+      case 'waveclear': if (e.wave < G.waves.length) { Sound.play('clear'); if (!devUsed && !saveCheckpoint(Engine.snapshot(G))) toast('這次進度未能保存。請先保持遊戲開啟，離開後可能需要重來。', true); } break;
       case 'win': onWin(); break;
       case 'lose': onLose(e.reason); break;
     }
@@ -986,7 +1030,7 @@ function tick(now) {
     // 引擎或畫面丟例外：以前 rAF 迴圈會就此停掉、畫面定格沒有任何提示（2026-10-20 P3）。現在停下這一局、說一聲、回關卡；清完的波已存，可以「繼續上次」
     console.error(err);
     cancelAnimationFrame(raf); if (G) G.over = true;
-    toast('出了點狀況，這一局先停下。清完的波已經存著，回來可以繼續上次', true);
+    toast(`出了點狀況，這一局先停下。${checkpointNote()}`, true);
     setTimeout(backToLevels, 1800);
   }
 }
@@ -1336,8 +1380,8 @@ function unitNums(k) {
   if (u.lanes) s.push(`同時攻擊上下 ${u.lanes} 排，共 ${u.lanes * 2 + 1} 排；飛的也打得到`);
   if (u.deflect) s.push(`不攻擊；地面敵人走到它面前就被趕到隔壁排（最上最下排往中間趕，中間排上下輪流），每趕一隻自己掉 ${u.deflect} 血、同一隻 ${u.deflectCd} 秒內不重複趕；頭目與飛的不受影響`);
   if (u.light !== undefined) s.push(`不攻擊；照亮自己這排和上下 ${u.light} 排：光裡的敵人不會自己換排（豺狼不繞路、豹不跳排、夜鴞不飄，牧人杖照樣趕得動），無月夜裡那幾排的腳印預告也會回來`);
-  if (u.kind === 'patrol') s.push(`在自己這排和上下兩排之間來回走（每排 ${u.walk} 秒），走到那排就打前方 ${u.reach} 格內的敵人，攻擊間隔 ${u.every} 秒、每次傷害 ${u.dmg}；只有走在那排時才會被咬`);
-  if (u.cradle) s.push(`不攻擊；迷羊走到他那一格就立刻回圈（羊數 +1、糧 +${STRAY.reward}），不必走到最左邊`);
+  if (u.kind === 'patrol') s.push(`在本排與上下鄰排巡邏（每排 ${u.walk} 秒）；空閒時優先走向近戰範圍內最靠近羊圈的地面敵人，接敵後留在那排。前方 ${u.reach} 格內可攻擊，每 ${u.every} 秒傷害 ${u.dmg}；只在目前所在排承受攻擊`);
+  if (u.cradle) s.push(`不攻擊；接應本排與上下鄰排，迷羊走到他所在的那一欄就立刻回圈（羊數 +1、糧 +${STRAY.reward}），不必走到最左邊`);
   if (u.upgrade) { const p = u.upgrade; s.push(`第 ${p.from} 夜起再點一下花 ${p.cost} 糧升級「${p.name}」：${p.desc}${p.poison ? `；中毒 ${STATUS.poison.t} 秒、每秒 ${STATUS.poison.dps}、攻擊 ×${STATUS.poison.biteMul}，同一隻只中一次` : ''}${p.all ? `；每 ${u.every} 秒一次，飛的不受影響` : ''}`); }
   return s.join('・');
 }
@@ -1377,7 +1421,7 @@ const GLOSSARY = [
   { name: '換排', ico: '↕️', text: `敵人從這排換到隔壁排，射手要跟著換。來源：牧人杖（趕的）、豺狼碰到牆繞路、豹每 ${ENEMIES.leopard.shiftEvery} 秒自己換、夜鴞在三排之間飄。油燈照到的排，敵人不會自己換排（杖還是趕得動）` },
   { name: '看門的', ico: '🧍', text: '門口站的人（約 10:3「看門的就給他開門」；約翰福音裡看門的只認牧人的聲音，這裡借他的名字做一次性的門）。第一隻走到門口的地面敵人會被他擋下，把這排的地面敵人一起趕出場，叼著的迷羊也放下；用過一次他就不在了，那排再漏就守不住。飛的不經過門。寧靜夜每排一位、起風夜中間三排、暴風夜第 2、4 排' },
   { name: '無月夜', ico: '🌑', text: '第二章起第二波後看不到腳印預告，不知道下一隻從哪排來。油燈照到的三排例外' },
-  { name: '迷羊', ico: '🐑', text: `不是敵人。從右邊走進來往羊圈走，走到最左邊或抱羊羔的牧人那格就回圈（羊數 +1、糧 +${STRAY.reward}）；地面敵人碰到就叼走，被叼出場算失落一隻；叼羊的被打倒，羊就從那裡繼續走。牧羊犬沒事時會走在牠旁邊護送` },
+  { name: '迷羊', ico: '🐑', text: `不是敵人。從右邊走進來往羊圈走，走到最左邊，或走到本排／上下鄰排抱羊羔牧人所在的欄位，就回圈（羊數 +1、糧 +${STRAY.reward}）；地面敵人碰到就叼走，被叼出場算失落一隻；叼羊的被打倒，羊就從那裡繼續走。牧羊犬沒事時會走在牠旁邊護送` },
   { name: '撞牆', ico: '🐗', text: `野豬撞上每道牆的第一下傷害 ${ENEMIES.boar.slam}，之後正常咬；撞完自己暈 ${ENEMIES.boar.slamStun} 秒。踏過荊棘直接踩爛` },
   { name: '蹲伏', ico: '🐆', text: `豹走到第 ${ENEMIES.leopard.crouchAt} 格先蹲 ${ENEMIES.leopard.crouch} 秒（看得到預兆），然後以 ${STATUS.dash.mul} 倍速衝 ${ENEMIES.leopard.dash} 格` },
 ];
@@ -1422,7 +1466,7 @@ function tutShow() {
 }
 function tutAdvance() {
   tut.step++;
-  if (tut.step >= TUT_STEPS.length) return tutEnd('做得好。狼要來了，腳印出現在哪一排，狼就從那排來；每排都要有射手。走到門口的狼會被 🧍 看門的趕走，但每排只能幫你一次');
+  if (tut.step >= TUT_STEPS.length) return tutEnd(`做得好。腳印預告狼從哪排來，每排都要有射手。${gateAdvice(level, diff)}`);
   tutShow();
 }
 function tutEnd(msg) {
@@ -1450,6 +1494,7 @@ function pauseGame() {
   if (!G || G.over || paused) return;
   if (!$('#result').hidden || !$('#roster').hidden || !$('#intro').hidden || !$('#levels').hidden) return;
   paused = true; $('#pause').hidden = false; syncPause(); syncSoundUI();
+  $('#pause-note').textContent = `狼也在等。回來再按繼續。${checkpointNote()}`;
 }
 function resumeGame() {
   paused = false; $('#pause').hidden = true; syncPause();
@@ -1475,7 +1520,7 @@ document.querySelectorAll('#snd-panel [data-snd]').forEach(b => b.addEventListen
 document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.addEventListener('click', () => { Sound.set('vol', Number(b.dataset.vol)); syncSoundUI(); Sound.play('clear'); }));
 // iOS 要有一次手勢才能出聲：第一次點任何地方就把聲音打開
 document.addEventListener('pointerdown', () => Sound.unlock(), { capture: true, passive: true });
-// 大字：整頁放大 1.18 倍（html.big，CSS zoom），存 sheepfold-bigtext
+// 大字只放大文字，棋盤與底部提示仍受同一個視窗高度限制。
 function applyBig(on, save = true) { document.documentElement.classList.toggle('big', !!on); const b = $('#big-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) try { localStorage.setItem('sheepfold-bigtext', on ? '1' : '0'); } catch (e) {} }
 $('#big-btn').addEventListener('click', () => { applyBig(!document.documentElement.classList.contains('big')); Sound.play('tap'); });
 try { applyBig(localStorage.getItem('sheepfold-bigtext') === '1', false); } catch (e) {}
@@ -1484,7 +1529,18 @@ syncSoundUI();
 // 檢查點：每清完一波存一次，每關各存一份（去玩別關不會蓋掉）；守完、輸了、重新開始同一關只清自己這關的
 const CKEY = id => `sheepfold-checkpoint-${id}`;
 function loadCheckpoint(id) { try { const c = JSON.parse(localStorage.getItem(CKEY(id)) || 'null'); return c && typeof c === 'object' ? c : null; } catch (e) { return null; } }
-function saveCheckpoint(snap) { try { localStorage.setItem(CKEY(snap.levelId), JSON.stringify(snap)); } catch (e) {} }
+function saveCheckpoint(snap) {
+  try {
+    const text = JSON.stringify(snap), key = CKEY(snap.levelId);
+    localStorage.setItem(key, text);
+    return localStorage.getItem(key) === text;
+  } catch (e) { return false; }
+}
+function checkpointNote() {
+  const cp = loadCheckpoint(level.id);
+  if (cp && Engine.checkSnapshot(cp, level.id)) return `已存到${DIFFS[cp.diff].name}第 ${cp.wave} 波結束，可從第 ${cp.wave + 1} 波繼續。`;
+  return '目前沒有可用的檢查點，離開後需從這一夜開頭重來。';
+}
 function clearCheckpoint(id) { try { localStorage.removeItem(CKEY(id)); } catch (e) {} }
 // 舊版只有一份存檔：搬到那一關自己的欄位，不讓玩家的進度不見
 try { const old = JSON.parse(localStorage.getItem('sheepfold-checkpoint') || 'null'); if (old && old.levelId && !localStorage.getItem(CKEY(old.levelId))) localStorage.setItem(CKEY(old.levelId), JSON.stringify(old)); localStorage.removeItem('sheepfold-checkpoint'); } catch (e) {}
