@@ -673,26 +673,59 @@
     }
   }
 
-  // 巡夜人：先完成當前排交戰；空閒時往三排內最靠近羊圈的近戰目標走，沒有目標才巡邏。
+  // ====== 巡夜人（2026-10-21 小居審查第 1 項：站位、攻擊排、碰撞排統一） ======
+  // 一條規則：rv 是畫面上的位置（小數，走路動畫用）；「他站在哪一排」＝rv 四捨五入，攻擊與擋狼都看這一排。
+  // 只有走到整數排才出手，不會停在兩排中間打人；鄰排他這一欄已經有別的單位或石頭就走不進去（繞不過，留在走得進的排）；
+  // 他站著的鄰排那一格如果後來被放了東西，他讓出來走回家排。
+  const patrolRow = u => Math.round(u.rv);
+  const patrolArrived = u => Math.abs(u.rv - patrolRow(u)) < 1e-9;
+  // 這一排走不走得進：家排一定可以；鄰排要他這一欄沒單位、沒石頭、也沒有別的巡夜人已經站在那
+  function patrolCanStand(G, u, r) {
+    if (r === u.r) return true;
+    const k = key(r, u.c);
+    if (G.units[k] || G.rocks.has(k)) return false;
+    for (const k2 in G.units) { const v = G.units[k2]; if (v !== u && UNITS[v.type].kind === 'patrol' && v.c === u.c && patrolArrived(v) && patrolRow(v) === r) return false; }
+    return true;
+  }
+  // 這一步每個巡夜人實際站的格子（走去鄰排時，那格在 G.units 裡是空的；敵人的碰撞要查這張表）
+  function patrolMap(G) { const m = {}; for (const k in G.units) { const u = G.units[k]; if (UNITS[u.type].kind === 'patrol' && u.hp > 0) m[key(patrolRow(u), u.c)] = u; } return m; }
+  // 敵人前面那格擋著的是誰：巡夜人只算他現在站的那排（家排的 🪵 崗位他不在時不擋）
+  function blockerAt(G, pm, r, c) {
+    const k = key(r, c);
+    let b = G.units[k];
+    if (b && UNITS[b.type].kind === 'patrol' && patrolRow(b) !== r) b = null;
+    if (!b) b = pm[k];
+    return b && b.hp > 0 ? b : null;
+  }
+
   function patrolAct(G, u, def, dt) {
     const lo = Math.max(0, u.r - 1), hi = Math.min(ROWS - 1, u.r + 1);
-    const row = Math.round(u.rv);
-    const t = G.enemies.find(e => e.r === row && targetable(e) && !ENEMIES[e.type].flying && e.x > u.c - 0.2 && e.x - u.c <= def.reach);
-    if (t) {
-      u.timer -= dt;
-      if (u.timer <= 0) { u.timer = def.every; hurt(G, t, def.dmg); ev(G, { t: 'hit', id: t.id }); ev(G, { t: 'fx', kind: 'strike', r: row, x: t.x }); }
-      return;
+    const row = patrolRow(u), arrived = patrolArrived(u);
+    if (arrived) u.rv = row; // 差不到一根頭髮就算到了，站正
+    const inReach = e => targetable(e) && !ENEMIES[e.type].flying && e.x > u.c - 0.2 && e.x - u.c <= def.reach;
+    u.timer = Math.max(0, u.timer - dt); // 走路時也在蓄力，到了那排馬上能出手
+    if (arrived) {
+      const t = G.enemies.find(e => e.r === row && inReach(e));
+      if (t) { // 接戰：留在這排打，不走
+        if (u.timer <= 0) { u.timer = def.every; hurt(G, t, def.dmg); ev(G, { t: 'hit', id: t.id }); ev(G, { t: 'fx', kind: 'strike', r: row, x: t.x }); }
+        return;
+      }
     }
-    u.timer = Math.min(u.timer, def.every * 0.5);
-    const nearby = G.enemies.filter(e => targetable(e) && !ENEMIES[e.type].flying && e.r >= lo && e.r <= hi && e.x > u.c - 0.2 && e.x - u.c <= def.reach);
-    nearby.sort((a, b) => a.x - b.x || Math.abs(a.r - u.rv) - Math.abs(b.r - u.rv));
-    if (nearby.length) {
-      const delta = nearby[0].r - u.rv;
-      u.rv += Math.sign(delta) * Math.min(Math.abs(delta), dt / def.walk);
-      return;
+    let goal;
+    if (!patrolCanStand(G, u, row)) goal = u.r; // 站著的那格被放了東西：讓出來，走回家排
+    else {
+      // 三排內最靠近羊圈、而且走得進去的敵人排；沒有就照原方向巡邏，走到頭折返
+      const nearby = G.enemies.filter(e => e.r >= lo && e.r <= hi && inReach(e) && patrolCanStand(G, u, e.r));
+      nearby.sort((a, b) => a.x - b.x || Math.abs(a.r - u.rv) - Math.abs(b.r - u.rv));
+      if (nearby.length) goal = nearby[0].r;
+      else {
+        const edge = d => { const r = d > 0 ? hi : lo; return patrolCanStand(G, u, r) ? r : u.r; };
+        goal = edge(u.dir);
+        if (arrived && goal === row) { u.dir = -u.dir; goal = edge(u.dir); }
+      }
     }
-    u.rv += u.dir * dt / def.walk;
-    if (u.rv >= hi) { u.rv = hi; u.dir = -1; } else if (u.rv <= lo) { u.rv = lo; u.dir = 1; }
+    const delta = goal - u.rv, stepLen = dt / def.walk;
+    u.rv = Math.abs(delta) <= stepLen ? goal : u.rv + Math.sign(delta) * stepLen; // 到了就正好站在整數排（浮點數相加不會剛好落在整數上）
   }
 
   // ====== 迷羊 ======
@@ -758,6 +791,7 @@
 
   // 敵人走路、咬東西、特殊能力
   function enemiesMove(G, dt) {
+    const pm = patrolMap(G); // 巡夜人現在站哪格（擋狼用）
     for (const e of G.enemies) {
       if (e.dead || e.hp <= 0) continue; // 這一步剛被打死的也不走不咬（以前只跳 dead，零血的狼還能再走一小步越線）
       const def = ENEMIES[e.type];
@@ -832,10 +866,9 @@
       let blocked = false;
       if (!def.flying) {
         const frontCol = Math.floor(e.x + 0.3);
-        const b = G.units[key(e.r, frontCol)];
+        const b = blockerAt(G, pm, e.r, frontCol); // 巡夜人只擋他現在站的那排（含走去的鄰排），家排空著時從旁邊過
         const bk = b ? UNITS[b.type].kind : null;
-        // 巡夜人只有走在這一排時才擋得到（在別排就從旁邊過）
-        const solid = b && ['blocker', 'producer', 'shooter', 'support', 'deflector'].includes(bk) || (bk === 'patrol' && Math.abs(b.rv - e.r) < 0.5);
+        const solid = b && ['blocker', 'producer', 'shooter', 'support', 'deflector', 'patrol'].includes(bk);
         if (solid && e.x <= frontCol + 0.6) {
           if (def.vaults && !e.vaulted && bk === 'blocker' && !UNITS[b.type].tall) {
             e.vaulting = VAULT_TIME; e.vaultFrom = e.x; e.vaultTo = frontCol - 0.45; continue; // 動作本身就是說明，不飄符號

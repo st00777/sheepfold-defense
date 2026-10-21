@@ -575,7 +575,14 @@ function loadProgress() {
   return p;
 }
 let P = loadProgress();
-function saveProgress(p) { try { localStorage.setItem(PKEY, JSON.stringify(p || P)); } catch (e) {} }
+// 回傳存成功了沒（寫完讀回來對一次）。寫不進去（空間滿、無痕瀏覽、被瀏覽器擋）以前是默默吞掉，畫面說通關、重開卻沒紀錄（小居 10/21 第 2 項）；現在失敗會記在 saveFailed，結算頁說明、檢查點先留著當備份、回關卡時再試一次
+let saveFailed = false;
+function saveProgress(p) {
+  try { const text = JSON.stringify(p || P); localStorage.setItem(PKEY, text); saveFailed = localStorage.getItem(PKEY) !== text; }
+  catch (e) { saveFailed = true; }
+  return !saveFailed;
+}
+const SAVE_FAILED_NOTE = '這一夜的紀錄沒能存進這支手機（可能是空間不足、無痕瀏覽或瀏覽器擋了存檔）。上一波的檢查點先留著，下次進來可以「繼續上次」再守一次最後一波。';
 const unlockAll = /[?&]all/.test(location.search);
 // 星級：每夜三顆——守過／零損失（沒失羊、沒有人被咬倒或逃走）／看門的都在（這個難度一開始有幾位就要幾位都在）。自動累積（不同局拿到的可以合起來）、不解鎖任何東西，只是看得見的完整度
 function starsOf(id) { const s = P.stars[id] || {}; return { win: !!P.cleared[id], noLoss: !!s.noLoss, gates: !!s.gates }; }
@@ -1187,7 +1194,7 @@ function recordBest(cleared) {
   // 星級：零損失與看門的跨局累積（OR）；開過開發者模式的那局不算
   const st = cleared && G.result && G.result.stars;
   if (st && !devUsed) { const o = P.stars[level.id] || {}; P.stars[level.id] = { noLoss: !!(o.noLoss || st.noLoss), gates: !!(o.gates || st.gates) }; }
-  saveProgress();
+  return saveProgress();
 }
 function showStars() {
   const st = (G.result && G.result.stars) || {}, slots = Engine.starSlots(level);
@@ -1203,11 +1210,12 @@ function showStars() {
 }
 function onWin() {
   Sound.ambient(false); Sound.play('dawn');
-  recordBest(true); clearCheckpoint(level.id);
+  const saved = recordBest(true);
+  if (saved) clearCheckpoint(level.id); // 紀錄沒存進去就不清檢查點：至少還能「繼續上次」重守最後一波，不會畫面說守過、重開卻什麼都沒有
   const next = Engine.nextOf(level.id);
   dawn();
   setTimeout(() => { // 先讓人看到天亮，結算頁慢 0.9 秒出來（減少動態：立刻）
-    endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${level.outroWin}`);
+    endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${level.outroWin}${saved ? '' : ' ' + SAVE_FAILED_NOTE}`);
     showStars();
     $('#next').hidden = !next; $('#retry').textContent = '再守這一夜';
     if (level.psalm) {
@@ -1266,6 +1274,7 @@ function startGame(fromCp) {
 function backToLevels() {
   clearBoard(); Sound.ambient(false);
   if (G) G.over = true; // 中途回關卡不清檢查點，之後可以「繼續上次」
+  if (saveFailed && saveProgress()) toast('剛才沒存進去的紀錄，這次存好了'); // 上次寫失敗的永久進度再試一次（P 在記憶體裡還是對的）
   paused = false; $('#pause').hidden = true; syncPause();
   buildLevels();
   $('#intro').hidden = true; $('#result').hidden = true; $('#levels').hidden = false;
@@ -1385,7 +1394,7 @@ function unitNums(k) {
   if (u.lanes) s.push(`同時攻擊上下 ${u.lanes} 排，共 ${u.lanes * 2 + 1} 排；飛的也打得到`);
   if (u.deflect) s.push(`不攻擊；地面敵人走到它面前就被趕到隔壁排（最上最下排往中間趕，中間排上下輪流），每趕一隻自己掉 ${u.deflect} 血、同一隻 ${u.deflectCd} 秒內不重複趕；頭目與飛的不受影響`);
   if (u.light !== undefined) s.push(`不攻擊；照亮自己這排和上下 ${u.light} 排：光裡的敵人不會自己換排（豺狼不繞路、豹不跳排、夜鴞不飄，牧人杖照樣趕得動），無月夜裡那幾排的腳印預告也會回來`);
-  if (u.kind === 'patrol') s.push(`在本排與上下鄰排巡邏（每排 ${u.walk} 秒）；空閒時優先走向近戰範圍內最靠近羊圈的地面敵人，接敵後留在那排。前方 ${u.reach} 格內可攻擊，每 ${u.every} 秒傷害 ${u.dmg}；只在目前所在排承受攻擊`);
+  if (u.kind === 'patrol') s.push(`在本排與上下鄰排巡邏（每排 ${u.walk} 秒）；空閒時優先走向近戰範圍內最靠近羊圈的地面敵人，接敵後留在那排。前方 ${u.reach} 格內可攻擊，每 ${u.every} 秒傷害 ${u.dmg}。他站在哪一排，就擋那排的狼、也只在那排被咬；鄰排他這一欄已經有東西就走不進去`);
   if (u.cradle) s.push(`不攻擊；接應本排與上下鄰排，迷羊走到他所在的那一欄就立刻回圈（羊數 +1、糧 +${STRAY.reward}），不必走到最左邊`);
   if (u.upgrade) { const p = u.upgrade; s.push(`第 ${p.from} 夜起再點一下花 ${p.cost} 糧升級「${p.name}」：${p.desc}${p.poison ? `；中毒 ${STATUS.poison.t} 秒、每秒 ${STATUS.poison.dps}、攻擊 ×${STATUS.poison.biteMul}，同一隻只中一次` : ''}${p.all ? `；每 ${u.every} 秒一次，飛的不受影響` : ''}`); }
   return s.join('・');
