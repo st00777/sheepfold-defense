@@ -128,6 +128,14 @@
   #board.moonless .cell.lit.alt { background: #8a9847d0; }
   .cell.rock::after { content: '🪨'; opacity: .7; font-size: .8em; }
   .cell.hint { outline: 2px dashed var(--gold); outline-offset: -4px; }
+  /* 範圍預覽：拿著卡點到／滑過某格，或剛放下時，這張卡管得到的格子淡金；只疊在底色上，不蓋住單位 */
+  .cell.range { box-shadow: inset 0 0 0 100px #e6b84a3a; }
+  /* 接回：抱羊羔的牧人接到迷羊，他那格飄一個「接回」小牌子（不是飄字，要跟 +25 分開） */
+  .fx.label { font-size: 12px; font-weight: bold; color: #2a2418; background: var(--gold); border-radius: 999px; padding: 2px 8px; width: auto; height: auto; margin: 6px 0 0 4px; white-space: nowrap; animation-duration: 1.3s; }
+  /* 巡夜人出手：人往前揮一下，落點的 ✦ 放大描金，看得出是他打的 */
+  .fx.strike { color: var(--gold); text-shadow: 0 0 6px #fff8, 0 0 2px #000; font-size: clamp(20px, 6vw, 34px); animation-duration: .45s; }
+  .patrol-run.swing .body { animation: swing .3s var(--ease-out); }
+  @keyframes swing { 40% { transform: translateX(28%) rotate(14deg); } }
   .cell .unit { position: relative; display: flex; align-items: center; justify-content: center; width: 80%; height: 80%; border-radius: 8px; }
   .unit { background: var(--u, #888); }
   .unit.shepherd.elder { filter: brightness(.85); box-shadow: inset 0 0 0 2px var(--gold); }
@@ -387,6 +395,8 @@
     .gate-sweep { animation: gateSweepFade .9s ease-out forwards; } /* 減少動態：不位移，只淡出，事件仍看得到 */
     .card.new::after, .cell.teach::before { opacity: .8; }
     .pop, .fx { animation-name: fadeOut; animation-duration: .5s; }
+    .fx.label { animation-duration: 1.2s; }
+    .patrol-run.swing .body { animation: none; filter: brightness(1.35); } /* 減少動態：不揮，只亮一下 */
     #stars .st { animation: none; opacity: 1; }
     .dialog { transition: opacity 200ms; }
     .card:active, .btn:active, .diff:active, .tab:active, .lv:active, .rc:active, #pause-btn:active, #snd-btn:active, .corner:active, .snd-row button:active, #tut-skip:active { transform: none; }
@@ -606,6 +616,9 @@ function buildBoard() {
     d.className = 'cell' + ((r + c) % 2 ? ' alt' : '');
     d.dataset.r = r; d.dataset.c = c;
     d.addEventListener('click', () => tapCell(r, c));
+    // 範圍預覽：拿著卡滑過（桌機）或按住（手機）可放的格子，先亮出這張卡管得到的格子；放下後再亮 1.3 秒（tapCell）
+    d.addEventListener('pointerenter', () => { if (selected && selected !== 'shovel' && d.classList.contains('hint')) showRange(rangeCells(selected, r, c)); });
+    d.addEventListener('pointerleave', () => { if (!rangeTimer) clearRange(); });
     board.appendChild(d); cells.push(d);
   }
   // 無月夜的黑霧一排一個，油燈照到的排才能單獨散掉
@@ -812,7 +825,31 @@ function clearSelection() {
   selected = null;
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
   cells.forEach(x => x.classList.remove('hint', 'sell', 'swap'));
+  if (!rangeTimer) clearRange(); // 放下後的 1.3 秒預覽留著，只清滑過的那種
 }
+// ====== 範圍預覽（2026-10-21 小居第 5 項：選卡看得到範圍） ======
+// 這張卡放在 (r,c) 會管到哪些格：數字全從 data.js 帶，射程、排數改了預覽跟著變。只放自己那格的（牧人、牆、荊棘）回空陣列
+let rangeTimer = 0;
+function rangeCells(key, r, c) {
+  const u = UNITS[key], out = [];
+  const add = (rr, cc) => { if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) out.push([rr, cc]); };
+  const span = (rr, from, to) => { for (let cc = from; cc <= to; cc++) add(rr, cc); };
+  if (u.kind === 'shooter') { const lanes = u.lanes || 0, to = u.range ? Math.min(COLS - 1, c + Math.floor(u.range)) : COLS - 1; for (let rr = r - lanes; rr <= r + lanes; rr++) span(rr, c + 1, to); }
+  else if (u.kind === 'patrol') { for (let rr = r - 1; rr <= r + 1; rr++) span(rr, c, c + Math.floor(u.reach)); }
+  else if (u.cradle) { for (let rr = r - 1; rr <= r + 1; rr++) add(rr, c); }
+  else if (u.kind === 'dog') span(r, 0, COLS - 1);
+  else if (u.kind === 'instant' || u.heal) { const k = u.kind === 'instant' ? 1 : u.range; for (let rr = r - k; rr <= r + k; rr++) span(rr, c - k, c + k); }
+  else if (u.push || u.ignite) span(r, c + 1, COLS - 1);
+  else if (u.light !== undefined) { for (let rr = r - u.light; rr <= r + u.light; rr++) span(rr, 0, COLS - 1); }
+  else if (u.deflect) { add(r - 1, c); add(r + 1, c); }
+  return out;
+}
+function showRange(list, ms) {
+  clearRange();
+  for (const [rr, cc] of list) cells[rr * COLS + cc].classList.add('range');
+  if (ms) rangeTimer = setTimeout(() => { rangeTimer = 0; clearRange(); }, ms);
+}
+function clearRange() { clearTimeout(rangeTimer); rangeTimer = 0; cells.forEach(x => x.classList.remove('range')); }
 function tapCell(r, c) {
   if (!G || G.over) return;
   if (devOn && devEnemy) { if (devEnemy === 'stray') Engine.dev.stray(G, r, c); else Engine.dev.spawn(G, devEnemy, r, c); flushEvents(); draw(); return; }
@@ -824,6 +861,7 @@ function tapCell(r, c) {
   flushEvents();
   if (!res.ok) { toast(res.msg || ''); return; }
   if (UNITS[selected].kind !== 'instant') { Sound.play('place'); squashUnit(r, c); if (selected === 'brazier' || selected === 'lamp') igniteUnit(r, c); } // 瓦瓶的聲音走 fx blast，也不回彈；火先點亮
+  showRange(rangeCells(selected, r, c), 1300); // 放下後亮 1.3 秒這張卡管得到的格子（手機沒有滑過，靠這個看範圍）
   clearSelection();
   if (tut.on) { tutAdvance(); return; }
   toast(res.msg);
@@ -861,7 +899,21 @@ function fx(kind, r, x, id) {
   if (kind === 'dodge') { flashDodge(r, x); return; } // 狐狸閃避：殘影，不飄字
   if (kind === 'hop') return;                       // 換排：敵人本身會滑過去，不飄字
   if (kind === 'gate') { gateSweep(r); return; }     // 看門的把整排趕出去：一個人影從門口掃到右邊
+  if (kind === 'catch') { catchFx(r, x, id); return; } // 抱羊羔的牧人接回迷羊：他那格飄「接回」牌子、人跳一下
+  if (kind === 'strike') { swingPatrol(id); spawnFx(FX.strike, r, x).classList.add('strike'); return; } // 巡夜人出手：人往前揮，落點描金 ✦
   if (FX[kind]) spawnFx(FX[kind], r, x);
+}
+// 接回：牌子落在牧人那格（可能在迷羊的上下鄰排），牧人本人跳一下；不管他是不是產糧的（hopUnit 只跳牧人）
+function catchFx(r, c, id) {
+  spawnFx('接回 🐑', r, c).classList.add('label');
+  if (REDUCE_MOTION.matches || speed > 1) return;
+  const u = unitEl(r, c); if (!u) return;
+  u.animate([{ transform: 'translateY(0) scale(1)' }, { transform: 'translateY(-12%) scale(1.08)', offset: .4 }, { transform: 'translateY(0) scale(1)' }], { duration: 320, easing: EASE_OUT });
+}
+// 巡夜人揮棒：重放 swing 動畫（連續出手時每一下都看得到）
+function swingPatrol(id) {
+  const el = els.get(id); if (!el) return;
+  el.classList.remove('swing'); void el.offsetWidth; el.classList.add('swing');
 }
 // 看門的掃排：人影從左邊門口衝到右邊，後面拖一道金色光，敵人在引擎裡已經消失
 function gateSweep(r) {
@@ -1215,7 +1267,7 @@ function onWin() {
   const next = Engine.nextOf(level.id);
   dawn();
   setTimeout(() => { // 先讓人看到天亮，結算頁慢 0.9 秒出來（減少動態：立刻）
-    endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${level.outroWin}${saved ? '' : ' ' + SAVE_FAILED_NOTE}`);
+    endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${sheepSummary()}${level.outroWin}${saved ? '' : ' ' + SAVE_FAILED_NOTE}`);
     showStars();
     $('#next').hidden = !next; $('#retry').textContent = '再守這一夜';
     if (level.psalm) {
@@ -1224,6 +1276,16 @@ function onWin() {
       level.psalm.forEach((line, i) => { const d = document.createElement('div'); d.textContent = line; box.appendChild(d); setTimeout(() => d.classList.add('on'), 600 + i * 1500); });
     }
   }, REDUCE_MOTION.matches ? 0 : 900);
+}
+// 結語依實際羊數選（2026-10-21 小居第 6 項）：有羊數的夜才講；接回幾隻、失去幾隻、圈裡剩幾隻都從引擎帶，不再一句「一隻不少」到底
+function sheepSummary() {
+  if (!level.sheep) return '';
+  const start = level.sheep, now = G.sheep, saved = G.sheepSaved || 0, lost = G.sheepLost || 0;
+  if (!lost) return saved ? `${saved} 隻迷羊全接回來了，圈裡從 ${start} 隻變 ${now} 隻。` : `羊一隻沒少，圈裡 ${now} 隻。`;
+  const head = saved ? `接回 ${saved} 隻迷羊、失去 ${lost} 隻，` : `失去 ${lost} 隻，`;
+  if (now > start) return `${head}圈裡 ${now} 隻，比昨晚多 ${now - start} 隻。`;
+  if (now === start) return `${head}圈裡還是 ${now} 隻。`;
+  return `${head}圈裡剩 ${now} 隻。`;
 }
 function onLose(reason) {
   Sound.ambient(false); Sound.play('lose');
@@ -1240,7 +1302,7 @@ function clearBoard() {
   for (const [, el] of els) el.remove(); els.clear();
   board.querySelectorAll('.pop, .fx, .mark, .gate-sweep, .dying, .dust').forEach(x => x.remove()); moundEls.clear(); markerEl = null; strayMarkEl = null;
   board.classList.add('still');
-  selected = null;
+  selected = null; clearRange();
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
   tut.on = false; $('#tut-skip').classList.remove('on');
   $('#result').hidden = true;

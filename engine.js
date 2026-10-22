@@ -85,7 +85,7 @@
       total: waves.reduce((n, w) => n + w.list.reduce((m, [, k]) => m + k, 0), 0),
       nextRow: null, nextType: null,
       units: {}, enemies: [], shots: [], fx: [],
-      sheep: level.sheep || 0, sheepLost: 0, unitsLost: 0, // unitsLost：這局被敵人咬倒／撞垮／嚇跑的單位數（星級「零損失」用；鏟除、換卡、荊棘與杖自己磨損不算）
+      sheep: level.sheep || 0, sheepLost: 0, sheepSaved: 0, unitsLost: 0, // sheepSaved：這局接回圈的迷羊數（結語用）；unitsLost：這局被敵人咬倒／撞垮／嚇跑的單位數（星級「零損失」用；鏟除、換卡、荊棘與杖自己磨損不算）
       over: false, result: null, events: [], seen: new Set(), started: false, holdWaves: false, // holdWaves：教學中先不放狼
       nextId: 1, time: 0,
       // 第二章：nextVisible 無月夜時腳印看不看得見；strays 場上的迷羊、strayQueue 這波還沒出來的迷羊（秒）；hand 送卡模式手上的卡
@@ -165,7 +165,7 @@
 
   // ====== 檢查點：每清完一波存一次，只存場上單位與糧，不存敵人，所以永遠從下一波的開頭接 ======
   function snapshot(G) {
-    return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep, sheepLost: G.sheepLost, unitsLost: G.unitsLost ?? undefined, seen: [...G.seen], hand: G.hand.slice(),
+    return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep, sheepLost: G.sheepLost, sheepSaved: G.sheepSaved || 0, unitsLost: G.unitsLost ?? undefined, seen: [...G.seen], hand: G.hand.slice(),
       gates: G.gates.slice(), // 還在的看門的
       strays: G.strays.filter(s => !s.dead).map(s => ({ r: s.r, x: Math.round(s.x * 10) / 10 })), // 還在路上的迷羊
       strayQueue: G.strayQueue.map(t => Math.max(0, Math.round((t - G.waveT) * 10) / 10)),       // 還沒出來的迷羊（距現在幾秒）
@@ -183,6 +183,7 @@
     if (!DIFFS[snap.diff] || !isInt(snap.wave, 1, level.waves.length - 1) || !Number.isFinite(snap.food) || snap.food < 0) return false;
     if (snap.sheep !== undefined && !isInt(snap.sheep, 0, 99)) return false;
     if (snap.sheepLost !== undefined && !isInt(snap.sheepLost, 0, 99)) return false;
+    if (snap.sheepSaved !== undefined && !isInt(snap.sheepSaved, 0, 99)) return false;
     if (snap.unitsLost !== undefined && snap.unitsLost !== null && !isInt(snap.unitsLost, 0, 999)) return false; // null＝舊檔續玩後不知道，放行
     if (snap.seen !== undefined && !Array.isArray(snap.seen)) return false;
     if (snap.hand !== undefined && !(Array.isArray(snap.hand) && snap.hand.length <= 12 && snap.hand.every(k => UNITS[k]))) return false;
@@ -218,6 +219,7 @@
     G.food = Math.max(0, snap.food); if (G.level.sheep) G.sheep = Math.max(1, Math.min(99, Number.isInteger(snap.sheep) ? snap.sheep : G.sheep)); // 迷羊回圈後會超過開局的隻數，不壓回去
     if (G.level.conveyor && Array.isArray(snap.hand)) { G.hand = snap.hand.filter(k => UNITS[k] && G.level.units.includes(k)); ev(G, { t: 'hand' }); } // 送卡模式：手牌跟著存，續玩不會重發開局三張
     G.sheepLost = Number.isInteger(snap.sheepLost) ? snap.sheepLost : 0;
+    G.sheepSaved = Number.isInteger(snap.sheepSaved) ? snap.sheepSaved : 0;
     G.unitsLost = Number.isInteger(snap.unitsLost) ? snap.unitsLost : null; // 舊存檔沒這欄：這局不知道有沒有損失，「零損失」那顆星不給
     if (Array.isArray(snap.seen)) for (const t of snap.seen) if (ENEMIES[t]) G.seen.add(t);
     if (Array.isArray(snap.gates)) G.gates = snap.gates.filter(r => G.gateRows.includes(r)); // 舊存檔沒這欄：這個難度該有的都在；存檔裡多出這難度沒有的排就丟掉
@@ -707,7 +709,7 @@
     if (arrived) {
       const t = G.enemies.find(e => e.r === row && inReach(e));
       if (t) { // 接戰：留在這排打，不走
-        if (u.timer <= 0) { u.timer = def.every; hurt(G, t, def.dmg); ev(G, { t: 'hit', id: t.id }); ev(G, { t: 'fx', kind: 'strike', r: row, x: t.x }); }
+        if (u.timer <= 0) { u.timer = def.every; hurt(G, t, def.dmg); ev(G, { t: 'hit', id: t.id }); ev(G, { t: 'fx', kind: 'strike', r: row, x: t.x, id: u.id }); } // id 帶巡夜人：畫面讓他往前揮一下，看得出是他出的手
         return;
       }
     }
@@ -736,10 +738,13 @@
     if (!G.toldStray) { G.toldStray = true; ev(G, { t: 'toast', msg: '有一隻迷羊從東邊走過來了，別讓狼碰到牠' }); }
     return s;
   }
-  function strayHome(G, s, c) {
-    s.dead = true; G.sheep++; G.food += STRAY.reward;
-    ev(G, { t: 'sheep' }); ev(G, { t: 'pop', r: s.r, c: Math.max(0, c), text: `+${STRAY.reward}` }); ev(G, { t: 'fx', kind: 'home', r: s.r, x: Math.max(0, c) });
-    ev(G, { t: 'toast', msg: '一隻迷羊回圈了 🐑' });
+  // 迷羊回圈：自己走到最左邊，或被抱羊羔的牧人接回（receiver）。接回的畫面要看得出是誰接的（2026-10-21 小居第 5 項）：
+  // fx catch 落在牧人那一格（可能在迷羊的上下鄰排），id 帶牧人，畫面好找到他跳一下
+  function strayHome(G, s, c, receiver) {
+    s.dead = true; G.sheep++; G.sheepSaved = (G.sheepSaved || 0) + 1; G.food += STRAY.reward;
+    ev(G, { t: 'sheep' }); ev(G, { t: 'pop', r: s.r, c: Math.max(0, c), text: `+${STRAY.reward}` });
+    if (receiver) { ev(G, { t: 'fx', kind: 'catch', r: receiver.r, x: receiver.c, id: receiver.id }); ev(G, { t: 'toast', msg: `${UNITS[receiver.type].name}接回一隻迷羊 🐑` }); }
+    else { ev(G, { t: 'fx', kind: 'home', r: s.r, x: Math.max(0, c) }); ev(G, { t: 'toast', msg: '一隻迷羊走回圈了 🐑' }); }
   }
   function straysMove(G, dt) {
     for (const s of G.strays) {
@@ -747,7 +752,7 @@
       s.x -= STRAY.speed * dt;
       const c = Math.round(s.x);
       const receiver = Object.values(G.units).find(u => UNITS[u.type].cradle && Math.abs(u.r - s.r) <= 1 && Math.abs(s.x - u.c) < 0.3);
-      if (receiver || s.x < -0.4) { strayHome(G, s, receiver ? receiver.c : c); continue; }
+      if (receiver || s.x < -0.4) { strayHome(G, s, receiver ? receiver.c : c, receiver); continue; }
       // 地面敵人碰到就叼走（被咬住、嚇退、暈眩、翻牆中的不會）
       for (const e of G.enemies) {
         if (e.r !== s.r || !targetable(e) || ENEMIES[e.type].flying || e.carrying || e.heldBy || e.st.panic || e.st.stun || e.vaulting > 0 || e.crouchT > 0) continue;
@@ -935,8 +940,8 @@
   // ====== 勝負 ======
   function win(G) {
     // 天亮了：還在路上的、還沒走到的迷羊都算回圈
-    for (const s of G.strays) if (!s.dead) { s.dead = true; G.sheep++; }
-    G.sheep += G.strayQueue.length; G.strays = []; G.strayQueue = []; G.strayNextRow = null; ev(G, { t: 'strayMark', r: null });
+    for (const s of G.strays) if (!s.dead) { s.dead = true; G.sheep++; G.sheepSaved = (G.sheepSaved || 0) + 1; }
+    G.sheep += G.strayQueue.length; G.sheepSaved = (G.sheepSaved || 0) + G.strayQueue.length; G.strays = []; G.strayQueue = []; G.strayNextRow = null; ev(G, { t: 'strayMark', r: null });
     G.over = true; G.result = { win: true, stars: starsOf(G) }; ev(G, { t: 'win' });
   }
   // 星級：每夜三顆，自動累積、不解鎖任何東西。守過／零損失（沒失羊、沒有人被咬倒或逃走；舊存檔續玩的那局 unitsLost 是 null，不給）／五位看門的都在（關卡關掉看門的就只有兩顆）
