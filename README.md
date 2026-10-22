@@ -18,7 +18,7 @@
 - `sound.js` 音效：Web Audio 現場合成，沒有音檔；頂欄與開場頁 🔊 一鍵靜音，暫停層有音效／蟲鳴／音量三檔（存 `sheepfold-sound`）
 - 頂欄 ⏩ 二倍速（存 `sheepfold-speed`，加速時裝飾動畫關掉只留資訊）；暫停層「大字」把整頁放大 1.18 倍（存 `sheepfold-bigtext`）。2026-10-20 多視角審查加的
 - 星級：每夜三顆（守過／零損失／看門的都在——這個難度開局有幾位就要幾位都在），跨局累積、不解鎖任何東西；規則與邊界見 `docs/chapter-expansion-design-2026-10-18.md` §13。
-- `sim/simulate.js` 勝率模擬：`node sim/simulate.js [關|all] [calm|windy|storm|all] [局數] [good|basic]`（輸出含「最近幾格」＝敵人最靠近羊圈到哪，越小越驚險）；`node --test sim/*.test.js` 跑引擎測試
+- `sim/simulate.js` 勝率模擬：`node sim/simulate.js [關|all] [calm|windy|storm|all] [局數] [good|basic|line|thorns|multi|compare]`（輸出含「最近幾格」＝敵人最靠近羊圈到哪，越小越驚險）。`line`＝射手守線、`thorns`＝荊棘續航、`multi`＝多排調度三套固定打法；`compare` 用同一批種子把四套各跑一遍印成一張表，並數「只有某一套贏」的局數（2026-10-22）；`node --test sim/*.test.js` 跑引擎測試
 - `docs/roster.md` 單位／敵人／關卡定案；`docs/level-design.md` 每關新鮮感與教學順序；`docs/chapter-2-design.md` 第二章完整規格
 
 ## 兩章各十夜（2026-10-18 起）
