@@ -127,6 +127,7 @@ const Board = (() => {
     const hover = e => { const rc = cellAt(e.global); const k = rc ? key(rc[0], rc[1]) : ''; if (k === hoverKey) return; hoverKey = k; onHover(rc ? rc[0] : null, rc ? rc[1] : null); };
     app.stage.on('pointermove', hover); app.stage.on('pointerdown', hover);
     app.stage.on('pointerleave', () => { hoverKey = ''; onHover(null, null); }); app.stage.on('pointerup', () => { hoverKey = ''; onHover(null, null); });
+    app.canvas.addEventListener('contextmenu', e => e.preventDefault()); // 手機長按棋盤（按住看範圍）會跳系統選單，擋掉；舊 DOM 版靠格子本身沒有可選內容，canvas 要明講
   }
 
   // ====== 每一幀：index.html 的 tick 呼叫；回報「有人在咬」與新出手數給它放音效 ======
