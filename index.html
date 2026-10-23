@@ -379,7 +379,7 @@
 <script src="engine.js?v=16"></script>
 <script src="sound.js?v=7"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=1"></script>
+<script src="render.js?v=3"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS 由 data.js 直接提供
@@ -470,7 +470,9 @@ function icoFail(img) { img.replaceWith(document.createTextNode(img.alt)); }
 let boardReady = false;
 async function buildBoard() {
   boardReady = await Board.init({ el: $('#board'), icons: ICON_IMG, onTap: tapCell,
-    onHover: (r, c) => { if (r === null) { if (!rangeTimer) clearRange(); return; } if (selected && selected !== 'shovel' && hintMap.has(r + ',' + c)) showRange(rangeCells(selected, r, c)); } });
+    onHover: (r, c) => { if (r === null) { if (!rangeTimer) clearRange(); return; } if (selected && selected !== 'shovel' && hintMap.has(r + ',' + c)) showRange(rangeCells(selected, r, c)); },
+    // 畫面層出錯：引擎沒事，遊戲照走；說一聲並記在 localStorage（sheepfold-lasterr，給除錯用），不像引擎出錯那樣回關卡
+    onError: msg => { toast('畫面出了點狀況，已記下來；遊戲照常繼續', true); try { localStorage.setItem('sheepfold-lasterr', `${new Date().toISOString()} ${msg}`.slice(0, 2000)); } catch (e) {} } });
   if (!boardReady) { $('#board-fail').classList.add('on'); $('#start').disabled = true; }
 }
 function buildCards() {
@@ -773,7 +775,8 @@ function tick(now) {
     // 引擎或畫面丟例外：以前 rAF 迴圈會就此停掉、畫面定格沒有任何提示（2026-10-20 P3）。現在停下這一局、說一聲、回關卡；清完的波已存，可以「繼續上次」
     console.error(err);
     cancelAnimationFrame(raf); if (G) G.over = true;
-    toast(`出了點狀況，這一局先停下。${checkpointNote()}`, true);
+    try { localStorage.setItem('sheepfold-lasterr', `${new Date().toISOString()} ${err && err.stack || err}`.slice(0, 2000)); } catch (e) {}
+    toast(`出了點狀況，這一局先停下。${checkpointNote()}（${String(err && err.message || err).slice(0, 80)}）`, true);
     setTimeout(backToLevels, 1800);
   }
 }

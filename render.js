@@ -24,7 +24,7 @@ const Board = (() => {
   let app = null, el = null, ICONS = {}, tex = {}, radialTex, bandTex, vignetteTex, dotTex, rainTex, gradTex = {};
   let W = 0, H = 0, cw = 0, ch = 0, layoutN = 0; // layoutN：尺寸變了就 +1，畫面物件看到號碼不同就重建
   let G = null, diff = 'calm', speed = 1, paused = false, still = false, dawned = false, time = 0;
-  let onTap = () => {}, onHover = () => {};
+  let onTap = () => {}, onHover = () => {}, onError = () => {};
   const L = {};              // 圖層
   const UN = new Map();      // 單位：key → 畫面物件
   const EN = new Map();      // 敵人：id → 畫面物件
@@ -39,7 +39,7 @@ const Board = (() => {
 
   // ====== 啟動：載圖、建圖層 ======
   async function init(opts) {
-    el = opts.el; ICONS = opts.icons || {}; onTap = opts.onTap || onTap; onHover = opts.onHover || onHover;
+    el = opts.el; ICONS = opts.icons || {}; onTap = opts.onTap || onTap; onHover = opts.onHover || onHover; onError = opts.onError || onError;
     if (typeof PIXI === 'undefined') return false;
     try {
       app = new PIXI.Application();
@@ -51,7 +51,8 @@ const Board = (() => {
     await Promise.all([...files].map(f => PIXI.Assets.load({ alias: f, src: `img/ico/${f}.webp` }).then(t => { tex[f] = t; }, () => { tex[f] = null; })));
     await PIXI.Assets.load({ alias: 'ground', src: 'img/ground.webp' }).then(t => { tex.ground = t; }, () => { tex.ground = null; });
     makeTextures(); buildLayers(); bindPointer();
-    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { app.resize(); layout(); }).observe(el);
+    // 盒子大小變了就重排；延到下一幀做，不然在回呼裡改 canvas 尺寸會被瀏覽器記一筆「ResizeObserver loop」警告
+    if (typeof ResizeObserver !== 'undefined') { let queued = false; new ResizeObserver(() => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; if (app) { app.resize(); layout(); } }); }).observe(el); }
     layout();
     return true;
   }
@@ -128,11 +129,19 @@ const Board = (() => {
     if (!paused) time += dt;
     const info = { biting: false, shots: 0 };
     if (!G) { app.render(); return info; }
-    drawCells(); drawUnits(dt); info.biting = drawEnemies(dt); drawMovers(dt); info.shots = drawShots(dt); drawMarks();
-    if (!paused) { updateParticles(dt); updateTweens(dt); drawSky(dt); drawWeather(dt); }
-    drawDark();
+    try {
+      drawCells(); drawUnits(dt); info.biting = drawEnemies(dt); drawMovers(dt); info.shots = drawShots(dt); drawMarks();
+      if (!paused) { updateParticles(dt); updateTweens(dt); drawSky(dt); drawWeather(dt); }
+      drawDark();
+    } catch (err) { report(err); }
     app.render();
     return info;
+  }
+  // 畫面層自己出錯不該讓玩家被踢回關卡（引擎還好好的）：記下來、每局只通知一次，遊戲照走
+  let errCount = 0, lastError = '';
+  function report(err) {
+    errCount++; lastError = String(err && err.stack || err);
+    if (errCount === 1) { console.error(err); try { onError(lastError); } catch (e) {} }
   }
 
   // ====== 格子：底色、石頭、提示框、範圍、教學高亮、照亮的排 ======
@@ -190,7 +199,7 @@ const Board = (() => {
     const icoEmoji = def.kind === 'dog' ? '🦴' : def.kind === 'patrol' ? '🪵' : def.ico; // 狗窩、巡夜人的崗位：人在外面走
     const marker = def.kind === 'dog' || def.kind === 'patrol';
     const spr = makeIcon(icoEmoji, ch * (marker ? .32 : .5)); spr.y = -ch * .04; inner.addChild(spr);
-    const v = { cont, inner, bg, spr, u, def, hpLast: -1, phase: (r * COLS + c) % 8 * .6, recoil: 0, hop: 0, glow: null, cd: null, up: null, upText: '', ready: null };
+    const v = { cont, inner, bg, spr, u, def, hpLast: -1, phase: (r * COLS + c) % 8 * .6, recoil: 0, hop: 0, glow: null, cd: null, up: null, upText: '', ready: null, elderWas: u.elder, upWas: u.upgraded, fearWas: u.fear > 0 };
     if (marker) inner.alpha = .35;
     if (u.upgraded && def.upgrade && def.upgrade.ico) { const b = new PIXI.Container(); b.addChild(new PIXI.Graphics().roundRect(-ch * .13, -ch * .1, ch * .26, ch * .2, 6).fill({ color: 0x000000, alpha: .65 })); const bi = makeIcon(def.upgrade.ico, ch * .16); b.addChild(bi); b.x = cw * .38; b.y = -ch * .36; inner.addChild(b); }
     if (def.push) { v.cd = new PIXI.Graphics(); inner.addChild(v.cd); }
@@ -210,12 +219,11 @@ const Board = (() => {
   function dashCircle(g, x, y, R, color, alpha) { const n = 14; for (let i = 0; i < n; i++) { const a0 = i / n * 6.283, a1 = (i + .55) / n * 6.283; g.moveTo(x + Math.cos(a0) * R, y + Math.sin(a0) * R); g.arc(x, y, R, a0, a1); } g.stroke({ width: 2, color, alpha }); }
   function drawUnits(dt) {
     const anim = !paused && !still && speed <= 1 && !reduce();
+    // 要整格重建的先記下來、迴圈結束再做：迭代 Map 途中刪掉再放回同一把鑰匙，會被再訪問一次而繞不出來（2026-10-23 荊棘撒蠍子後整頁凍住）
+    const rebuild = [];
     for (const [k, v] of UN) {
-      const u = G.units[k]; if (!u) { renderUnit(...k.split(',').map(Number)); continue; }
-      if (u !== v.u || u.elder !== v.elderWas || u.upgraded !== v.upWas || (u.fear > 0) !== v.fearWas) { // 引擎換了物件或狀態（升級、修補、被嚇）就重畫
-        if (u !== v.u || u.upgraded !== v.upWas) { renderUnit(u.r, u.c); continue; }
-        v.u = u; drawUnitBg(v);
-      }
+      const u = G.units[k]; if (!u || u !== v.u || u.upgraded !== v.upWas) { rebuild.push(k); continue; } // 單位沒了、引擎換了物件、升級了：整格重建
+      if (u.elder !== v.elderWas || (u.fear > 0) !== v.fearWas) drawUnitBg(v); // 老牧人、被嚇：只重畫底色
       v.elderWas = u.elder; v.upWas = u.upgraded; v.fearWas = u.fear > 0;
       if (!paused) { v.recoil = Math.max(0, v.recoil - dt); v.hop = Math.max(0, v.hop - dt); }
       v.inner.x = v.recoil > 0 ? -3 * Math.sin(v.recoil / .09 * Math.PI) : 0;
@@ -234,6 +242,7 @@ const Board = (() => {
       if (v.up && !reduce()) { v.upT = (v.upT || 0) + (paused ? 0 : dt); v.up.y = -ch * .42 - (v.upT < 2.8 ? 3 * Math.abs(Math.sin(v.upT / .7 * Math.PI)) : 0); }
       if (v.def.light !== undefined && state.dark) ensureHole(k, v.cont.x, v.cont.y, v.def.light); else removeHole(k);
     }
+    for (const k of rebuild) renderUnit(...k.split(',').map(Number));
   }
   // 放下：先壓扁再彈回（200ms），樞紐在腳底；火盆油燈再「點亮」：縮小冒出來、閃一下暖光
   function placed(r, c, kind) {
@@ -351,7 +360,7 @@ const Board = (() => {
   // 吹角：被推的地面敵人從原位滑到新位（引擎已更新位置，這裡只疊視覺位移；靠右被夾住的只滑那一點）
   function hornShove(moved) { if (reduce() || speed > 1 || !moved) return; for (const m of moved) { if (!(m.dx > 0.01)) continue; const v = EN.get(m.id); if (v) { v.shove = .18; v.shoveDx = m.dx; } } }
   function flashDodge(r, x) { const e = G.enemies.find(o => o.r === r && Math.abs(o.x - x) < .3 && ENEMIES[o.type].dodge); const v = e && EN.get(e.id); if (v && !reduce()) v.dodge = .35; }
-  function swingPatrol(id) { const v = MV.get(id); if (!v) return; if (reduce()) { v.bright = .35; return; } v.swing = .3; }
+  function swingPatrol(id) { const v = MV.get(id); if (!v) return; if (reduce()) { v.brightT = .35; return; } v.swing = .3; }
 
   // ====== 狗、巡夜人、迷羊（格子外走的）======
   function moverVisual(id, emoji, kind) {
@@ -365,17 +374,17 @@ const Board = (() => {
     const spr = makeIcon(emoji, ch * (kind === 'stray' ? .38 : .44)); spr.y = -ch * .02; body.addChild(spr);
     const bright = makeIcon(emoji, spr.width || ch * .44); bright.y = spr.y; bright.blendMode = 'add'; bright.alpha = 0; body.addChild(bright);
     const hp = new PIXI.Graphics(); cont.addChild(hp);
-    const v = { cont, body, spr, bright, hp, hpLast: -1, phase: Math.random() * 6, kind, swing: 0, zz: null }; MV.set(id, v); return v;
+    const v = { cont, body, spr, bright, brightT: 0, hp, hpLast: -1, phase: Math.random() * 6, kind, swing: 0, zz: null }; MV.set(id, v); return v; // brightT：減少動態時巡夜人出手改用「亮一下」的剩餘秒數（跟 bright 精靈分開存，2026-10-23 混用過一次整局停掉）
   }
   function drawMovers(dt) {
     const alive = new Set(); const anim = !paused && !still && speed <= 1 && !reduce();
     const put = (id, emoji, kind, x, y, hpv, max, resting) => {
       alive.add(id); const v = MV.get(id) || moverVisual(id, emoji, kind);
       v.cont.x = x * cw; v.cont.y = y * ch;
-      if (!paused) { v.swing = Math.max(0, v.swing - dt); if (v.bright) v.bright = Math.max(0, v.bright - dt); }
+      if (!paused) { v.swing = Math.max(0, v.swing - dt); v.brightT = Math.max(0, v.brightT - dt); }
       const sw = v.swing > 0 ? Math.sin((1 - v.swing / .3) * Math.PI) : 0;
       v.body.rotation = (anim && !resting ? Math.sin((time + v.phase) * (kind === 'dog' ? 8 : kind === 'patrol' ? 5.3 : 4.5)) * .061 : 0) + sw * .24; v.body.x = sw * cw * .28;
-      v.bright.alpha = v.bright ? Math.min(.5, v.bright) : 0;
+      v.bright.alpha = Math.min(.5, v.brightT);
       v.cont.alpha = resting ? .55 : 1;
       if (resting && !v.zz) { v.zz = makeText('💤', Math.max(10, ch * .18), TEXT, false); v.zz.style.stroke = null; v.zz.x = cw * .2; v.zz.y = -ch * .3; v.cont.addChild(v.zz); } if (!resting && v.zz) { v.zz.destroy(); v.zz = null; }
       if (max && v.hpLast !== hpv) { v.hpLast = hpv; hpBar(v.hp, cw * .6, ch * .33, clamp(hpv / max, 0, 1), OK); }
@@ -534,7 +543,7 @@ const Board = (() => {
 
   // ====== 開局、清場 ======
   function newGame(g, opts) {
-    G = g; diff = opts.diff; speed = opts.speed || 1; dawned = false; still = false; paused = false; time = 0;
+    G = g; diff = opts.diff; speed = opts.speed || 1; dawned = false; still = false; paused = false; time = 0; errCount = 0;
     clear(false);
     state.cellsDirty = true; state.dark = false; state.darkA = 0; state.litRows.fill(false); L.litG.clear();
     for (const k in G.units) renderUnit(G.units[k].r, G.units[k].c);
@@ -561,19 +570,22 @@ const Board = (() => {
   return {
     init, newGame, frame, clear,
     event(e, g) { // 引擎事件裡跟畫面有關的：index.html 的 flushEvents 每一件都丟過來，不認得的這裡略過
-      G = g;
-      switch (e.t) {
-        case 'die': dieFx(e.e); break;
-        case 'hit': flashHit(e.id); break;
-        case 'pop': popText(e.r, e.c, e.text); if (String(e.text)[0] === '+') hopUnit(e.r, e.c); break;
-        case 'unit': renderUnit(e.r, e.c); break;
-        case 'fx': fx(e.kind, e.r, e.x, e.id, e); break;
-        case 'marker': setMarker(e.r, e.type); break;
-        case 'strayMark': setStrayMark(e.r); break;
-      }
+      G = g; if (!app) return;
+      try {
+        switch (e.t) {
+          case 'die': dieFx(e.e); break;
+          case 'hit': flashHit(e.id); break;
+          case 'pop': popText(e.r, e.c, e.text); if (String(e.text)[0] === '+') hopUnit(e.r, e.c); break;
+          case 'unit': renderUnit(e.r, e.c); break;
+          case 'fx': fx(e.kind, e.r, e.x, e.id, e); break;
+          case 'marker': setMarker(e.r, e.type); break;
+          case 'strayMark': setStrayMark(e.r); break;
+        }
+      } catch (err) { report(err); }
     },
     setHints, setRange, setTeach, placed, squashUnit, lightning, dawn, lose,
     setSpeed(n) { speed = n; }, setPaused(p) { paused = p; }, setStill(s) { still = s; },
     get ready() { return !!app; },
+    get lastError() { return lastError; }, get errCount() { return errCount; },
   };
 })();
