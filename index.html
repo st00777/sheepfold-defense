@@ -80,7 +80,6 @@
   .card .ico { font-size: 24px; line-height: 1; }
   /* Fluent 3D 圖示（img/ico/*.webp）：包在原本的 .ico 裡，大小跟著字級走，emoji 的呼吸／走路動畫規則照用 */
   img.ei { width: 1.15em; height: 1.15em; vertical-align: -.2em; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
-  .unit .ico > img, .enemy .ico > img, .dog-run .ico > img { display: block; } /* 棋盤上：圖獨占一行，外層 .ico 剛好包住它 */
   .card .name { font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card .cost { font-size: 13px; color: var(--gold); white-space: nowrap; }
   @media (min-width: 560px) { .card .ico { font-size: 26px; } .card .name, .card .cost { font-size: 13px; } }
@@ -91,15 +90,11 @@
   .card.once.selected, .rc.once.on { border-color: var(--gold); }
   .tag.once { background: #f3ead8cc; }
   .new .tag.once { right: 30px; }
-  .cell.hint.sell { outline-color: var(--danger); }
-  .cell.hint.swap { outline-style: solid; } /* 可直接換掉的單位：金色實線，跟空格的虛線分開 */
   /* 新卡光暈：陰影固定畫在一層假元素上，循環只動它的透明度，不每幀重繪陰影 */
   .card.new::after { content: ''; position: absolute; inset: -2px; border-radius: 10px; box-shadow: 0 0 10px 2px var(--new); pointer-events: none; animation: glowFade 1.4s infinite alternate; }
   @keyframes glowFade { from { opacity: 0; } to { opacity: 1; } }
-  /* 教學：沒輪到的卡壓暗、要放的格子亮金框 */
+  /* 教學：沒輪到的卡壓暗（要放的格子亮金框在 render.js 畫） */
   .card.dim { opacity: .25; pointer-events: none; }
-  .cell.teach { outline: 3px solid var(--gold); outline-offset: -5px; }
-  .cell.teach::before { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 18px 4px #e6b84a77; pointer-events: none; animation: glowFade .9s infinite alternate; }
   #tut-skip { display: none; margin: 6px auto 0; font: inherit; font-size: 12px; background: transparent; color: var(--muted); border: 1px solid var(--muted); border-radius: 6px; padding: 3px 10px; }
   #tut-skip.on { display: block; }
   /* 按壓回饋：所有可按的東西都縮一點點 */
@@ -111,168 +106,23 @@
   #stage { width: 100%; max-width: 640px; } /* 棋盤＋提示列一組，寬度由 fitBoard 依剩餘高度算 */
   #shell { position: relative; width: 100%; padding-left: var(--lane); --lane: 28px; } /* 左邊留一條「門口」走道給看門的，不跟第 0 欄搶位置 */
   #lane { position: absolute; left: 0; top: 0; bottom: 0; width: var(--lane); border-radius: 8px 0 0 8px; background: linear-gradient(90deg, #2f2c24, #3d3929); box-shadow: inset -2px 0 4px #0006; }
-  #board { position: relative; width: 100%; aspect-ratio: 7 / 5; display: grid;
-    grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(5, 1fr); border-radius: 8px; overflow: hidden;
-    background: #243a2a url(img/ground.webp) center / cover no-repeat; }
+  /* 棋盤本體是一張 canvas（render.js 用 PixiJS 畫），這裡只留盒子；開不了 WebGL 時 #board-fail 的說明會蓋在上面 */
+  #board { position: relative; width: 100%; aspect-ratio: 7 / 5; border-radius: 8px; overflow: hidden; background: #243a2a; touch-action: manipulation; }
+  #board canvas { display: block; width: 100%; height: 100%; }
+  #board-fail { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; text-align: center; font-size: 14px; line-height: 1.6; color: var(--muted); background: #243a2a; }
+  #board-fail.on { display: flex; }
   /* 外框獨立一層：頭目登場只震這一層，棋盤格子不動，手機不會點錯格 */
   #frame { position: absolute; inset: -3px -3px -3px calc(var(--lane) - 3px); border: 3px solid var(--line); border-radius: 10px; pointer-events: none; z-index: 6; }
-  .cell { position: relative; background: var(--grass-t); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); }
-  .cell.alt { background: var(--grass2-t); }
-  .cell.rock { background: var(--rock); }
-  /* 無月夜：腳印消失那一刻整個棋盤暗一階，右邊出生的那側更暗（看不見牠從哪來） */
-  #board { transition: filter 2s; }
-  #board.moonless { filter: brightness(.78) saturate(.85); }
-  .fog { position: absolute; right: 0; height: calc(100% / 5); width: 22%; background: linear-gradient(90deg, #0000, #0a0c14cc); pointer-events: none; opacity: 0; transition: opacity 2s; z-index: 1; }
-  #board.moonless .fog { opacity: 1; }
-  /* 油燈照到的排：黑霧散掉、草地轉暖亮（棋盤整體仍是調暗的，這幾排看起來就像被燈照著） */
-  #board.moonless .fog.lit { opacity: 0; transition: opacity .6s; }
-  .cell { transition: background .6s; }
-  #board.moonless .cell.lit { background: #7d8a3fd9; }
-  #board.moonless .cell.lit.alt { background: #8a9847d0; }
-  .cell.rock::after { content: '🪨'; opacity: .7; font-size: .8em; }
-  .cell.hint { outline: 2px dashed var(--gold); outline-offset: -4px; }
-  /* 範圍預覽：拿著卡點到／滑過某格，或剛放下時，這張卡管得到的格子淡金；只疊在底色上，不蓋住單位 */
-  .cell.range { box-shadow: inset 0 0 0 100px #e6b84a3a; }
-  /* 接回：抱羊羔的牧人接到迷羊，他那格飄一個「接回」小牌子（不是飄字，要跟 +25 分開） */
-  .fx.label { font-size: 12px; font-weight: bold; color: #2a2418; background: var(--gold); border-radius: 999px; padding: 2px 8px; width: auto; height: auto; margin: 6px 0 0 4px; white-space: nowrap; animation-duration: 1.3s; }
-  /* 巡夜人出手：人往前揮一下，落點的 ✦ 放大描金，看得出是他打的 */
-  .fx.strike { color: var(--gold); text-shadow: 0 0 6px #fff8, 0 0 2px #000; font-size: clamp(20px, 6vw, 34px); animation-duration: .45s; }
-  .patrol-run.swing .body { animation: swing .3s var(--ease-out); }
-  @keyframes swing { 40% { transform: translateX(28%) rotate(14deg); } }
-  .cell .unit { position: relative; display: flex; align-items: center; justify-content: center; width: 80%; height: 80%; border-radius: 8px; }
-  .unit { background: var(--u, #888); }
-  .unit.shepherd.elder { filter: brightness(.85); box-shadow: inset 0 0 0 2px var(--gold); }
-  .unit.dog      { background: transparent; opacity: .35; font-size: .6em; }
-  .unit.thorns { background: #f3ead822; border: 2px dashed #f3ead866; border-radius: 50%; }
-  .unit.thorns.upgraded { border-color: #c9d46a; }
-  .unit.healer.upgraded, .unit.horn.upgraded { box-shadow: inset 0 0 0 2px var(--gold); }
-  .unit.lamp { box-shadow: 0 0 14px 4px #ffd98a66; }        /* 油燈：暖光暈，無月夜裡一眼看到誰照著 */
-  .unit.staff { background: transparent; border: 2px solid #c9a24a99; }
-  .unit.patrol { background: transparent; opacity: .35; font-size: .6em; } /* 跟狗窩一樣：格子只留個記號，人在外面走 */
-  .unit.cradle { background: var(--u-cradle); }
-  .unit .hp.thick { height: 5px; }
-  .unit .cd { position: absolute; left: 10%; right: 10%; bottom: 7px; height: 3px; background: #0006; }  /* 吹角手冷卻條，疊在血條上方 */
-  .unit .cd > i { display: block; height: 100%; width: 100%; background: var(--gold); transform-origin: left; opacity: .85; }
-  .unit.ready .cd > i { opacity: 1; box-shadow: 0 0 6px 1px var(--gold); }  /* 蓄力完成：金條發亮，隨時會吹 */
-  .unit .hp, .enemy .hp, .dog-run .hp { position: absolute; left: 10%; right: 10%; bottom: 2px; height: 3px; background: #0006; }
-  .hp > i { display: block; height: 100%; width: 100%; background: var(--ok); transform-origin: left; }  /* 血量用 scaleX 畫，不動寬度 */
-  .unit.fear { filter: grayscale(.8); }
-  .unit .badge { position: absolute; top: -4px; right: -4px; font-size: 11px; background: #000a; border-radius: 8px; padding: 0 4px; }
-  /* 可以升級／修補的提示角標：糧夠了才出現 */
-  .unit .up { position: absolute; top: -7px; left: -7px; font-size: 10px; line-height: 1.4; background: var(--gold); color: #2b2a26; border-radius: 8px; padding: 0 4px; white-space: nowrap; animation: bob .7s 4 alternate; }
-  @keyframes bob { to { transform: translateY(-3px); } }
 
-  /* 敵人、狗、石頭用絕對定位；會動的東西位置走 transform（百分比以自己一格的大小為準），不每幀改 left/top */
-  .enemy, .dog-run, .shot { left: 0; top: 0; will-change: transform; }
-  .enemy, .dog-run { transition: opacity .2s; }
-  .enemy, .dog-run, .mark { position: absolute; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; }
-  /* 敵人辨識規則：所有敵人暗紅細圈（陣營）；大小＝威脅；金色粗圈＝頭目；形狀圓＝獸、方圓＝人；底色只做輔助 */
-  /* ====== 單位活起來：圖示包一層 .ico，只動這一層的 transform；外層位置、閃白、倒下各自獨立不打架 ====== */
-  #board .ico { display: inline-block; line-height: 1; }
-  .unit.shepherd .ico, .unit.hireling .ico, .unit.healer .ico, .unit.cradle .ico, .unit.horn .ico { animation: breathe 2.4s ease-in-out infinite alternate; animation-delay: var(--d, 0s); } /* 只有「人」待機呼吸（石牆、荊棘、投石機是物件不動），依格子錯開起點 */
-  .unit.brazier .ico, .unit.lamp .ico { animation: flicker .5s ease-in-out infinite alternate; animation-delay: var(--d, 0s); } /* 火光微晃 */
-  @keyframes flicker { from { transform: scale(1); opacity: .9; } to { transform: scale(1.07) rotate(2deg); opacity: 1; } }
-  .enemy .ico { animation: walk .55s ease-in-out infinite alternate; animation-delay: var(--d, 0s); transform-origin: 50% 85%; } /* 走路：左右小幅搖、腳步起伏；每隻起點隨機錯開，整排才不會一起晃 */
-  .enemy.fast .ico { animation-duration: .4s; }
-  .enemy.big .ico, .enemy.boar .ico { animation-duration: .8s; }
-  .enemy.fly .ico, .enemy.owl .ico, .enemy.swarm .ico { animation: hover 1s ease-in-out infinite alternate; }
-  .enemy.biting .ico { animation: lunge .45s ease-in infinite; }                                        /* 咬東西：一下一下往前撲 */
-  .enemy.s-stun .ico, .enemy.underground .ico, .enemy.dying .ico, .enemy.s-crouch .ico { animation-play-state: paused; }
-  .dog-run .ico { animation: walk .4s ease-in-out infinite alternate; transform-origin: 50% 85%; }
-  .dog-run.rest .ico { animation: none; }
-  .patrol-run .ico { animation-duration: .6s; }
-  .stray .ico { animation-duration: .7s; }
-  #board.fast .ico { animation: none; }                                                                  /* 加速時裝飾動畫關掉，只留資訊 */
-  #board.fast .enemy.biting .ico { animation: lunge .45s ease-in infinite; }                           /* 「正在咬」是資訊，加速也保留 */
-  #board.still .ico, #board.still .enemy.biting .ico { animation: none; }                                /* 結算頁、回關卡後棋盤靜止，不白耗電 */
-  @keyframes breathe { from { transform: translateY(0) scale(1); } to { transform: translateY(-1px) scale(1.04); } }
-  @keyframes walk { from { transform: rotate(-3.5deg) translateY(0); } to { transform: rotate(3.5deg) translateY(-5%); } }
-  @keyframes hover { from { transform: translateY(-6%); } to { transform: translateY(6%); } }
-  @keyframes lunge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-14%) scale(1.06); } }
-  /* ====== 天色與場地：入夜暖橘罩退成夜色、天亮金光；暴風夜冷色罩＋偶發閃電；左邊圍欄、右邊曠野暗邊 ====== */
-  #sky { position: absolute; inset: 0; pointer-events: none; z-index: 5; opacity: 0; background: linear-gradient(180deg, #ffb45a, #ff7a3a 55%, #4a2a60); }
-  #sky.dusk { opacity: .3; }
-  #sky.fade { transition: opacity 4s ease-out; opacity: 0; }
-  #sky.dawn { background: linear-gradient(180deg, #fff3c0, #ffd98a 50%, #ffb45a); opacity: .42; transition: opacity .9s ease-out; } /* 跟結算頁同 0.9 秒，金光到頂時結算剛好出來 */
-  #sky.lose { background: linear-gradient(180deg, #0b1020, #1a1030 60%, #06080f); opacity: .45; transition: opacity .9s ease-out; } /* 失守：同一套格式的冷色退場，不加懲罰感 */
-  #weather { position: absolute; inset: 0; pointer-events: none; z-index: 4; opacity: 0; background: #5a6a8a; }
-  #board.storm #weather { opacity: .14; }
-  #board.storm.moonless #weather { opacity: .08; } /* 暴風夜疊無月夜：冷罩再淡，別把畫面壓死 */
-  .fence { position: absolute; left: 0; top: 0; bottom: 0; width: 9px; pointer-events: none; background: linear-gradient(90deg, #7a5a34, #a07a48 45%, #6a4a2a), repeating-linear-gradient(180deg, #0000 0 10px, #00000055 10px 13px); background-blend-mode: multiply; opacity: .92; box-shadow: 1px 0 4px #0008; }
   #shell.dawn .gate span { filter: drop-shadow(0 0 6px #ffd98a); }
-  .enemy .body { --k: 1; width: 70%; height: 70%; border-radius: 50%; background: #5b5b66; display: flex; align-items: center; justify-content: center; position: relative;
-    box-shadow: 0 0 0 1.5px #8a2f2c; transform: scale(calc(var(--k) * var(--hs, 1))); transition: box-shadow .2s, filter .2s, transform 200ms var(--ease-out); }
-  .enemy.fast .body { --k: .8; }
-  .enemy.fast .body::before { content: ''; position: absolute; left: 90%; top: 45%; width: 70%; height: 3px; background: linear-gradient(90deg, #f3ead8aa, #f3ead800); }
-  .enemy.alpha .body { --k: 1.2; box-shadow: 0 0 0 3px var(--gold); }
-  .enemy.big .body { --k: 1.3; background: #5a3f2a; }
-  .enemy.lion .body { --k: 1.4; box-shadow: 0 0 0 3px var(--gold); }
-  .enemy.human .body { background: #3a3a30; border-radius: 30%; transform: scale(calc(var(--k) * var(--hs, 1))) rotate(-6deg); }
-  .enemy.light .body { background: #a89a7a; }
-  .enemy.small .body { width: 50%; height: 50%; background: #b8682a; }
-  .enemy.swarm .body { width: 45%; height: 45%; background: #5f7a34; box-shadow: none; }
-  .enemy.dig .body { background: linear-gradient(180deg, #a8843a 55%, #5a4a2a 56%); overflow: hidden; }
-  /* 第二章 */
-  .enemy.sly .body { background: #6b5a3a; }                                   /* 豺狼：毛色偏黃，跟灰狼分得開 */
-  .enemy.boar .body { --k: 1.25; background: #4a3426; border-radius: 42%; }   /* 野豬：方一點 */
-  .enemy.owl .body { background: transparent; box-shadow: none; }
-  .enemy.leopard .body { --k: 1.35; background: #a8862a; box-shadow: 0 0 0 3px var(--gold); }
-  .enemy.s-crouch .body { transform: scale(calc(var(--k) * var(--hs, 1) * .8)) translateY(12%); filter: brightness(.7); } /* 蹲伏：壓低、變暗，預兆 */
-  .enemy.s-dash .body { filter: brightness(1.25); }
-  /* 巡夜人與迷羊：跟狗一樣是會動的，絕對定位走 transform */
-  .patrol-run .body { width: 70%; height: 70%; border-radius: 8px; background: var(--u-patrol); display: flex; align-items: center; justify-content: center; position: relative; }
-  .stray .body { width: 60%; height: 60%; border-radius: 50%; background: #f3ead8; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #e6b84a; }
-  .enemy.underground { opacity: 0; }
-  .enemy.fly { align-items: flex-start; }
-  .enemy.fly .body { background: transparent; box-shadow: none; }
-  .enemy.fly::after { content: ''; position: absolute; bottom: 8%; left: 30%; width: 40%; height: 6px; border-radius: 50%; background: #0005; }
-  .enemy.carry .body::after { content: '🐑'; position: absolute; right: -10px; bottom: -6px; font-size: .7em; }
-  .enemy .hp > i { background: var(--danger); }
-  .enemy.alpha .hp, .enemy.big .hp { height: 5px; }
-  .enemy .st { position: absolute; top: 0; left: 50%; transform: translateX(-50%); font-size: .45em; line-height: 1; white-space: nowrap; }
-  .enemy.s-burn .body { box-shadow: 0 0 10px 3px #ff8a3d; }
-  .enemy .flash { position: absolute; inset: 0; border-radius: inherit; background: #fff; opacity: 0; pointer-events: none; } /* 受擊閃白的疊層，WAAPI 控透明度 */
-  .enemy.dying { pointer-events: none; }
-  .dust { position: absolute; width: calc(100% / 7 * .55); height: calc(100% / 5 * .18); border-radius: 50%; background: #e8dcc4; opacity: 0; pointer-events: none; }
-  .enemy.s-poison .body { filter: sepia(.4) hue-rotate(60deg) saturate(1.6); }
-  .enemy.s-stun { opacity: .6; }
-  .enemy.s-dodge .body { animation: dodge .35s; }
-  @keyframes dodge { 30% { transform: translateX(40%) scale(calc(var(--k) * var(--hs, 1))); opacity: .4; } }
-  /* 嚎叫／咆哮：向外擴散的波紋，不飄字 */
-  .ripple { position: absolute; width: calc(100% / 7); height: calc(100% / 5); pointer-events: none; }
-  .ripple::before, .ripple::after { content: ''; position: absolute; inset: 15%; border-radius: 50%; border: 2px solid var(--ripple, #f3ead8); animation: ripple 1s ease-out forwards; }
-  .ripple::after { animation-delay: .25s; }
-  @keyframes ripple { to { transform: scale(2.6); opacity: 0; } }
-  .dog-run .body { width: 70%; height: 70%; border-radius: 50%; background: #c9a24a; display: flex; align-items: center; justify-content: center; position: relative; }
-  .dog-run.rest { opacity: .55; }
-  .dog-run.rest .body::after { content: '💤'; position: absolute; top: -8px; right: -6px; font-size: .5em; }
-  .mark { right: 2px; font-size: clamp(14px, 4.5vw, 26px); opacity: .85; animation: blink .8s infinite alternate; }
-  .mark.stray-mark { opacity: .95; right: calc(100% / 7 + 2px); } /* 跟敵人腳印錯開一格，同排同時出現不會疊 */
-  /* 看門的：每排門口左下角一個小人影，用掉就淡出往左退 */
-  .gate { position: absolute; left: 0; width: var(--lane); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; cursor: pointer; } /* 站在棋盤外的門口走道，一排一位；點他看說明 */
+  /* 看門的：每排門口左下角一個小人影，用掉就淡出往左退（站在棋盤外的走道上，維持 DOM） */
+  .gate { position: absolute; left: 0; width: var(--lane); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; cursor: pointer; } /* 一排一位；點他看說明 */
   .gate span { font-size: clamp(20px, 5.6vw, 30px); line-height: 1; filter: drop-shadow(0 0 2px #000) drop-shadow(0 2px 2px #000a); transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out); }
   .gate.flash::before { content: ''; position: absolute; inset: 2px 0; border-radius: 6px; background: var(--danger); animation: gateFlash 1.1s ease-out forwards; pointer-events: none; } /* 用掉那一刻門口閃紅：讓新手看見「這排少了一條命」 */
   @keyframes gateFlash { from { opacity: .75; } to { opacity: 0; } }
   .gate.none { display: none; } /* 這個難度本來就沒有的排：不畫（跟「用掉了」的灰影分開） */
   .gate.used span { opacity: .38; transform: scale(.85); filter: grayscale(1) drop-shadow(0 0 2px #000); } /* 用掉的留灰影：分得出「用掉了」和「本來沒有」 */
-  .gate-sweep { position: absolute; left: 0; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6vw, 36px); pointer-events: none; animation: gateSweep .9s cubic-bezier(.3, 0, .7, 1) forwards; }
-  .gate-sweep::before { content: ''; position: absolute; right: 55%; top: 38%; height: 24%; width: 260%; border-radius: 999px; background: linear-gradient(90deg, transparent, #e6b84a88); }
-  @keyframes gateSweep { from { transform: translateX(-30%); opacity: 1; } 80% { opacity: 1; } to { transform: translateX(640%); opacity: 0; } }
-  @keyframes gateSweepFade { from { opacity: 1; } 60% { opacity: 1; } to { opacity: 0; } }
   .card.capped { opacity: .45; }
-  .mark.special span { display: flex; align-items: center; justify-content: center; width: 72%; height: 72%; border-radius: 50%; box-shadow: 0 0 0 2px #8a2f2c, 0 0 10px 2px #8a2f2c88; }
-  .mark.boss span { box-shadow: 0 0 0 3px var(--gold), 0 0 12px 3px #e6b84a88; }
-  @keyframes blink { from { opacity: .35; } to { opacity: .95; } }
-  .shot { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #e9e4d0; pointer-events: none; }
-  .shot.arrow { width: 18px; height: 3px; border-radius: 2px; background: #d8c8a0; }
-  .shot.sling { width: 14px; height: 14px; background: #d0d0d0; }
-  .shot.lob { width: 14px; height: 14px; background: #a9a9a9; }
-  .shot.burn { background: #ff8a3d; box-shadow: 0 0 6px #ff8a3d; }
-  .pop { position: absolute; color: var(--gold); font-weight: bold; font-size: 14px; pointer-events: none; animation: pop 1s var(--ease-out) forwards; }
-  .fx { position: absolute; width: calc(100% / 7); height: calc(100% / 5); display: flex; align-items: center; justify-content: center; font-size: clamp(16px, 5vw, 30px); pointer-events: none; animation: popLight .8s var(--ease-out) forwards; }
-  @keyframes popLight { to { transform: translateY(-12px); opacity: 0; } }
-  .fx.stay { animation: blink .6s infinite alternate; }
-  @keyframes pop { to { transform: translateY(-24px); opacity: 0; } }
 
   /* 開發者模式列 */
   #dev { display: none; flex-wrap: wrap; gap: 6px; padding: 6px 12px; background: #1f1e1a; border-top: 1px solid #000; font-size: 12px; align-items: center; }
@@ -295,8 +145,6 @@
   .dialog { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
   @starting-style { .overlay:not([hidden]) .dialog { opacity: 0; transform: scale(.97); } }
   #pause .dialog { transition: none; }
-  /* 暫停時棋盤上的循環動畫也停 */
-  #board.paused, #board.paused * { animation-play-state: paused; }
   .dialog { background: var(--panel); border-radius: 14px; padding: 22px 20px; max-width: 420px; width: 100%; text-align: center; margin: auto; }
   #intro .dialog { display: flex; flex-direction: column; max-height: calc(100dvh - 40px); padding: 0; overflow: hidden; }
   .intro-content { min-height: 0; overflow-y: auto; padding: 20px 20px 12px; }
@@ -390,16 +238,9 @@
 
   /* 減少動態：留透明度變化，拿掉位移與閃爍 */
   @media (prefers-reduced-motion: reduce) {
-    .card.new::after, .cell.teach::before, .mark, .fx.stay, .unit .up { animation: none; }
-    #board .ico { animation: none !important; }
-    #sky.fade { transition: none; }
+    .card.new::after { animation: none; opacity: .8; }
     .gate.used span { transform: none; }
     .gate.flash::before { animation-duration: .6s; }
-    .gate-sweep { animation: gateSweepFade .9s ease-out forwards; } /* 減少動態：不位移，只淡出，事件仍看得到 */
-    .card.new::after, .cell.teach::before { opacity: .8; }
-    .pop, .fx { animation-name: fadeOut; animation-duration: .5s; }
-    .fx.label { animation-duration: 1.2s; }
-    .patrol-run.swing .body { animation: none; filter: brightness(1.35); } /* 減少動態：不揮，只亮一下 */
     #stars .st { animation: none; opacity: 1; }
     .dialog { transition: opacity 200ms; }
     .card:active, .btn:active, .diff:active, .tab:active, .lv:active, .rc:active, #pause-btn:active, #snd-btn:active, .corner:active, .snd-row button:active, #tut-skip:active { transform: none; }
@@ -430,7 +271,7 @@
 </div>
 
 <div id="board-wrap"><div id="stage">
-  <div id="shell"><div id="lane"></div><div id="board"></div><div id="frame"></div></div>
+  <div id="shell"><div id="lane"></div><div id="board"><div id="board-fail">這支瀏覽器開不了棋盤畫面（需要 WebGL）。請換 Chrome 或 Safari 試試，或把瀏覽器更新到最新版。</div></div><div id="frame"></div></div>
   <!-- 提示列貼在棋盤正下方（2026-10-21 James 實機回饋：放頁面最底下根本不會看到） -->
   <div id="bottom">
     <div id="bar"><i></i></div>
@@ -537,6 +378,8 @@
 <script src="data.js?v=12"></script>
 <script src="engine.js?v=16"></script>
 <script src="sound.js?v=7"></script>
+<script src="lib/pixi.min.js"></script>
+<script src="render.js?v=1"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS 由 data.js 直接提供
@@ -546,9 +389,6 @@ const setText = (el, s) => { if (el.textContent !== s) el.textContent = s; }; //
 const SHAKE = [{ transform: 'translateX(0)' }, { transform: 'translateX(-5px)', offset: .25 }, { transform: 'translateX(5px)', offset: .75 }, { transform: 'translateX(0)' }];
 function shake(el) { if (el.animate) el.animate(SHAKE, 300); }
 document.addEventListener('touchstart', () => {}, { passive: true }); // iOS 要有這個 :active 才會亮
-const board = $('#board');
-const boardSize = { w: 0, h: 0 }; // 棋盤大小變了才量一次，畫投射物時直接用，不每幀量
-if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { boardSize.w = board.clientWidth; boardSize.h = board.clientHeight; }).observe(board);
 function fitBoard() {
   const wrap = $('#board-wrap'), stage = $('#stage'), shell = $('#shell'), bottom = $('#bottom');
   const style = getComputedStyle(wrap);
@@ -561,10 +401,8 @@ function fitBoard() {
 if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(fitBoard); ro.observe($('#board-wrap')); ro.observe($('#bottom')); } // 提示列換行變高也要重算
 else window.addEventListener('resize', fitBoard);
 fitBoard();
-const cells = [], fogEls = [], litRows = [false, false, false, false, false];
 let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf = 0;
-const els = new Map();   // 引擎物件 id → 畫面元素
-let markerEl = null, strayMarkEl = null, moundEls = new Map();
+let hintMap = new Map(); // 現在亮著提示框的格子：key → 'hint'（空地）／'swap'（可直接換）／'sell'（鏟子）；畫在 render.js，這裡留一份給範圍預覽查
 const gateEls = []; // 每排門口的看門的（跟著 G.gates 顯示／隱藏）
 const GATE_TIP = '🧍 看門的：第一隻摸到門口的地面敵人，會被他連同整排一起趕出去；用過一次他就走了，那排再漏就守不住。飛的不經過門。寧靜夜每排一位、起風夜中間三排、暴風夜第 2、4 排';
 let toastTimer = 0;
@@ -628,23 +466,12 @@ function icoFail(img) { img.replaceWith(document.createTextNode(img.alt)); }
 (window.requestIdleCallback || setTimeout)(() => { for (const f of new Set(Object.values(ICON_IMG))) { const i = new Image(); i.src = `img/ico/${f}.webp`; } });
 
 // ====== 畫面建立 ======
-function buildBoard() {
-  board.innerHTML = ''; cells.length = 0;
-  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
-    const d = document.createElement('div');
-    d.className = 'cell' + ((r + c) % 2 ? ' alt' : '');
-    d.dataset.r = r; d.dataset.c = c;
-    d.addEventListener('click', () => tapCell(r, c));
-    // 範圍預覽：拿著卡滑過（桌機）或按住（手機）可放的格子，先亮出這張卡管得到的格子；放下後再亮 1.3 秒（tapCell）
-    d.addEventListener('pointerenter', () => { if (selected && selected !== 'shovel' && d.classList.contains('hint')) showRange(rangeCells(selected, r, c)); });
-    d.addEventListener('pointerleave', () => { if (!rangeTimer) clearRange(); });
-    board.appendChild(d); cells.push(d);
-  }
-  // 無月夜的黑霧一排一個，油燈照到的排才能單獨散掉
-  fogEls.length = 0;
-  for (let r = 0; r < ROWS; r++) { const f = document.createElement('div'); f.className = 'fog'; f.style.top = (r / ROWS * 100) + '%'; board.appendChild(f); fogEls.push(f); }
-  // 場地與天色層：圍欄在單位底下；暴風夜冷色罩、天色罩在最上面（都不吃點擊）
-  for (const id of ['fence', 'weather', 'sky']) { const d = document.createElement('div'); d.id = id; d.className = id; board.appendChild(d); }
+// 棋盤是 canvas（render.js）：點格子交給 tapCell；拿著卡滑過（桌機）或按住（手機）可放的格子，先亮出這張卡管得到的格子，放下後再亮 1.3 秒（tapCell）
+let boardReady = false;
+async function buildBoard() {
+  boardReady = await Board.init({ el: $('#board'), icons: ICON_IMG, onTap: tapCell,
+    onHover: (r, c) => { if (r === null) { if (!rangeTimer) clearRange(); return; } if (selected && selected !== 'shovel' && hintMap.has(r + ',' + c)) showRange(rangeCells(selected, r, c)); } });
+  if (!boardReady) { $('#board-fail').classList.add('on'); $('#start').disabled = true; }
 }
 function buildCards() {
   const wrap = $('#cards'); wrap.innerHTML = '';
@@ -830,20 +657,20 @@ function tapShovel() {
 }
 // 依目前拿的卡把格子亮起來：空地虛線、可直接換的單位金實線、鏟子時有單位的格。場上單位數一變（死了、放了）draw 會再叫一次，免得亮著的格子已經空了
 function markHints() {
-  let swappable = 0;
-  cells.forEach(c => {
-    const r = +c.dataset.r, col = +c.dataset.c, k = r + ',' + col;
-    if (selected === 'shovel') { const on = !!G.units[k]; c.classList.remove('swap'); c.classList.toggle('sell', on); c.classList.toggle('hint', on); return; }
+  let swappable = 0; hintMap = new Map();
+  for (let r = 0; r < ROWS; r++) for (let col = 0; col < COLS; col++) {
+    const k = r + ',' + col;
+    if (selected === 'shovel') { if (G.units[k]) hintMap.set(k, 'sell'); continue; }
     const sw = !!selected && !tut.on && Engine.canSwap(G, r, col, selected); if (sw) swappable++;
-    c.classList.remove('sell'); c.classList.toggle('swap', sw);
-    c.classList.toggle('hint', sw || (!!selected && !G.units[k] && !G.rocks.has(k)));
-  });
+    if (sw) hintMap.set(k, 'swap'); else if (selected && !G.units[k] && !G.rocks.has(k)) hintMap.set(k, 'hint');
+  }
+  Board.setHints(hintMap);
   return swappable;
 }
 function clearSelection() {
   selected = null;
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
-  cells.forEach(x => x.classList.remove('hint', 'sell', 'swap'));
+  hintMap = new Map(); Board.setHints(null);
   if (!rangeTimer) clearRange(); // 放下後的 1.3 秒預覽留著，只清滑過的那種
 }
 // ====== 範圍預覽（2026-10-21 小居第 5 項：選卡看得到範圍） ======
@@ -864,11 +691,10 @@ function rangeCells(key, r, c) {
   return out;
 }
 function showRange(list, ms) {
-  clearRange();
-  for (const [rr, cc] of list) cells[rr * COLS + cc].classList.add('range');
+  clearRange(); Board.setRange(list);
   if (ms) rangeTimer = setTimeout(() => { rangeTimer = 0; clearRange(); }, ms);
 }
-function clearRange() { clearTimeout(rangeTimer); rangeTimer = 0; cells.forEach(x => x.classList.remove('range')); }
+function clearRange() { clearTimeout(rangeTimer); rangeTimer = 0; Board.setRange(null); }
 function tapCell(r, c) {
   if (!G || G.over) return;
   if (devOn && devEnemy) { if (devEnemy === 'stray') Engine.dev.stray(G, r, c); else Engine.dev.spawn(G, devEnemy, r, c); flushEvents(); draw(); return; }
@@ -879,213 +705,47 @@ function tapCell(r, c) {
   const res = G.units[r + ',' + c] ? Engine.swap(G, r, c, selected) : Engine.place(G, r, c, selected);
   flushEvents();
   if (!res.ok) { toast(res.msg || ''); return; }
-  if (UNITS[selected].kind !== 'instant') { Sound.play('place'); squashUnit(r, c); if (selected === 'brazier' || selected === 'lamp') igniteUnit(r, c); } // 瓦瓶的聲音走 fx blast，也不回彈；火先點亮
+  if (UNITS[selected].kind !== 'instant') { Sound.play('place'); Board.placed(r, c, selected); } // 放下壓扁回彈；火盆油燈先點亮。瓦瓶的聲音走 fx blast，也不回彈
   showRange(rangeCells(selected, r, c), 1300); // 放下後亮 1.3 秒這張卡管得到的格子（手機沒有滑過，靠這個看範圍）
   clearSelection();
   if (tut.on) { tutAdvance(); return; }
   toast(res.msg);
 }
 
-// ====== 畫單位 ======
-function renderUnit(r, c) {
-  const cell = cells[r * COLS + c];
-  const u = G.units[r + ',' + c];
-  cell.innerHTML = '';
-  if (!u) return;
-  const def = UNITS[u.type];
-  const d = document.createElement('div');
-  d.className = 'unit ' + u.type + (u.elder ? ' elder' : '') + (u.upgraded ? ' upgraded' : '') + (u.fear > 0 ? ' fear' : '');
-  d.style.setProperty('--u', `var(--u-${u.type})`);
-  d.style.setProperty('--d', ((r * COLS + c) % 8 * -0.6) + 's'); // 呼吸起點錯開（8 個相位鋪滿 4.8 秒一個來回），整排不會同步起伏
-  const ico = def.kind === 'dog' ? '🦴' : def.kind === 'patrol' ? '🪵' : def.ico; // 狗窩、巡夜人的崗位：人在外面走
-  const sting = u.upgraded && def.upgrade && def.upgrade.ico ? `<div class="badge">${icoImg(def.upgrade.ico)}</div>` : ''; // 升級角標：荊棘 🦂、纏裹的牧人 🫗
-  const bar = sting + ((u.maxHp > 1 && def.kind !== 'dog') ? `<div class="hp"><i style="transform:scaleX(${(u.hp / u.maxHp).toFixed(3)})"></i></div>` : '');
-  const cd = def.push ? '<div class="cd"><i></i></div>' : ''; // 吹角手／銀號：冷卻條（每幀在 render 裡更新，滿了就是隨時會吹）
-  d.innerHTML = `<span class="ico">${icoImg(ico)}</span>${cd}${bar}`;
-  cell.appendChild(d);
-}
-
-// ====== 畫面上的一次性效果 ======
-const FX = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤', slam: '💥', trample: '💨', home: '💛', strike: '✦', crouch: '👁' };
-// 引擎事件對應的音效（名稱在 sound.js）；沒列的就沒聲音
-const FX_SFX = { blast: 'blast', ignite: 'ignite', horn: 'horn', emerge: 'emerge', grab: 'grab', splash: 'hit', enrage: 'growl', rest: 'whine', howl: 'howl', roar: 'roar', flee: 'whine', slam: 'boar', crouch: 'growl', home: 'sheep', strike: 'hit' };
-const SPAWN_SFX = { owl: 'owl', leopard: 'growl' }; // 出生就叫的敵人：無月夜看不到，先聽到
-function fx(kind, r, x, id) {
-  if (kind === 'mound') { const d = spawnFx('🕳️', r, x, true); moundEls.set(id, d); return; }
-  if (kind === 'emerge') { const d = moundEls.get(id); if (d) { d.remove(); moundEls.delete(id); } }
-  if (kind === 'howl' || kind === 'roar') { ripple(r, x, kind === 'roar' ? 'var(--gold)' : '#c9a0dc'); return; }
-  if (kind === 'bark') return;                      // 狗咬住狼已經看得到，不飄字
-  if (kind === 'dodge') { flashDodge(r, x); return; } // 狐狸閃避：殘影，不飄字
-  if (kind === 'hop') return;                       // 換排：敵人本身會滑過去，不飄字
-  if (kind === 'gate') { gateSweep(r); return; }     // 看門的把整排趕出去：一個人影從門口掃到右邊
-  if (kind === 'catch') { catchFx(r, x, id); return; } // 抱羊羔的牧人接回迷羊：他那格飄「接回」牌子、人跳一下
-  if (kind === 'strike') { swingPatrol(id); spawnFx(FX.strike, r, x).classList.add('strike'); return; } // 巡夜人出手：人往前揮，落點描金 ✦
-  if (FX[kind]) spawnFx(FX[kind], r, x);
-}
-// 接回：牌子落在牧人那格（可能在迷羊的上下鄰排），牧人本人跳一下；不管他是不是產糧的（hopUnit 只跳牧人）
-function catchFx(r, c, id) {
-  spawnFx('接回 🐑', r, c).classList.add('label');
-  if (REDUCE_MOTION.matches || speed > 1) return;
-  const u = unitEl(r, c); if (!u) return;
-  u.animate([{ transform: 'translateY(0) scale(1)' }, { transform: 'translateY(-12%) scale(1.08)', offset: .4 }, { transform: 'translateY(0) scale(1)' }], { duration: 320, easing: EASE_OUT });
-}
-// 巡夜人揮棒：重放 swing 動畫（連續出手時每一下都看得到）
-function swingPatrol(id) {
-  const el = els.get(id); if (!el) return;
-  el.classList.remove('swing'); void el.offsetWidth; el.classList.add('swing');
-}
-// 看門的掃排：人影從左邊門口衝到右邊，後面拖一道金色光，敵人在引擎裡已經消失
-function gateSweep(r) {
-  const d = document.createElement('div'); d.className = 'gate-sweep'; d.textContent = '🧍';
-  d.style.top = (r / ROWS * 100) + '%';
-  board.appendChild(d); Sound.play('horn'); setTimeout(() => d.remove(), 1000);
-}
-function ripple(r, x, color) {
-  const d = document.createElement('div'); d.className = 'ripple'; d.style.setProperty('--ripple', color);
-  d.style.left = (x / COLS * 100) + '%'; d.style.top = (r / ROWS * 100) + '%';
-  board.appendChild(d); setTimeout(() => d.remove(), 1300);
-}
-function flashDodge(r, x) {
-  const e = G.enemies.find(o => o.r === r && Math.abs(o.x - x) < 0.3 && ENEMIES[o.type].dodge);
-  const el = e && els.get(e.id); if (!el) return;
-  el.classList.remove('s-dodge'); void el.offsetWidth; el.classList.add('s-dodge');
-}
-// ====== 手感三件：受擊閃白、倒下收尾、放下回彈。只動 transform／opacity，用 WAAPI 不重排、不碰 filter（filter 給中毒／閃避／蹲伏用） ======
+// 棋盤上的動畫（受擊、倒下、回彈、天色、閃電…）都在 render.js；這裡剩看門的（走道）與外框這兩個 DOM 元素的動作
 const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 const EASE_OUT = 'cubic-bezier(.23, 1, .32, 1)';
-// 受擊：身體上疊一層白，90ms 線性退掉。蝗群不逐隻閃（滿場閃反而看不清）；沒有身體底色的飛禽閃淡一點
-function flashHit(id) {
-  const el = els.get(id); if (!el || el.classList.contains('swarm')) return;
-  let f = el.querySelector('.flash');
-  if (!f) { f = document.createElement('i'); f.className = 'flash'; el.firstElementChild.appendChild(f); }
-  f.animate([{ opacity: el.matches('.fly, .owl') ? .45 : .85 }, { opacity: 0 }], { duration: 90, easing: 'linear' });
-}
-// 倒下：元素脫離 els 交給動畫收尾（draw 不再碰它），220ms 縮到 .85 並淡出；地面敵人腳下一朵塵。減少動態只淡出；加速時不出塵
-function dieFx(e) {
-  const el = els.get(e.id); if (!el) return;
-  els.delete(e.id); el.classList.add('dying');
-  const base = el.style.transform, reduce = REDUCE_MOTION.matches;
-  el.animate(reduce ? [{ opacity: 1 }, { opacity: 0 }] : [{ opacity: 1, transform: base }, { opacity: 0, transform: `${base} scale(.85)` }],
-    { duration: 220, easing: EASE_OUT, fill: 'forwards' }).onfinish = () => el.remove();
-  if (reduce || speed > 1 || e.underground || ENEMIES[e.type].flying) return;
-  if (board.querySelectorAll('.dust').length >= 4) return; // 同時最多四朵，蝗群／瓦瓶齊倒不會滿地煙
-  const d = document.createElement('div'); d.className = 'dust';
-  d.style.left = ((e.x + 0.5) / COLS * 100) + '%'; d.style.top = ((e.r + 0.72) / ROWS * 100) + '%';
-  board.appendChild(d);
-  d.animate([{ opacity: .5, transform: 'translate(-50%, 0) scale(.6)' }, { opacity: 0, transform: 'translate(-50%, -40%) scale(1.3)' }],
-    { duration: 260, easing: EASE_OUT, fill: 'forwards' }).onfinish = () => d.remove();
-}
-// 放下：先壓扁再彈回（200ms），樞紐在腳底；減少動態不做
-function squashUnit(r, c) {
-  if (REDUCE_MOTION.matches) return;
-  const u = cells[r * COLS + c].querySelector('.unit'); if (!u) return;
-  u.style.transformOrigin = '50% 90%';
-  u.animate([{ transform: 'scale(1.12, .86)' }, { transform: 'scale(.97, 1.03)', offset: .6 }, { transform: 'scale(1, 1)' }], { duration: 200, easing: EASE_OUT });
-}
-// ====== A1 儀式型效果：射手出手、產糧小跳、吹角頓挫、頭目登場、入夜／天亮、閃電 ======
-const COMPOSITE_OK = typeof KeyframeEffect !== 'undefined' && 'composite' in KeyframeEffect.prototype; // 疊加式動畫：沒有就不做頓挫（避免蓋掉位置）
-function unitEl(r, c) { const cell = cells[r * COLS + c]; return cell && cell.querySelector('.unit'); }
-// 射手出手：整個單位往後退 3px 再回來（90ms）。看得出哪排在開火；加速、減少動態不做
-function recoilUnit(r, c) {
-  if (REDUCE_MOTION.matches || speed > 1) return;
-  const u = unitEl(r, c); if (!u) return;
-  u.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-3px)', offset: .3 }, { transform: 'translateX(0)' }], { duration: 90, easing: EASE_OUT });
-}
-// 產糧：牧人小跳一下（240ms），只對產糧單位
-function hopUnit(r, c) {
-  if (REDUCE_MOTION.matches || speed > 1) return;
-  const g = G.units[r + ',' + c]; if (!g || UNITS[g.type].kind !== 'producer') return;
-  const u = unitEl(r, c); if (!u) return;
-  u.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-9%)', offset: .4 }, { transform: 'translateY(0)' }], { duration: 240, easing: EASE_OUT });
-}
-// 吹角：吹的人回彈；被推的地面敵人從原位「滑」到新位（疊在引擎已更新的位置上，不改引擎數值）
-function hornShove(r, c, moved) {
-  if (REDUCE_MOTION.matches || speed > 1) return;
-  squashUnit(r, c);
-  if (!COMPOSITE_OK || !moved) return;
-  for (const m of moved) { // 引擎算好每隻實際退了多遠（靠右邊被夾住的只滑那一點），不用整格硬套
-    if (!(m.dx > 0.01)) continue;
-    const el = els.get(m.id); if (!el) continue;
-    el.animate([{ transform: `translateX(${(-m.dx * 100).toFixed(1)}%)` }, { transform: 'translateX(0)' }], { duration: 180, easing: EASE_OUT, composite: 'add' });
-  }
-}
 // 頭目登場：只震外框一次（2px、350ms）＋金邊閃一下；棋盤格子不動
 function bossEnter() {
   const f = $('#frame'); if (!f) return;
   if (!REDUCE_MOTION.matches && speed <= 1) f.animate([{ transform: 'translate(0, 0)' }, { transform: 'translate(-2px, 1px)', offset: .2 }, { transform: 'translate(2px, -1px)', offset: .45 }, { transform: 'translate(-1px, 0)', offset: .7 }, { transform: 'translate(0, 0)' }], { duration: 350, easing: 'ease-out' });
   f.animate([{ boxShadow: '0 0 0 2px #e6b84a, 0 0 18px 4px #e6b84a88' }, { boxShadow: '0 0 0 0 #e6b84a00, 0 0 0 0 #e6b84a00' }], { duration: 700, easing: 'ease-out' });
 }
-// 入夜：開局罩一層暖橘，四秒退成夜色；續玩（已是半夜）不做
-function dusk(on) {
-  const s = $('#sky'); if (!s) return;
-  if (!on || REDUCE_MOTION.matches) { s.className = ''; return; }
-  s.className = 'dusk'; void s.offsetWidth;
-  requestAnimationFrame(() => { if (s.classList.contains('dusk')) s.className = 'fade'; });
-}
-// 天亮：金光罩上來、無月夜的暗罩退掉（filter 2s 漸亮）、看門的發亮；結算頁晚一點再出來讓人看到
+// 天亮：金光罩上來、黑暗退掉、場上的人由左到右跳一下（render.js）；看門的發亮、由上到下跳一下（走道是 DOM，在這裡）
 function dawn() {
-  dawned = true; board.classList.remove('moonless'); board.classList.add('dawn'); $('#shell').classList.add('dawn'); const s = $('#sky'); if (s) s.className = 'dawn';
+  dawned = true; $('#shell').classList.add('dawn'); Board.dawn();
   if (REDUCE_MOTION.matches) return;
-  // 守過那一瞬間：還在的看門的由上到下跳一下，場上的人由左到右跟著跳（儀式感，不帶數值）
   gateEls.forEach((g, i) => { if (g && !g.classList.contains('used')) g.firstElementChild.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-28%)', offset: .4 }, { transform: 'translateY(0)' }], { duration: 420, delay: i * 70, easing: EASE_OUT }); });
-  for (const k in G.units) { const u = G.units[k]; const el = unitEl(u.r, u.c); if (el) el.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-8%)', offset: .4 }, { transform: 'translateY(0)' }], { duration: 360, delay: 120 + u.c * 55, easing: EASE_OUT }); }
 }
 // 失守：冷色罩上來（跟天亮同一套格式），結算頁一樣慢 0.9 秒出來
-function nightfall() { const s = $('#sky'); if (s) s.className = 'lose'; }
-// 火盆、油燈放下那一刻先「點亮」：縮小冒出來、閃一下暖光再定住（.ico 那層；外層的放下壓扁照跑）
-function igniteUnit(r, c) {
-  if (REDUCE_MOTION.matches || speed > 1) return;
-  const u = unitEl(r, c); const ico = u && u.querySelector('.ico'); if (!ico) return;
-  ico.animate([{ transform: 'scale(.6)', filter: 'drop-shadow(0 0 0 #ffd98a00)' }, { transform: 'scale(1.3)', filter: 'drop-shadow(0 0 10px #ffd98a)', offset: .45 }, { transform: 'scale(1)', filter: 'drop-shadow(0 0 0 #ffd98a00)' }], { duration: 520, easing: EASE_OUT });
-}
-function lightning() {
-  const w = $('#weather'); if (!w || REDUCE_MOTION.matches || speed > 1 || board.classList.contains('moonless')) return; // 無月夜不閃電：那段本來就是「看不見」
-  w.animate([{ opacity: .5, backgroundColor: '#f4f0ff' }, { opacity: .14, backgroundColor: '#5a6a8a' }], { duration: 180, easing: 'ease-out' });
-}
-function spawnFx(text, r, x, stay) {
-  const d = document.createElement('div'); d.className = 'fx' + (stay ? ' stay' : ''); d.textContent = text;
-  d.style.left = (x / COLS * 100) + '%'; d.style.top = (r / ROWS * 100) + '%';
-  board.appendChild(d); if (!stay) setTimeout(() => d.remove(), 1100);
-  return d;
-}
-function pop(r, c, text) {
-  const d = document.createElement('div'); d.className = 'pop'; d.textContent = text;
-  d.style.left = ((c + 0.3) / COLS * 100) + '%'; d.style.top = ((r + 0.2) / ROWS * 100) + '%';
-  board.appendChild(d); setTimeout(() => d.remove(), 1000);
-}
-// 迷羊的腳印：跟敵人腳印同一個位置，但是 🐑，不閃紅框；無月夜也看得到（羊不是敵人）
-function setStrayMark(r) {
-  if (strayMarkEl) { strayMarkEl.remove(); strayMarkEl = null; }
-  if (r === null || r === undefined) return;
-  const d = document.createElement('div'); d.className = 'mark stray-mark'; d.textContent = '🐑';
-  d.style.transform = `translateY(${r * 100}%)`; board.appendChild(d); strayMarkEl = d;
-}
-function setMarker(r, type) {
-  if (markerEl) { markerEl.remove(); markerEl = null; }
-  if (r === null || r === undefined) return;
-  const d = document.createElement('div'); d.className = 'mark';
-  const special = type && type !== 'wolf' && type !== 'fast';
-  if (special) { const boss = !!ENEMIES[type].boss; d.classList.add('special'); if (boss) d.classList.add('boss'); d.innerHTML = `<span>${icoImg(ENEMIES[type].ico)}</span>`; }
-  else d.innerHTML = icoImg('🐾');
-  d.style.top = (r / ROWS * 100) + '%';
-  board.appendChild(d); markerEl = d;
-}
-
-// 把引擎這一步發生的事畫出來
+function nightfall() { Board.lose(); }
+// 引擎事件對應的音效（名稱在 sound.js）；沒列的就沒聲音
+const FX_SFX = { blast: 'blast', ignite: 'ignite', horn: 'horn', emerge: 'emerge', grab: 'grab', splash: 'hit', enrage: 'growl', rest: 'whine', howl: 'howl', roar: 'roar', flee: 'whine', slam: 'boar', crouch: 'growl', home: 'sheep', strike: 'hit' };
+const SPAWN_SFX = { owl: 'owl', leopard: 'growl' }; // 出生就叫的敵人：無月夜看不到，先聽到
+// 把引擎這一步發生的事畫出來（棋盤上的交給 render.js，這裡放音效、提示、存檔、勝負）
 function flushEvents() {
   const spawned = [];
   for (const e of G.events) {
     switch (e.t) {
       case 'spawn': spawned.push(e.e.type); if (SPAWN_SFX[e.e.type]) Sound.play(SPAWN_SFX[e.e.type]); if (ENEMIES[e.e.type].boss) bossEnter(); break;
       case 'toast': toast(e.msg); break;
-      case 'die': Sound.play('die'); dieFx(e.e); break;
-      case 'hit': flashHit(e.id); break;
+      case 'die': Sound.play('die'); Board.event(e, G); break;
+      case 'hit': Board.event(e, G); break;
       case 'callout': if (!seenEnemy(e.type)) { toast(`${ENEMIES[e.type].ico} ${e.tip}`, true); markSeenEnemy(e.type); } break;
-      case 'pop': pop(e.r, e.c, e.text); if (String(e.text)[0] === '+') { Sound.play('food'); hopUnit(e.r, e.c); } break;
-      case 'unit': renderUnit(e.r, e.c); break;
-      case 'fx': fx(e.kind, e.r, e.x, e.id); if (FX_SFX[e.kind]) Sound.play(FX_SFX[e.kind]); if (e.kind === 'horn') hornShove(e.r, e.x, e.moved); break;
-      case 'marker': setMarker(e.r, e.type); break;
-      case 'strayMark': setStrayMark(e.r); break;
+      case 'pop': Board.event(e, G); if (String(e.text)[0] === '+') Sound.play('food'); break;
+      case 'unit': Board.event(e, G); break;
+      case 'fx': Board.event(e, G); if (FX_SFX[e.kind]) Sound.play(FX_SFX[e.kind]); if (e.kind === 'gate') Sound.play('horn'); break;
+      case 'marker': case 'strayMark': Board.event(e, G); break;
       case 'sheep': $('#sheep-n').textContent = G.sheep; break;
       case 'hand': buildCards(); if (selected && selected !== 'shovel' && !G.hand.includes(selected)) clearSelection(); break; // 送卡模式：手上的卡變了；選著的那張已經不在就取消
       case 'stray': Sound.play('sheep'); break;
@@ -1107,8 +767,8 @@ function tick(now) {
   const wasWave = G.phase === 'wave';
   try {
     for (let i = 0; i < speed; i++) { Engine.step(G, dt); flushEvents(); if (G.over) break; }
-    if (!wasWave && G.phase === 'wave') { Sound.play('wave'); if (diff === 'storm' && Math.random() < .35) lightning(); } // 暴風夜：波開始時偶爾閃一次電
-    draw();
+    if (!wasWave && G.phase === 'wave') { Sound.play('wave'); if (diff === 'storm' && Math.random() < .35) Board.lightning(); } // 暴風夜：波開始時偶爾閃一次電
+    draw(dt);
   } catch (err) {
     // 引擎或畫面丟例外：以前 rAF 迴圈會就此停掉、畫面定格沒有任何提示（2026-10-20 P3）。現在停下這一局、說一聲、回關卡；清完的波已存，可以「繼續上次」
     console.error(err);
@@ -1119,7 +779,7 @@ function tick(now) {
 }
 // 速度：玩家用右上角 ⏩ 在 1× 與 2× 之間切（存 sheepfold-speed）；開發者列的 1／2／4／8× 走同一條
 function setSpeed(n) {
-  speed = n; board.classList.toggle('fast', speed > 1);
+  speed = n; Board.setSpeed(speed);
   document.querySelectorAll('#dev [data-speed]').forEach(x => x.classList.toggle('on', Number(x.dataset.speed) === speed));
   const fb = $('#fast-btn'); fb.classList.toggle('on', speed > 1); fb.textContent = speed > 1 ? `⏩${speed}×` : '⏩'; fb.title = speed > 1 ? `加速中 ${speed}×，點一下回正常` : '加速（二倍速）';
   try { localStorage.setItem('sheepfold-speed', String(speed)); } catch (e) {}
@@ -1127,14 +787,7 @@ function setSpeed(n) {
 $('#fast-btn').addEventListener('click', () => { setSpeed(speed > 1 ? 1 : 2); Sound.play('tap'); });
 try { const sp = Number(localStorage.getItem('sheepfold-speed')); if (sp === 2) setSpeed(2); } catch (e) {}
 
-// 頭上最多兩個圖示，依重要性；緩速與嚎叫不顯示（荊棘腳下看得到、領頭狼本身在場）
-function statusText(e) {
-  const list = [];
-  if (e.enraged) list.push('😡'); if (e.st.panic) list.push('😱'); if (e.st.stun || e.st.distract) list.push('💫'); if (e.st.burn) list.push('🔥'); if (e.st.poison) list.push('☠️');
-  return list.slice(0, 2).join('');
-}
-function draw() {
-  const bw = boardSize.w || board.clientWidth, bh = boardSize.h || board.clientHeight; // 尺寸由 ResizeObserver 記著；還沒量到才現讀
+function draw(dt = 0) {
   setText($('#food'), G.level.conveyor ? '—' : String(Math.floor(G.food)));
   const t = Math.ceil(G.timer), n = G.waves.length;
   setText($('#wave-info'),
@@ -1142,62 +795,10 @@ function draw() {
     G.phase === 'prep' ? (G.started ? `第 1 波 ${t} 秒後來` : '放下第一個單位才開始倒數') :
     G.phase === 'rest' ? (G.wave >= n ? '天快亮了' : `第 ${G.wave + 1} 波 ${t} 秒後來`) :
     `第 ${G.wave} / ${n} 波`);
-
-  const alive = new Set();
-  let biting = false;
-  for (const e of G.enemies) {
-    alive.add(e.id); if (e.biting || e.heldBy) biting = true;
-    let el = els.get(e.id);
-    if (!el) {
-      const def = ENEMIES[e.type];
-      el = document.createElement('div'); el.className = 'enemy ' + (def.cls || '');
-      el.innerHTML = `<div class="body"><span class="ico">${icoImg(def.ico)}</span><div class="st"></div></div><div class="hp"><i></i></div>`;
-      const w = G.waves[G.wave - 1];
-      if (w && w.hpMul > 1.2) el.style.setProperty('--hs', (1 + (w.hpMul - 1) * 0.2).toFixed(2));
-      el.style.setProperty('--d', (-Math.random() * 1.1).toFixed(2) + 's'); // 走路相位隨機，整排不同步晃
-      board.appendChild(el); els.set(e.id, el);
-    }
-    el.classList.toggle('s-burn', !!e.st.burn); el.classList.toggle('s-poison', !!e.st.poison); el.classList.toggle('s-stun', !!(e.st.stun || e.st.distract));
-    el.classList.toggle('s-crouch', e.crouchT > 0); el.classList.toggle('s-dash', e.dashLeft > 0); el.classList.toggle('biting', !!e.biting);
-    const rv = e.rv === undefined ? e.r : e.rv; // 換排時從舊排滑到新排
-    el.style.transform = `translate(${(e.x * 100).toFixed(2)}%, ${((rv - (e.lift || 0) * 0.6) * 100).toFixed(1)}%)`; // lift：賊翻牆的弧線
-    el.classList.toggle('underground', !!e.underground);
-    el.classList.toggle('carry', !!e.carrying);
-    el.querySelector('.hp > i').style.transform = `scaleX(${(Math.max(0, e.hp) / e.maxHp).toFixed(3)})`;
-    const st = el.querySelector('.st'); const txt = statusText(e); if (st.textContent !== txt) st.textContent = txt;
-  }
-  for (const s of G.shots) {
-    alive.add(s.id);
-    let el = els.get(s.id);
-    if (!el) { el = document.createElement('div'); el.className = 'shot ' + s.kind; board.appendChild(el); els.set(s.id, el); Sound.play('shot'); recoilUnit(s.ur === undefined ? s.r : s.ur, s.uc === undefined ? Math.floor(s.x) : s.uc); }
-    el.classList.toggle('burn', !!s.burn);
-    const lift = s.kind === 'lob' ? Math.sin(Math.min(1, s.t) * Math.PI) * 0.6 : 0;
-    el.style.transform = `translate(${(s.x / COLS * bw - 6).toFixed(1)}px, ${((s.r + 0.5 - lift) / ROWS * bh - 6).toFixed(1)}px)`;
-  }
-  for (const k in G.units) {
-    const u = G.units[k]; if (u.type !== 'dog') continue;
-    alive.add(u.id);
-    let el = els.get(u.id);
-    if (!el) { el = document.createElement('div'); el.className = 'dog-run'; el.innerHTML = `<div class="body"><span class="ico">${icoImg('🐕')}</span></div><div class="hp"><i></i></div>`; board.appendChild(el); els.set(u.id, el); }
-    el.style.transform = `translate(${(u.x * 100).toFixed(2)}%, ${u.r * 100}%)`;
-    el.classList.toggle('rest', !!u.resting);
-    el.querySelector('.hp > i').style.transform = `scaleX(${(Math.max(0, u.hp) / u.maxHp).toFixed(3)})`;
-  }
-  for (const k in G.units) {
-    const u = G.units[k]; if (u.type !== 'patrol') continue;
-    alive.add(u.id);
-    let el = els.get(u.id);
-    if (!el) { el = document.createElement('div'); el.className = 'dog-run patrol-run'; el.innerHTML = `<div class="body"><span class="ico">${icoImg(UNITS.patrol.ico)}</span></div><div class="hp"><i></i></div>`; board.appendChild(el); els.set(u.id, el); }
-    el.style.transform = `translate(${u.c * 100}%, ${(u.rv * 100).toFixed(1)}%)`;
-    el.querySelector('.hp > i').style.transform = `scaleX(${(Math.max(0, u.hp) / u.maxHp).toFixed(3)})`;
-  }
-  for (const s of G.strays) {
-    alive.add(s.id);
-    let el = els.get(s.id);
-    if (!el) { el = document.createElement('div'); el.className = 'dog-run stray'; el.innerHTML = `<div class="body"><span class="ico">${icoImg(STRAY.ico)}</span></div>`; board.appendChild(el); els.set(s.id, el); }
-    el.style.transform = `translate(${(s.x * 100).toFixed(2)}%, ${s.r * 100}%)`;
-  }
-  for (const [id, el] of els) if (!alive.has(id)) { el.remove(); els.delete(id); }
+  // 棋盤裡的一切（單位、敵人、投射物、效果、天色）交給 render.js；它回報有沒有人在咬、這一幀新出手幾發，聲音在這裡放
+  const info = Board.frame(G, dt);
+  if (info.shots) Sound.play('shot');
+  const biting = info.biting;
   // 看門的：每排門口一位，用掉的淡出
   for (let r = 0; r < ROWS; r++) {
     let g = gateEls[r];
@@ -1211,25 +812,6 @@ function draw() {
     }
   }
   if (biting) Sound.play('bite'); // sound.js 自己限流，每 0.45 秒最多一聲
-  // 無月夜：腳印消失的那一波起棋盤變暗（跟引擎 markerVisible 同一個時間點）
-  const dark = !dawned && !!G.level.moonless && G.wave + (G.phase === 'wave' ? 0 : 1) >= G.level.moonless; // 天亮後不再罩回去
-  board.classList.toggle('moonless', dark);
-  // 油燈照到的排亮起來（跟引擎 rowLit 同一套判定：燈活著、上下 light 排內）
-  for (let r = 0; r < ROWS; r++) {
-    const lit = dark && Engine.rowLit(G, r);
-    if (lit !== litRows[r]) { litRows[r] = lit; fogEls[r].classList.toggle('lit', lit); for (let c = 0; c < COLS; c++) cells[r * COLS + c].classList.toggle('lit', lit); }
-  }
-
-  // 吹角手／銀號冷卻條：從放下（或上次吹）開始慢慢填滿，填滿＝蓄力完成、場上有地面敵人就會響
-  for (const k in G.units) {
-    const u = G.units[k]; const def = UNITS[u.type]; if (!def.push) continue;
-    const d = cells[u.r * COLS + u.c].firstElementChild; if (!d) continue;
-    const bar = d.querySelector('.cd > i'); if (!bar) continue;
-    const ready = u.timer <= 0;
-    const len = u.cdLen || def.every; // 剛放下只等 6 秒，條要照 6 秒算，不然一放下就七成滿
-    bar.style.transform = `scaleX(${ready ? 1 : Math.max(0, Math.min(1, 1 - u.timer / len)).toFixed(3)})`;
-    d.classList.toggle('ready', ready);
-  }
   $('#bar > i').style.transform = `scaleX(${G.total ? (G.killed / G.total).toFixed(3) : 0})`;
   const nUnits = Object.keys(G.units).length;
   if (nUnits !== lastUnits) { lastUnits = nUnits; if (selected) markHints(); }
@@ -1237,20 +819,11 @@ function draw() {
   if (f !== lastFood) { lastFood = f; for (const c of cardEls) c.classList.toggle('poor', !G.level.conveyor && f < UNITS[c.dataset.key].cost); }
   if (G.level.maxUnits) for (const c of cardEls) { const cap = G.level.maxUnits[c.dataset.key]; if (cap !== undefined) c.classList.toggle('capped', Engine.countUnits(G, c.dataset.key) >= cap); }
   if (tut.on && tut.waiting && f >= TUT_STEPS[tut.step].need) tutShow();
-  // 牧人可升級／石牆可修補：糧夠了才掛角標，點一下就知道
-  for (const k in G.units) {
-    const u = G.units[k], up = Engine.tapHint(G, u); // 規則在引擎，這裡只畫
-    const el = cells[u.r * COLS + u.c].firstChild; if (!el) continue;
-    let b = el.querySelector('.up');
-    if (up && !b) { b = document.createElement('div'); b.className = 'up'; el.appendChild(b); }
-    if (b && b.textContent !== up) b.textContent = up;
-    if (!up && b) b.remove();
-  }
 }
 
 // ====== 勝負 ======
 function endGame(title, text) {
-  board.classList.add('still'); // 結算頁底下的棋盤不再呼吸、走路
+  Board.setStill(true); // 結算頁底下的棋盤不再呼吸、走路
   $('#result-title').textContent = title;
   $('#result-text').textContent = text;
   $('#psalm').innerHTML = ''; $('#stars').innerHTML = ''; $('#stars-note').textContent = '';
@@ -1318,9 +891,7 @@ function onLose(reason) {
 // ====== 開始／重來 ======
 function clearBoard() {
   cancelAnimationFrame(raf);
-  for (const [, el] of els) el.remove(); els.clear();
-  board.querySelectorAll('.pop, .fx, .mark, .gate-sweep, .dying, .dust').forEach(x => x.remove()); moundEls.clear(); markerEl = null; strayMarkEl = null;
-  board.classList.add('still');
+  Board.clear(); // 棋盤上的東西全收掉、停止重畫（不白耗電）
   selected = null; clearRange();
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
   tut.on = false; $('#tut-skip').classList.remove('on');
@@ -1340,13 +911,12 @@ function startGame(fromCp) {
   // 重新開始「同一關」才丟掉舊檢查點（每關各一份，別關不動）；開著開發者面板這局不會存，舊檔一併清掉免得之後重打
   if (!resumed || devUsed) clearCheckpoint(level.id);
   buildCards();
-  cells.forEach(c => { c.innerHTML = ''; c.classList.remove('hint', 'sell', 'swap', 'teach'); c.classList.toggle('rock', G.rocks.has(c.dataset.r + ',' + c.dataset.c)); });
   $('#sheep').hidden = !level.sheep; $('#sheep-n').textContent = G.sheep;
-  for (const k in G.units) renderUnit(G.units[k].r, G.units[k].c);
+  Board.newGame(G, { diff, speed, resumed }); // 石頭格、場上單位、入夜暖橘（續玩不做）
   for (let i = G.events.length - 1; i >= 0; i--) if (G.events[i].t === 'unit') G.events.splice(i, 1); // 單位已直接畫了，其餘事件留給第一幀
   toast(resumed ? `從第 ${G.wave + 1} 波繼續，場上的人都還在${devUsed ? '；開著開發者模式，這局不存檔' : ''}` : broken ? CP_BROKEN : '先點一張卡，再點草地放下去');
-  dawned = false; board.classList.remove('dawn', 'still'); $('#shell').classList.remove('dawn'); board.classList.toggle('storm', diff === 'storm'); board.classList.toggle('fast', speed > 1); dusk(!resumed);
-  draw();
+  dawned = false; $('#shell').classList.remove('dawn');
+  draw(0);
   if (!resumed && level.id === 1 && (!tutDone() || /[?&]tut/.test(location.search))) tutStart();
   last = performance.now();
   raf = requestAnimationFrame(tick);
@@ -1556,7 +1126,7 @@ function tutShow() {
   const st = TUT_STEPS[tut.step], ready = !st.need || G.food >= st.need;
   tut.waiting = !ready;
   document.querySelectorAll('#cards .card').forEach(c => c.classList.toggle('dim', !ready || c.dataset.key !== st.card));
-  cells.forEach(c => c.classList.toggle('teach', ready && +c.dataset.r === st.cell[0] && +c.dataset.c === st.cell[1]));
+  Board.setTeach(ready ? st.cell : null);
   toast(ready ? st.say : st.wait, true);
 }
 function tutAdvance() {
@@ -1567,7 +1137,7 @@ function tutAdvance() {
 function tutEnd(msg) {
   tut.on = false; if (G) G.holdWaves = false;
   document.querySelectorAll('#cards .card').forEach(c => c.classList.remove('dim'));
-  cells.forEach(c => c.classList.remove('teach'));
+  Board.setTeach(null);
   $('#tut-skip').classList.remove('on');
   try { localStorage.setItem(TKEY, '1'); } catch (e) {}
   if (msg) toast(msg, true);
@@ -1577,10 +1147,10 @@ $('#tut-skip').addEventListener('click', () => tutEnd('好，自己來。狼要�
 // ====== 暫停與檢查點 ======
 // 暫停：上方 ⏸ 或切到背景；畫面蓋一層，按繼續才走
 // 暫停狀態同步到畫面：棋盤循環動畫停、開發者面板的暫停鍵字樣跟著變
-const heldAnims = []; // 暫停時被我們停住的 WAAPI 動畫（回彈、吹角、倒下、閃電、震框），恢復時放回去；CSS 動畫交給 .paused 類別
+const heldAnims = []; // 暫停時被我們停住的 WAAPI 動畫（走道上看門的跨步、外框震動），恢復時放回去；棋盤 canvas 的動畫由 render.js 自己停
 const isCssAnim = a => (typeof CSSAnimation !== 'undefined' && a instanceof CSSAnimation) || (typeof CSSTransition !== 'undefined' && a instanceof CSSTransition);
 function syncPause() {
-  board.classList.toggle('paused', paused); $('#dev-pause').classList.toggle('on', paused); $('#dev-pause').textContent = paused ? '繼續' : '暫停';
+  Board.setPaused(paused); $('#dev-pause').classList.toggle('on', paused); $('#dev-pause').textContent = paused ? '繼續' : '暫停';
   const shell = $('#shell'); if (!shell || !shell.getAnimations) return;
   if (paused) { for (const a of shell.getAnimations({ subtree: true })) if (!isCssAnim(a) && a.playState === 'running') { a.pause(); heldAnims.push(a); } }
   else for (const a of heldAnims.splice(0)) if (a.playState === 'paused') a.play();
@@ -1662,7 +1232,7 @@ function buildDevEnemies() {
   const sel = $('#dev-enemy');
   for (const k in ENEMIES) { const o = document.createElement('option'); o.value = k; o.textContent = ENEMIES[k].ico + ' ' + ENEMIES[k].name; sel.appendChild(o); }
   const so = document.createElement('option'); so.value = 'stray'; so.textContent = STRAY.ico + ' ' + STRAY.name + '（中立）'; sel.appendChild(so);
-  sel.addEventListener('change', () => { devEnemy = sel.value; if (devEnemy) { selected = null; document.querySelectorAll('.card').forEach(x => x.classList.remove('selected')); cells.forEach(x => x.classList.remove('hint')); toast(`點任一格，放一隻${devEnemy === 'stray' ? STRAY.name : ENEMIES[devEnemy].name}`); } });
+  sel.addEventListener('change', () => { devEnemy = sel.value; if (devEnemy) { selected = null; document.querySelectorAll('.card').forEach(x => x.classList.remove('selected')); hintMap = new Map(); Board.setHints(null); toast(`點任一格，放一隻${devEnemy === 'stray' ? STRAY.name : ENEMIES[devEnemy].name}`); } });
 }
 document.querySelectorAll('#dev [data-speed]').forEach(b => b.addEventListener('click', () => setSpeed(Number(b.dataset.speed))));
 $('#dev-pause').addEventListener('click', () => { paused = !paused; syncPause(); if (!paused) last = performance.now(); });
@@ -1687,11 +1257,11 @@ buildDevEnemies(); setDev(devOn);
     for (const [k, alt] of Object.entries(FALLBACK)) { const d = UNITS[k] || ENEMIES[k]; if (d && broken(d.ico)) d.ico = alt; }
   } catch (e) {}
 })();
-buildBoard(); buildLevels();
+buildBoard(); buildLevels(); // buildBoard 是非同步的（載圖）；開始守夜前會確認棋盤已就緒
 try { diff = localStorage.getItem('sheepfold-diff') || 'calm'; } catch (e) {}
 if (!DIFFS[diff]) diff = 'calm';
 document.querySelectorAll('.diff').forEach(b => b.addEventListener('click', () => applyDiff(b.dataset.key)));
-$('#start').addEventListener('click', () => { markIntroSeen(); if (pickedFor(level) && !hasLoadout(level)) { openRoster('pick', 'intro'); return; } $('#intro').hidden = true; startGame(); });
+$('#start').addEventListener('click', () => { if (!boardReady) { toast(Board.ready ? '棋盤圖還在載入，等一下再按' : '這支瀏覽器開不了棋盤畫面', true); return; } markIntroSeen(); if (pickedFor(level) && !hasLoadout(level)) { openRoster('pick', 'intro'); return; } $('#intro').hidden = true; startGame(); });
 $('#intro-back').addEventListener('click', backToLevels);
 $('#retry').addEventListener('click', () => startGame());
 $('#back').addEventListener('click', backToLevels);
