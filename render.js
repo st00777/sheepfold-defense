@@ -9,7 +9,7 @@ const Board = (() => {
     brazier: 0x6e3a1e, jar: 0x8a5a2e, horn: 0x7a6a2a, healer: 0x3d8a7a, catapult: 0x5a4a3a, staff: 0x8a6a3a, lamp: 0xb8862a, patrol: 0x4a5a7a, volley: 0xa8553d, cradle: 0x7a4a6a };
   const GOLD = 0xe6b84a, DANGER = 0xd9534f, OK = 0x7bc47f, TEXT = 0xf3ead8, ENEMY_RING = 0x8a2f2c;
   // 敵人身體：底色、大小係數 k、形狀（跟 index.html 的 .enemy.* 規則對齊：圓＝獸、方圓＝人、暗紅細圈＝敵、金粗圈＝頭目）
-  const BODY_COL = { big: 0x5a3f2a, human: 0x3a3a30, light: 0xa89a7a, small: 0xb8682a, swarm: 0x5f7a34, dig: 0xa8843a, sly: 0x6b5a3a, boar: 0x4a3426, leopard: 0xa8862a };
+  const BODY_COL = { big: 0x5a3f2a, human: 0x3a3a30, light: 0xa89a7a, small: 0xb8682a, swarm: 0x4a6a28, dig: 0xa8843a, sly: 0x6b5a3a, boar: 0x4a3426, leopard: 0xa8862a };
   const KSIZE = { fast: .8, alpha: 1.2, big: 1.3, lion: 1.4, boar: 1.25, leopard: 1.35 };
   const BREATHERS = new Set(['shepherd', 'hireling', 'healer', 'cradle', 'horn']);
   const FX_TEXT = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤', slam: '💥', trample: '💨', home: '💛', strike: '✦', crouch: '👁' };
@@ -223,7 +223,7 @@ const Board = (() => {
     else if (t === 'staff') g.roundRect(-w / 2, -h / 2, w, h, 8).stroke({ width: 2, color: 0xc9a24a, alpha: .6 });
     else if (t === 'dog' || t === 'patrol') {} // 記號不畫底
     else { g.roundRect(-w / 2, -h / 2, w, h, 8).fill({ color: UCOL[t] || 0x888888, alpha: u.elder ? .85 : 1 });
-      if (u.elder || (u.upgraded && (t === 'healer' || t === 'horn'))) g.roundRect(-w / 2 + 1, -h / 2 + 1, w - 2, h - 2, 7).stroke({ width: 2, color: GOLD }); }
+      if (u.elder || (u.upgraded && (t === 'healer' || t === 'horn'))) g.roundRect(-w / 2 + 1, -h / 2 + 1, w - 2, h - 2, 7).stroke({ width: 2, color: u.elder ? 0xd9a44a : GOLD }); } // 老牧人用暖銅，金色留給升級、提示框與頭目圈，少一種「金」
     v.spr.tint = u.fear > 0 ? 0x9a9a9a : 0xffffff; // 被嚇到：灰掉
   }
   function dashCircle(g, x, y, R, color, alpha) { const n = 14; for (let i = 0; i < n; i++) { const a0 = i / n * 6.283, a1 = (i + .55) / n * 6.283; g.moveTo(x + Math.cos(a0) * R, y + Math.sin(a0) * R); g.arc(x, y, R, a0, a1); } g.stroke({ width: 2, color, alpha }); }
@@ -298,7 +298,7 @@ const Board = (() => {
     const w = G.waves[G.wave - 1]; if (w && w.hpMul > 1.2) k *= 1 + (w.hpMul - 1) * .2; // 後面幾波血厚的狼大一點
     const fly = cls.includes('fly') || cls.includes('owl'), swarm = cls.includes('swarm'), human = cls.includes('human'), small = cls.includes('small'), dig = cls.includes('dig');
     const boss = cls.includes('alpha') || cls.includes('lion') || cls.includes('leopard');
-    const bodyCol = cls.map(c => BODY_COL[c]).find(c => c !== undefined) ?? 0x5b5b66;
+    const bodyCol = cls.map(c => BODY_COL[c]).find(c => c !== undefined) ?? 0x44444f; // 預設狼灰與蝗蟲綠都調暗，跟草地 #4f6b3a 的明度拉開（美術總監 2026-10-23）
     const br = ch * (small ? .25 : swarm ? .22 : .35) * k;
     const body = new PIXI.Container(); cont.addChild(body);
     const bg = new PIXI.Graphics(); body.addChild(bg);
@@ -308,7 +308,7 @@ const Board = (() => {
       else bg.circle(0, 0, br).fill(bodyCol);
       if (boss) bg.stroke({ width: 3, color: GOLD }); else if (!swarm) bg.stroke({ width: 1.5, color: ENEMY_RING }); // 暗紅細圈＝敵人、金粗圈＝頭目（要緊接在身體後面：Pixi 的 stroke 只套用到最後一個形狀）
       if (dig) bg.rect(-br, br * .1, br * 2, br).fill(0x5a4a2a); // 鑽地的：上下分色
-      if (cls.includes('fast')) bg.rect(br * .9, -1.5, br * 1.4, 3).fill({ color: 0xf3ead8, alpha: .5 }); // 快狼的速度線
+      if (cls.includes('fast')) bg.rect(br * .9, -2, br * 1.4, 4).fill({ color: 0xf3ead8, alpha: .8 }); // 快狼的速度線（4px、.8，跟一般狼一眼分得開）
     } else { const sh = new PIXI.Graphics().ellipse(0, ch * .36, cw * .18, 3).fill({ color: 0x000000, alpha: .32 }); cont.addChildAt(sh, 0); } // 飛的：腳下影子
     const burnGlow = new PIXI.Sprite(radialTex); burnGlow.anchor.set(.5); burnGlow.blendMode = 'add'; burnGlow.tint = 0xff8a3d; burnGlow.width = burnGlow.height = br * 3.2; burnGlow.alpha = 0; body.addChildAt(burnGlow, 0);
     const spr = makeIcon(def.ico, ch * (small ? .34 : swarm ? .3 : .46) * k); spr.y = fly ? -ch * .12 : -ch * .02; body.addChild(spr);
@@ -514,7 +514,7 @@ const Board = (() => {
   function drawWeather(dt) {
     const storm = diff === 'storm';
     L.stormRect.clear(); if (storm) L.stormRect.rect(0, 0, W, H).fill({ color: 0x5a6a8a, alpha: state.dark ? .08 : .14 });
-    if (storm && speed <= 1 && !still && !reduce()) { rainAcc += dt; while (rainAcc > .012) { rainAcc -= .012; spawnParticle(Math.random() * (W + 40) - 20, -20, -ch * .6, ch * 7, .85, 0xcfd8ff, 1, 0, .28, true, rainTex); } } // 壽命 .85 秒：以 7 排／秒落下剛好穿過整張棋盤（5 排），不會下到一半消失
+    if (storm && !still && !reduce()) { const gap = speed > 1 ? .024 : .012; rainAcc += dt; while (rainAcc > gap) { rainAcc -= gap; spawnParticle(Math.random() * (W + 40) - 20, -20, -ch * .6, ch * 7, .85, 0xcfd8ff, 1, 0, .28, true, rainTex); } } // 壽命 .85 秒：以 7 排／秒落下剛好穿過整張棋盤（5 排），不會下到一半消失。加速時雨量減半不停掉，暴風夜的氛圍留著（James 2026-10-23）
     if (state.flash > 0) { state.flash -= dt; L.flashRect.clear().rect(0, 0, W, H).fill({ color: 0xf4f0ff, alpha: .5 * clamp(state.flash / .18, 0, 1) }); if (state.flash <= 0) { L.flashRect.clear(); if (state.bolt) { state.bolt.destroy(); state.bolt = null; } } }
   }
   function lightning() {
