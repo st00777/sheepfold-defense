@@ -40,7 +40,7 @@
   <button id="auto" class="on">自動玩：開</button>
   <button id="spd">1×</button>
   <button id="again">重來</button>
-  <div id="stats"><span>糧 <b id="food">0</b></span><span id="wave">—</span><span id="sheep" hidden>羊 <b id="sheep-n">0</b></span></div>
+  <div id="stats"><span>糧 <b id="food">0</b></span><span id="wave">—</span><span id="sheep" hidden>羊 <b id="sheep-n">0</b></span><span id="fps" title="每秒畫幾次；60 最順，低於 45 會感覺卡">—fps</span></div>
 </header>
 <div id="wrap"><div id="board"><div id="toast"></div></div></div>
 <div id="cards"></div>
@@ -293,8 +293,10 @@ function syncHud() {
   const t = Math.ceil(G.timer), n = G.waves.length;
   $('#wave').textContent = G.phase === 'prep' ? (G.started ? `第 1 波 ${t} 秒後` : '放下第一個單位才開始') : G.phase === 'rest' ? (G.wave >= n ? '天快亮了' : `第 ${G.wave + 1} 波 ${t} 秒後`) : `第 ${G.wave} / ${n} 波`;
   $('#sheep-n').textContent = G.sheep;
+  fpsAcc += 1; if (performance.now() - fpsAt > 500) { $('#fps').textContent = Math.round(fpsAcc * 1000 / (performance.now() - fpsAt)) + 'fps'; fpsAcc = 0; fpsAt = performance.now(); } // 手機測效能用
   syncCards();
 }
+let fpsAcc = 0, fpsAt = performance.now();
 
 // 引擎這一步發生的事，一件件畫出來
 function flushEvents() {
