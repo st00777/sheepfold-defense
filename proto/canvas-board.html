@@ -76,7 +76,7 @@ const easeOut = k => 1 - Math.pow(1 - k, 3);
 
 let G = null, diff = 'storm', speed = 1, auto = true, selected = null, over = false, gameT = 0, autoT = 0, waveWas = 'prep';
 let W = 0, H = 0, cw = 0, ch = 0, bw = 0; // 畫布尺寸、格子尺寸、棋盤寬（扣掉走道）
-let app, tex = {}, radialTex, vignetteTex, dotTex, rainTex;
+let app, tex = {}, radialTex, vignetteTex, dotTex, rainTex, bandTex;
 
 // ====== 啟動 ======
 (async function main() {
@@ -105,6 +105,9 @@ function makeTextures() {
   const v = document.createElement('canvas'); v.width = 512; v.height = 360; const vg = v.getContext('2d');
   const vr = vg.createRadialGradient(256, 180, 120, 256, 180, 330); vr.addColorStop(0, 'rgba(0,0,0,0)'); vr.addColorStop(1, 'rgba(0,0,0,.5)');
   vg.fillStyle = vr; vg.fillRect(0, 0, 512, 360); vignetteTex = PIXI.Texture.from(v);
+  const b = document.createElement('canvas'); b.width = 16; b.height = 256; const bg = b.getContext('2d'); // 橫向亮帶：上下邊緣柔化，給油燈「照亮整排」用
+  const bgr = bg.createLinearGradient(0, 0, 0, 256); bgr.addColorStop(0, 'rgba(255,255,255,0)'); bgr.addColorStop(.18, 'rgba(255,255,255,1)'); bgr.addColorStop(.82, 'rgba(255,255,255,1)'); bgr.addColorStop(1, 'rgba(255,255,255,0)');
+  bg.fillStyle = bgr; bg.fillRect(0, 0, 16, 256); bandTex = PIXI.Texture.from(b);
   dotTex = app.renderer.generateTexture(new PIXI.Graphics().circle(8, 8, 8).fill(0xffffff));
   rainTex = app.renderer.generateTexture(new PIXI.Graphics().roundRect(0, 0, 2, 18, 1).fill(0xffffff));
 }
@@ -362,14 +365,20 @@ function squash(v) { tween(.2, k => { const e = easeOut(k); const sx = 1.12 + (1
 function hopUnit(r, c) { const v = UN.get(key(r, c)); if (v && UNITS[v.u.type].kind === 'producer') v.hop = .24; }
 function recoil(r, c) { const v = UN.get(key(r, c)); if (v && speed <= 1) v.recoil = .09; }
 
-// 無月夜：油燈把黑暗擦出一個洞（橢圓，寬兩格半、高三排）
+// 無月夜：油燈照亮上下共三整排（跟規則一樣，這幾排的腳印預告會回來）——黑暗擦掉一條橫跨棋盤的亮帶，燈附近再多擦一圈更亮
 const holes = new Map();
 function ensureHole(k, x, y, light) {
   let h = holes.get(k);
-  if (!h) { h = new PIXI.Sprite(radialTex); h.anchor.set(.5); h.blendMode = 'erase'; L.darkHoles.addChild(h); holes.set(k, h); }
-  h.x = x; h.y = y; h.width = cw * 3.4; h.height = ch * (light * 2 + 1) * 1.25; h.alpha = 1;
+  if (!h) {
+    const band = new PIXI.Sprite(bandTex); band.anchor.set(.5); band.blendMode = 'erase';
+    const near = new PIXI.Sprite(radialTex); near.anchor.set(.5); near.blendMode = 'erase';
+    h = { band, near }; L.darkHoles.addChild(band, near); holes.set(k, h);
+  }
+  const rows = light * 2 + 1;
+  h.band.x = LANE + bw / 2; h.band.y = y; h.band.width = bw; h.band.height = ch * rows * 1.12; h.band.alpha = 1;
+  h.near.x = x; h.near.y = y; h.near.width = cw * 3.4; h.near.height = ch * rows * 1.25; h.near.alpha = 1;
 }
-function removeHole(k) { const h = holes.get(k); if (h) { h.destroy(); holes.delete(k); } }
+function removeHole(k) { const h = holes.get(k); if (h) { h.band.destroy(); h.near.destroy(); holes.delete(k); } }
 function drawDark() {
   const on = !!G.level.moonless && G.phase !== 'prep';
   L.dark.visible = on; if (!on) return;
