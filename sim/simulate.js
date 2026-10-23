@@ -52,8 +52,10 @@ function decide(G, skill) {
   if (shepCap !== undefined && count('shepherd') >= shepCap && G.food >= 100) for (const k in G.units) { const u = G.units[k]; if (u.type === 'shepherd' && !u.elder && E.tapUnit(G, u.r, u.c).ok) return; }
   if (count('shepherd') < (G.diff === 'storm' ? 4 : 3) && can('shepherd')) { for (const r of [2, 1, 3, 0]) if (!has(G, r, u => u.type === 'shepherd') && tryPlace(G, r, freeCell(G, r, 0), 'shepherd')) return; }
   // 第二章：無月夜先點燈（第 1、3 排各一盞就五排全亮）；邊排放牧人杖把狼趕進中間三排
-  if (G.level.moonless && can('lamp') && count('lamp') < 2 && G.wave >= 1) { for (const r of [1, 3]) if (!has(G, r, u => u.type === 'lamp') && tryPlace(G, r, freeCell(G, r, 2), 'lamp')) return; }
-  if (can('staff') && G.wave >= 1) { for (const r of [0, 4]) if (!has(G, r, u => u.type === 'staff' || kindOf(u) === 'shooter') && tryPlace(G, r, freeCell(G, r, 3), 'staff')) return; }
+  // 糧緊的夜（歌珊：開局糧少、牧人有上限）：燈和杖排在射手後面，手上要留得起一個投石手才買（2026-10-23 修好玩家暴風夜 7%）
+  const spare = k => G.food >= UNITS[k].cost + UNITS.slinger.cost || Object.values(G.units).filter(u => kindOf(u) === 'shooter').length >= 3;
+  if (G.level.moonless && can('lamp') && spare('lamp') && count('lamp') < 2 && G.wave >= 1) { for (const r of [1, 3]) if (!has(G, r, u => u.type === 'lamp') && tryPlace(G, r, freeCell(G, r, 2), 'lamp')) return; }
+  if (can('staff') && spare('staff') && G.wave >= 1) { for (const r of [0, 4]) if (!has(G, r, u => u.type === 'staff' || kindOf(u) === 'shooter') && tryPlace(G, r, freeCell(G, r, 3), 'staff')) return; }
   // 吹角手升銀號、荊棘以外的升級
   for (const k in G.units) { const u = G.units[k]; if (u.type === 'horn' && !u.upgraded && UNITS.horn.upgrade && E.posOf(G.level.id) >= UNITS.horn.upgrade.from && G.food >= UNITS.horn.upgrade.cost && E.tapUnit(G, u.r, u.c).ok) return; }
 
