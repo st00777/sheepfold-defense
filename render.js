@@ -77,7 +77,7 @@ const Board = (() => {
   }
   function buildLayers() {
     // 由下往上：草地 → 格子底色與提示 → 圍欄 → 腳印與土堆 → 單位 → 火光（相加）→ 會動的（敵人、狗、投射物）→ 效果 → 黑暗 → 天氣 → 天色 → 飄字 → 暗角
-    for (const n of ['ground', 'cells', 'marks', 'units', 'glow', 'movers', 'shots', 'fx', 'dark', 'weather', 'sky', 'text', 'top']) { L[n] = new PIXI.Container(); app.stage.addChild(L[n]); }
+    for (const n of ['ground', 'cells', 'marks', 'units', 'glow', 'movers', 'shots', 'fx', 'hints', 'dark', 'weather', 'sky', 'text', 'top']) { L[n] = new PIXI.Container(); app.stage.addChild(L[n]); }
     L.groundSpr = tex.ground ? new PIXI.Sprite(tex.ground) : new PIXI.Graphics(); L.ground.addChild(L.groundSpr);
     L.cellG = new PIXI.Graphics(); L.cells.addChild(L.cellG);
     L.hintG = new PIXI.Graphics(); L.cells.addChild(L.hintG);
@@ -199,7 +199,7 @@ const Board = (() => {
   function renderUnit(r, c) {
     const k = key(r, c), u = G && G.units[k];
     const old = UN.get(k);
-    if (old) { old.cont.destroy({ children: true }); if (old.glow) old.glow.destroy(); removeHole(k); UN.delete(k); }
+    if (old) { old.cont.destroy({ children: true }); if (old.glow) old.glow.destroy(); if (old.up) old.up.destroy({ children: true }); removeHole(k); UN.delete(k); }
     if (!u) return;
     const def = UNITS[u.type];
     const cont = new PIXI.Container(); cont.x = (c + .5) * cw; cont.y = (r + .5) * ch; L.units.addChild(cont);
@@ -248,8 +248,8 @@ const Board = (() => {
       // 可升級／修補角標：規則在引擎，這裡只畫；糧夠才出現，出現時跳 4 下
       const up = Engine.tapHint(G, u) || '';
       if (up !== v.upText) { v.upText = up; if (v.up) { v.up.destroy({ children: true }); v.up = null; }
-        if (up) { const t = makeText(up, Math.max(10, ch * .17), 0x2b2a26, false); t.style.stroke = null; const b = new PIXI.Container(); b.addChild(new PIXI.Graphics().roundRect(-t.width / 2 - 4, -t.height / 2 - 1, t.width + 8, t.height + 2, 8).fill(GOLD)); b.addChild(t); b.x = -cw * .5 + 2 + t.width / 2 + 4; b.y = -ch * .42; v.inner.addChild(b); v.up = b; v.upT = 0; } } // 靠格子左緣對齊，第 0 欄不會被切掉
-      if (v.up && !reduce()) { v.upT = (v.upT || 0) + (paused ? 0 : dt); v.up.y = -ch * .42 - (v.upT < 2.8 ? 3 * Math.abs(Math.sin(v.upT / .7 * Math.PI)) : 0); }
+        if (up) { const t = makeText(up, Math.max(10, ch * .17), 0x2b2a26, false); t.style.stroke = null; const b = new PIXI.Container(); b.addChild(new PIXI.Graphics().roundRect(-t.width / 2 - 4, -t.height / 2 - 1, t.width + 8, t.height + 2, 8).fill(GOLD)); b.addChild(t); b.x = v.cont.x - cw * .5 + 2 + t.width / 2 + 4; v.upBase = u.r === 0 ? -ch * .5 + (t.height + 2) / 2 + 4 : -ch * .42; b.y = v.cont.y + v.upBase; L.hints.addChild(b); v.up = b; v.upT = 0; } } // 靠格子左緣對齊，第 0 欄不會被切掉；掛在 hints 層（敵人之上）咬牆的狼才蓋不住「修補」；第 0 排往下挪免得貼頂被裁（美術總監 2026-10-23）
+      if (v.up && !reduce()) { v.upT = (v.upT || 0) + (paused ? 0 : dt); v.up.y = v.cont.y + v.upBase - (v.upT < 2.8 ? 3 * Math.abs(Math.sin(v.upT / .7 * Math.PI)) : 0); }
       if (v.def.light !== undefined && keepDark()) ensureHole(k, v.cont.x, v.cont.y, v.def.light); else removeHole(k);
     }
     for (const k of rebuild) renderUnit(...unkey(k));
@@ -343,7 +343,7 @@ const Board = (() => {
       const crouch = e.crouchT > 0; v.body.scale.set(crouch ? .8 : 1 + (reduce() ? 0 : bite * .06)); if (crouch) v.body.y += ch * .12;
       v.cont.alpha = e.underground ? 0 : stunned ? .6 : 1; v.body.alpha = v.dodge > 0 ? .4 + .6 * (1 - dodgeK) : 1;
       const biteTint = reduce() && e.biting && bite > .5; // 減少動態：咬住時身體一下紅一下白，不位移
-      v.spr.tint = e.st.poison ? 0x9fe07a : crouch ? 0xb0b0b0 : 0xffffff; v.bg.tint = e.st.poison ? 0xa8d890 : crouch ? 0xb0b0b0 : biteTint ? 0xffb0a0 : 0xffffff;
+      v.spr.tint = e.st.poison ? (v.swarm ? 0xd8b0f0 : 0x9fe07a) : crouch ? 0xb0b0b0 : 0xffffff; v.bg.tint = e.st.poison ? (v.swarm ? 0xc8a0e8 : 0xa8d890) : crouch ? 0xb0b0b0 : biteTint ? 0xffb0a0 : 0xffffff;
       v.burnGlow.alpha = e.st.burn ? .75 : 0;
       v.flash.alpha = e.dashLeft > 0 ? .25 : 0; // 衝刺：亮一階
       if (v.flashT > 0) { if (!paused) v.flashT -= dt; v.flash.alpha = Math.max(0, v.flashT / .09) * (v.fly ? .45 : .85); }
@@ -351,9 +351,9 @@ const Board = (() => {
         if (e.st.burn) { v.burnAcc += dt; while (v.burnAcc > .07) { v.burnAcc -= .07; spark(v.cont.x + (Math.random() - .5) * cw * .3, v.cont.y, Math.random() < .5 ? 0xff8a30 : 0xffd060, 1, .03 * ch, -ch * .7, .5, 2); } }
         if (e.st.poison) { v.poisonAcc += dt; while (v.poisonAcc > .2) { v.poisonAcc -= .2; spark(v.cont.x + (Math.random() - .5) * cw * .4, v.cont.y - ch * .1, 0x8fe06a, .8, .012 * ch, -ch * .35, .7, 1.2); } }
       }
-      if (v.hpLast !== e.hp) { v.hpLast = e.hp; hpBar(v.hp, cw * .8, clamp(v.br + 3, ch * .38, ch * .46), clamp(e.hp / e.maxHp, 0, 1), DANGER, v.thick); } // 血條在身體下緣之外，大型敵人也不會被身體蓋住
+      if (v.hpLast !== e.hp) { v.hpLast = e.hp; hpBar(v.hp, v.swarm ? v.br * 2.4 : cw * .8, clamp(v.br + 3, ch * .38, ch * .46), clamp(e.hp / e.maxHp, 0, 1), DANGER, v.thick); } // 血條在身體下緣之外，大型敵人也不會被身體蓋住
       const txt = statusText(e); if (txt !== v.stText) { v.stText = txt; v.st.text = txt; }
-      if (e.carrying && !v.carry) { v.carry = makeIcon('🐑', ch * .22); v.carry.x = cw * .22; v.carry.y = ch * .18; v.cont.addChild(v.carry); }
+      if (e.carrying && !v.carry) { v.carry = makeIcon('🐑', ch * .3); v.carry.x = cw * .22; v.carry.y = ch * .18; v.cont.addChild(v.carry); }
       if (!e.carrying && v.carry) { v.carry.destroy(); v.carry = null; }
     }
     for (const [id, v] of EN) if (!alive.has(id) && !v.dying) { v.cont.destroy({ children: true }); EN.delete(id); }
@@ -569,7 +569,7 @@ const Board = (() => {
   }
   function clear(all = true) {
     if (!app) return;
-    for (const [, v] of UN) { v.cont.destroy({ children: true }); if (v.glow) v.glow.destroy(); } UN.clear();
+    for (const [, v] of UN) { v.cont.destroy({ children: true }); if (v.glow) v.glow.destroy(); if (v.up) v.up.destroy({ children: true }); } UN.clear();
     for (const [, v] of EN) v.cont.destroy({ children: true }); EN.clear();
     for (const [, v] of MV) v.cont.destroy({ children: true }); MV.clear();
     for (const [, v] of SH) { v.cont.destroy({ children: true }); if (v.shadow) v.shadow.destroy(); } SH.clear();
@@ -577,7 +577,7 @@ const Board = (() => {
     for (const [, g] of mounds) g.destroy(); mounds.clear();
     for (const p of particles) p.s.destroy(); particles.length = 0;
     for (const w of tweens) if (w.done) try { w.done(); } catch (e) {} tweens.length = 0;
-    for (const n of ['fx', 'text']) L[n].removeChildren().forEach(c => c.destroy({ children: true }));
+    for (const n of ['fx', 'hints', 'text']) L[n].removeChildren().forEach(c => c.destroy({ children: true }));
     if (state.bolt) { state.bolt.destroy(); state.bolt = null; } L.flashRect.clear(); state.flash = 0;
     setMarker(null); setStrayMark(null); setHints(null); setRange(null); setTeach(null);
     state.dust = 0;
