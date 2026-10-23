@@ -106,7 +106,7 @@ const Board = (() => {
     L.fence.clear().rect(0, 0, 9, H).fill({ color: 0x8a6a3e, alpha: .92 }); for (let y = 10; y < H; y += 13) L.fence.rect(0, y, 9, 3).fill({ color: 0x000000, alpha: .33 }); L.fence.rect(9, 0, 3, H).fill({ color: 0x000000, alpha: .25 });
     if (L.darkRT) L.darkRT.destroy(true);
     L.darkRT = PIXI.RenderTexture.create({ width: W, height: H, resolution: app.renderer.resolution }); L.darkSpr.texture = L.darkRT;
-    L.darkFill.clear().rect(0, 0, W, H).fill({ color: 0x060a16, alpha: .32 });
+    L.darkFill.clear().rect(0, 0, W, H).fill({ color: 0x060a16, alpha: .22 }); // .22＝舊 DOM 版 brightness(.78) 的暗度；原本 .32 James 真機說太暗（2026-10-23）
     L.fogs.forEach((f, r) => { f.x = W * .78; f.y = r * ch; f.width = W * .22; f.height = ch; });
     state.cellsDirty = state.rocksDirty = true; state.litRows.fill(null); // 照亮的排用舊格子尺寸畫的，填 null 讓 drawDark 下一幀重畫
     for (const [, g] of mounds) drawMound(g);
@@ -444,7 +444,7 @@ const Board = (() => {
       case 'ignite': burst(px, py, 10, [0xff8a30, 0xffd060], ch * .6, .5); break;
       case 'howl': ripple(px, py, 0xc9a0dc); break;
       case 'roar': ripple(px, py, GOLD); break;
-      case 'horn': { if (speed <= 1) squashUnit(r, x); if (reduce()) { popText(r, x, FX_TEXT.horn); break; } const g = new PIXI.Graphics(); L.fx.addChild(g); tween(.45, k => { const e = EASE(k); g.clear().ellipse(px + e * W * .9, py, cw * .25, ch * .45).stroke({ width: 3, color: 0xffe28a, alpha: 1 - k }); }, () => g.destroy()); hornShove(ev && ev.moved); break; } // 吹的人回彈＋衝擊波＋被推的滑移
+      case 'horn': { if (speed <= 1) squashUnit(r, x); popText(r, x, FX_TEXT.horn); if (reduce()) break; const g = new PIXI.Graphics(); L.fx.addChild(g); tween(.45, k => { const e = EASE(k); g.clear().ellipse(px + e * W * .9, py, cw * .25, ch * .45).stroke({ width: 3, color: 0xffe28a, alpha: 1 - k }); }, () => g.destroy()); hornShove(ev && ev.moved); break; } // 吹的人回彈＋衝擊波＋被推的滑移
       case 'trample': case 'emerge': case 'flee': burst(px, py + ch * .2, 6, [0xc9bda0], ch * .4, .3); if (kind === 'flee') popText(r, x, FX_TEXT.flee); break;
       case 'gate': gateSweep(r); break;
       case 'strike': { burst(px, py, 6, [0xffe28a, 0xffffff], ch * .4, .25); const t = makeText('✦', Math.max(16, ch * .5), GOLD, true); t.x = px; t.y = py; L.text.addChild(t); tween(.45, k => { t.scale.set(1 + k * .4); t.alpha = 1 - k; }, () => t.destroy()); swingPatrol(id); break; }
