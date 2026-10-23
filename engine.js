@@ -911,7 +911,7 @@
       if (e.x < -0.6) {
         if (def.steals && G.sheep > 0) { e.carrying = true; e.x = -0.5; ev(G, { t: 'toast', msg: '偷羊人抱起一隻羊往回跑了！' }); ev(G, { t: 'fx', kind: 'grab', r: e.r, x: 0 }); continue; }
         if (!def.flying && G.gates.includes(e.r)) { useGate(G, e.r); continue; } // 看門的擋下：整排趕出去，這排的門用掉了。飛的不經過門
-        return lose(G, def.flying ? 'bird' : 'wolf');
+        return lose(G, def.flying ? 'bird' : 'wolf', e.type); // reason 分三類給結局文案與測試用；by 記是哪一種敵人，標題要寫牠的名字（以前夜鴞也寫成鷙鳥）
       }
     }
   }
@@ -947,7 +947,7 @@
   // 星級：每夜三顆，自動累積、不解鎖任何東西。守過／零損失（沒失羊、沒有人被咬倒或逃走；舊存檔續玩的那局 unitsLost 是 null，不給）／五位看門的都在（關卡關掉看門的就只有兩顆）
   function starsOf(G) { return { win: true, noLoss: G.sheepLost === 0 && G.unitsLost === 0, gates: G.level.gates !== false && G.gates.length === G.gateRows.length }; }
   function starSlots(level) { return level.gates === false ? 2 : 3; }
-  function lose(G, reason) { G.over = true; G.result = { win: false, reason }; ev(G, { t: 'strayMark', r: null }); ev(G, { t: 'lose', reason }); }
+  function lose(G, reason, by) { G.over = true; G.result = { win: false, reason, by }; ev(G, { t: 'strayMark', r: null }); ev(G, { t: 'lose', reason, by }); }
 
   // ====== 開發者模式 ======
   const dev = {

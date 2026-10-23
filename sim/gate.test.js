@@ -113,3 +113,11 @@ test('看門的依難度：人數、星級、存檔都跟著難度', () => {
   // 存檔裡寫了這個難度沒有的排（例如從寧靜夜的舊檔改難度）：丟掉，不會多出一位
   const S4 = E.create(1, 'storm'); assert.ok(E.restore(S4, { ...snap, gates: [0, 1, 3] })); assert.deepStrictEqual(S4.gates, [1, 3]);
 });
+
+test('失守回報闖進來的是哪一種敵人（標題要寫牠的名字，夜鴞不再翻成鷙鳥）', () => {
+  for (const [type, reason] of [['owl', 'bird'], ['bear', 'wolf'], ['wolf', 'wolf']]) {
+    const G = E.create(5, 'calm', () => 0.5); G.started = true; G.phase = 'wave'; G.wave = 1; G.holdWaves = true; G.gates = [];
+    E.dev.spawn(G, type, 2, -0.55); for (let i = 0; i < 8; i++) E.step(G, 0.1);
+    assert.ok(G.over && G.result.reason === reason && G.result.by === type, type + ' 要回報 reason=' + reason + '、by=' + type);
+  }
+});

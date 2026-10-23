@@ -1091,7 +1091,7 @@ function flushEvents() {
       case 'stray': Sound.play('sheep'); break;
       case 'waveclear': if (e.wave < G.waves.length) { Sound.play('clear'); if (!devUsed && !saveCheckpoint(Engine.snapshot(G))) toast('這次進度未能保存。請先保持遊戲開啟，離開後可能需要重來。', true); } break;
       case 'win': onWin(); break;
-      case 'lose': onLose(e.reason); break;
+      case 'lose': onLose(e.reason, e.by); break;
     }
   }
   G.events.length = 0;
@@ -1306,10 +1306,11 @@ function sheepSummary() {
   if (now === start) return `${head}圈裡還是 ${now} 隻。`;
   return `${head}圈裡剩 ${now} 隻。`;
 }
-function onLose(reason) {
+function onLose(reason, by) {
   Sound.ambient(false); Sound.play('lose');
   recordBest(false); clearCheckpoint(level.id);
-  const titles = { wolf: '狼闖進羊圈了', bird: '鷙鳥飛進羊圈了', sheep: '羊被偷光了' };
+  const who = by && ENEMIES[by] ? ENEMIES[by].name : null; // 標題寫闖進來的那一隻的名字：夜鴞就是夜鴞、母熊就是母熊，不再一律翻成狼／鷙鳥
+  const titles = { wolf: `${who || '狼'}闖進羊圈了`, bird: `${who || '鷙鳥'}飛進羊圈了`, sheep: '羊被偷光了' };
   const text = (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
   nightfall();
   setTimeout(() => { endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`); $('#next').hidden = true; $('#retry').textContent = '再守一夜'; }, REDUCE_MOTION.matches ? 0 : 900);
