@@ -379,7 +379,7 @@
 <script src="engine.js?v=16"></script>
 <script src="sound.js?v=7"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=3"></script>
+<script src="render.js?v=4"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS 由 data.js 直接提供
@@ -901,6 +901,8 @@ function clearBoard() {
   $('#result').hidden = true;
 }
 function startGame(fromCp) {
+  // 開始、重來、下一夜、繼續上次都走這裡：棋盤還沒就緒（圖還在載／開不了 WebGL）一律擋下，不然畫面層會對著半套圖層丟例外
+  if (!boardReady) { toast(Board.ready ? '棋盤圖還在載入，等一下再按' : '這支瀏覽器開不了棋盤畫面', true); return; }
   clearBoard();
   devUsed = devOn;
   if (fromCp) applyDiff(fromCp.diff, false); // 續玩用存檔那一夜的難度，只套用這一局；回開場頁會換回平常的預設
