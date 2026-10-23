@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>羊圈守夜 · canvas 棋盤原型</title>
+<!--
+  這是「棋盤改 canvas 引擎」的拋棄式原型（2026-10-23），回答一個問題：
+  同一套 engine.js 不動，棋盤改用 PixiJS 畫，特效（光、火、粒子、閃電、受擊、天色）會不會明顯比現在的 DOM 版好看。
+  不是正式版：沒有音效、沒有教學、沒有存檔、沒有圖鑑。只有棋盤、卡片列、自動玩家。
+  看法：預設「自動玩」會照模擬器的好玩家打法自己放單位；也可以關掉自動玩，點卡片再點格子自己放。
+-->
+<style>
+  :root { --bg: #0f1420; --ink: #efe9dc; --gold: #e6b84a; --line: #3b4254; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; -webkit-tap-highlight-color: transparent; }
+  body { display: flex; flex-direction: column; min-height: 100dvh; }
+  header { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 8px 12px; font-size: 13px; }
+  header select, header button { font: inherit; background: #1b2232; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+  header button.on { border-color: var(--gold); color: var(--gold); }
+  #stats { margin-left: auto; display: flex; gap: 12px; font-variant-numeric: tabular-nums; }
+  #wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 6px 10px; min-height: 0; }
+  #board { position: relative; width: min(100%, 720px); aspect-ratio: 7.4 / 5; border-radius: 10px; overflow: hidden; touch-action: manipulation; }
+  #board canvas { display: block; }
+  #cards { display: flex; gap: 6px; padding: 8px 10px 14px; overflow-x: auto; scrollbar-width: none; }
+  .card { flex: 0 0 auto; width: 62px; border: 2px solid var(--line); border-radius: 10px; background: #1b2232; padding: 5px 2px; text-align: center; font-size: 11px; line-height: 1.25; color: var(--ink); }
+  .card img { width: 26px; height: 26px; display: block; margin: 0 auto 2px; }
+  .card.sel { border-color: var(--gold); box-shadow: 0 0 10px #e6b84a66; }
+  .card.poor { opacity: .45; }
+  .card .cost { color: var(--gold); }
+  #note { font-size: 12px; opacity: .7; padding: 0 12px 10px; }
+  #toast { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); background: #000a; padding: 6px 12px; border-radius: 8px; font-size: 13px; pointer-events: none; opacity: 0; transition: opacity .3s; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <select id="lv"></select>
+  <select id="df"><option value="calm">寧靜夜</option><option value="windy">起風夜</option><option value="storm" selected>暴風夜</option></select>
+  <button id="auto" class="on">自動玩：開</button>
+  <button id="spd">1×</button>
+  <button id="again">重來</button>
+  <div id="stats"><span>糧 <b id="food">0</b></span><span id="wave">—</span><span id="sheep" hidden>羊 <b id="sheep-n">0</b></span></div>
+</header>
+<div id="wrap"><div id="board"><div id="toast"></div></div></div>
+<div id="cards"></div>
+<div id="note">canvas 原型：同一套引擎，棋盤改 PixiJS 畫。看重點：油燈真的照亮一圈、火盆火星、石子拖尾、受擊閃白＋火花、倒下塵煙、瓦瓶爆炸衝擊波、嚎叫波紋、頭目登場震框、暴風夜雨絲與閃電、入夜與天亮的天色。</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.9.2/pixi.min.js"></script>
+<script src="../data.js"></script>
+<script src="../engine.js"></script>
+<script>
+'use strict';
+// ====== 圖示（跟正式版同一批 Fluent Emoji 3D）======
+const ICON_IMG = {
+  '🧑‍🌾': 'farmer', '🪨': 'rock', '🧱': 'brick', '🎯': 'bullseye', '🐕': 'dog', '🤾': 'person_playing_handball', '🗼': 'tokyo_tower', '🏹': 'bow_and_arrow',
+  '🌿': 'herb', '🦂': 'scorpion', '🔥': 'fire', '🏺': 'amphora', '📯': 'postal_horn', '🎺': 'trumpet', '🩹': 'adhesive_bandage', '🫗': 'pouring_liquid',
+  '🛞': 'wheel', '🦯': 'white_cane', '🪔': 'diya_lamp', '🚶': 'person_walking', '🥌': 'curling_stone', '🫂': 'people_hugging',
+  '🐺': 'wolf', '🐻': 'bear', '🦁': 'lion', '🥷': 'ninja', '🧔': 'person_beard', '🦊': 'fox', '🦗': 'cricket', '🐕‍🦺': 'service_dog', '🦅': 'eagle',
+  '🐗': 'boar', '🦉': 'owl', '🐆': 'leopard', '🐑': 'ewe', '🦴': 'bone', '🪵': 'wood', '🧍': 'person_standing', '🐾': 'paw_prints',
+};
+// 單位底色（跟 index.html 的 --u-* 同值）
+const UCOL = { shepherd: 0x3d6ea8, slinger: 0xa8553d, sling: 0x8a3f2e, hireling: 0x7d7a6a, archer: 0x6b4e2e, wall: 0x777777, tower: 0x5c5c66, dog: 0xc9a24a, thorns: 0x4a7a3a,
+  brazier: 0x6e3a1e, jar: 0x8a5a2e, horn: 0x7a6a2a, healer: 0x3d8a7a, catapult: 0x5a4a3a, staff: 0x8a6a3a, lamp: 0xb8862a, patrol: 0x4a5a7a, volley: 0xa8553d, cradle: 0x7a4a6a };
+// 敵人身體底色與大小（跟 index.html 的 .enemy.* 對齊）
+const BODY = { big: 0x5a3f2a, human: 0x3a3a30, light: 0xa89a7a, small: 0xb8682a, swarm: 0x5f7a34, dig: 0xa8843a, sly: 0x6b5a3a, boar: 0x4a3426 };
+const KSIZE = { fast: .8, alpha: 1.2, big: 1.3, lion: 1.4, boar: 1.25, small: .7, swarm: .6 };
+const BREATHERS = new Set(['shepherd', 'hireling', 'healer', 'cradle', 'horn']);
+const FX_TEXT = { sting: '☠️', flee: '💨', grab: '🐑', enrage: '😡', rest: '💤', home: '💛', crouch: '👁' };
+
+const LANE = 28; // 左邊門口走道（看門的站這裡）
+const $ = s => document.querySelector(s);
+const key = (r, c) => r + ',' + c;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const easeOut = k => 1 - Math.pow(1 - k, 3);
+
+let G = null, diff = 'storm', speed = 1, auto = true, selected = null, over = false, gameT = 0, autoT = 0, waveWas = 'prep';
+let W = 0, H = 0, cw = 0, ch = 0, bw = 0; // 畫布尺寸、格子尺寸、棋盤寬（扣掉走道）
+let app, tex = {}, radialTex, vignetteTex, dotTex, rainTex;
+
+// ====== 啟動 ======
+(async function main() {
+  app = new PIXI.Application();
+  await app.init({ resizeTo: $('#board'), backgroundAlpha: 0, antialias: true, resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true });
+  $('#board').appendChild(app.canvas);
+  const list = [{ alias: 'ground', src: '../img/ground.webp' }];
+  for (const f of new Set(Object.values(ICON_IMG))) list.push({ alias: f, src: `../img/ico/${f}.webp` });
+  await PIXI.Assets.load(list);
+  for (const it of list) tex[it.alias] = PIXI.Assets.get(it.alias);
+  makeTextures();
+  buildLayers();
+  buildHeader();
+  app.stage.eventMode = 'static'; app.stage.hitArea = app.screen;
+  app.stage.on('pointertap', onTap);
+  app.ticker.add(t => frame(Math.min(0.05, t.deltaMS / 1000)));
+  newGame();
+})();
+
+function texOf(emoji) { return tex[ICON_IMG[emoji]] || null; }
+// 幾張程式畫的貼圖：柔光圓（燈光、火光、拖尾）、暗角、小圓點（粒子）、雨絲
+function makeTextures() {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  const rg = g.createRadialGradient(128, 128, 0, 128, 128, 128); rg.addColorStop(0, 'rgba(255,255,255,1)'); rg.addColorStop(.35, 'rgba(255,255,255,.55)'); rg.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = rg; g.fillRect(0, 0, 256, 256); radialTex = PIXI.Texture.from(c);
+  const v = document.createElement('canvas'); v.width = 512; v.height = 360; const vg = v.getContext('2d');
+  const vr = vg.createRadialGradient(256, 180, 120, 256, 180, 330); vr.addColorStop(0, 'rgba(0,0,0,0)'); vr.addColorStop(1, 'rgba(0,0,0,.5)');
+  vg.fillStyle = vr; vg.fillRect(0, 0, 512, 360); vignetteTex = PIXI.Texture.from(v);
+  dotTex = app.renderer.generateTexture(new PIXI.Graphics().circle(8, 8, 8).fill(0xffffff));
+  rainTex = app.renderer.generateTexture(new PIXI.Graphics().roundRect(0, 0, 2, 18, 1).fill(0xffffff));
+}
+
+// ====== 圖層 ======
+const L = {};
+function buildLayers() {
+  for (const n of ['ground', 'cells', 'marks', 'units', 'glow', 'movers', 'shots', 'fx', 'dark', 'weather', 'sky', 'text', 'frame']) { L[n] = new PIXI.Container(); app.stage.addChild(L[n]); }
+  L.groundSpr = new PIXI.Sprite(tex.ground); L.ground.addChild(L.groundSpr);
+  L.cellG = new PIXI.Graphics(); L.cells.addChild(L.cellG);
+  L.glow.blendMode = 'add';
+  L.vig = new PIXI.Sprite(vignetteTex); L.sky.addChild(L.vig);
+  L.duskRect = new PIXI.Graphics(); L.sky.addChild(L.duskRect);
+  L.stormRect = new PIXI.Graphics(); L.sky.addChild(L.stormRect);
+  L.flashRect = new PIXI.Graphics(); L.sky.addChild(L.flashRect);
+  L.endRect = new PIXI.Graphics(); L.sky.addChild(L.endRect);
+  L.frameG = new PIXI.Graphics(); L.frame.addChild(L.frameG);
+  L.gates = new PIXI.Container(); L.frame.addChild(L.gates);
+  // 無月夜的黑暗：畫在一張離屏貼圖上，油燈的光用「擦掉」混合把黑暗挖出一個洞
+  L.darkRT = null; L.darkSpr = new PIXI.Sprite(); L.dark.addChild(L.darkSpr);
+  L.darkScene = new PIXI.Container(); L.darkFill = new PIXI.Graphics(); L.darkScene.addChild(L.darkFill); L.darkHoles = new PIXI.Container(); L.darkScene.addChild(L.darkHoles);
+}
+function layout() {
+  const w = app.screen.width, h = app.screen.height;
+  if (w === W && h === H) return;
+  W = w; H = h; bw = W - LANE; cw = bw / COLS; ch = H / ROWS;
+  const gs = L.groundSpr, s = Math.max(W / gs.texture.width, H / gs.texture.height); gs.scale.set(s); gs.x = (W - gs.texture.width * s) / 2; gs.y = (H - gs.texture.height * s) / 2;
+  L.vig.width = W; L.vig.height = H;
+  const g = L.cellG; g.clear();
+  g.rect(0, 0, LANE, H).fill({ color: 0x2a2416, alpha: .55 }); // 走道：木圍欄色
+  for (let i = 0; i < 4; i++) g.rect(4 + i * 6, 0, 2, H).fill({ color: 0x6a5433, alpha: .5 });
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const rock = G && G.rocks.has(key(r, c));
+    g.rect(LANE + c * cw, r * ch, cw, ch).fill({ color: rock ? 0x5a5a5a : (r + c) % 2 ? 0x55703e : 0x4f6b3a, alpha: rock ? .9 : (r + c) % 2 ? .72 : .80 });
+    g.rect(LANE + c * cw + .5, r * ch + .5, cw - 1, ch - 1).stroke({ width: 1, color: 0xffffff, alpha: .07 }); // 淡格線：放單位時看得出格子
+  }
+  g.rect(LANE, 0, bw, H).stroke({ width: 1, color: 0x000000, alpha: .12 });
+  L.frameG.clear().roundRect(1.5, 1.5, W - 3, H - 3, 10).stroke({ width: 3, color: 0x3b4254 });
+  if (L.darkRT) L.darkRT.destroy(true);
+  L.darkRT = PIXI.RenderTexture.create({ width: W, height: H, resolution: app.renderer.resolution }); L.darkSpr.texture = L.darkRT;
+  L.darkFill.clear().rect(0, 0, W, H).fill({ color: 0x060a16, alpha: .32 }); // 無月夜的暗度：敵人仍要看得見，只是腳印預告看不到
+}
+
+// ====== 開局 ======
+function buildHeader() {
+  const lv = $('#lv'); LEVELS.forEach((l, i) => { const o = document.createElement('option'); o.value = l.id; o.textContent = `第 ${i + 1} 夜 ${l.name}`; lv.appendChild(o); });
+  lv.value = '9'; // 拉結的燈：無月夜＋油燈，最能看出光的效果
+  lv.onchange = newGame; $('#df').onchange = () => { diff = $('#df').value; newGame(); };
+  $('#auto').onclick = () => { auto = !auto; $('#auto').textContent = `自動玩：${auto ? '開' : '關'}`; $('#auto').classList.toggle('on', auto); };
+  $('#spd').onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; $('#spd').textContent = speed + '×'; };
+  $('#again').onclick = newGame;
+}
+function newGame() {
+  diff = $('#df').value;
+  G = Engine.create(Number($('#lv').value), diff);
+  over = false; gameT = 0; autoT = 0; waveWas = 'prep'; selected = null; dawned = false;
+  for (const n of ['marks', 'units', 'glow', 'movers', 'shots', 'fx', 'text', 'darkHoles', 'gates']) L[n].removeChildren().forEach(c => c.destroy({ children: true }));
+  EN.clear(); SH.clear(); UN.clear(); MV.clear(); holes.clear(); mounds.clear(); markerSpr = strayMarkSpr = null; particles.length = 0; tweens.length = 0; shake.t = 0; L.flashT = 0; L.bolt = null;
+  W = 0; layout(); // 石頭格要重畫
+  $('#sheep').hidden = !G.level.sheep; $('#sheep-n').textContent = G.sheep;
+  buildGates(); buildCards();
+  L.endRect.clear(); L.flashRect.clear();
+  duskT = 4; stormT = 0;
+  toast('入夜了。' + (auto ? '自動玩會自己放單位' : '點一張卡，再點草地放下去'));
+}
+function buildGates() {
+  for (const r of G.gateRows) {
+    const s = new PIXI.Sprite(texOf('🧍')); s.anchor.set(.5); s.width = s.height = Math.min(26, LANE - 4); s.x = LANE / 2; s.y = (r + .5) * ch; s.rowIdx = r; L.gates.addChild(s);
+  }
+}
+function buildCards() {
+  const bar = $('#cards'); bar.innerHTML = '';
+  for (const k of G.level.units) {
+    const d = UNITS[k]; const b = document.createElement('button'); b.className = 'card'; b.dataset.k = k;
+    b.innerHTML = `<img src="../img/ico/${ICON_IMG[d.ico]}.webp" alt=""><div>${d.name}</div><div class="cost">${d.cost}</div>`;
+    b.onclick = () => { selected = selected === k ? null : k; syncCards(); if (selected) toast(`${d.name}：點一格草地放下`); };
+    bar.appendChild(b);
+  }
+}
+function syncCards() { for (const b of $('#cards').children) { b.classList.toggle('sel', b.dataset.k === selected); b.classList.toggle('poor', !Engine.canAfford(G, b.dataset.k)); } }
+let toastT = null;
+function toast(s) { const t = $('#toast'); t.textContent = s; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200); }
+
+// 點棋盤：有選卡就放；沒選卡點自己的單位就升級／修補
+function onTap(e) {
+  if (!G || over) return;
+  const c = Math.floor((e.global.x - LANE) / cw), r = Math.floor(e.global.y / ch);
+  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return;
+  if (selected) { const res = Engine.place(G, r, c, selected); if (res.msg) toast(res.msg); if (res.ok) { if (!Engine.canAfford(G, selected)) selected = null; syncCards(); } return; }
+  if (G.units[key(r, c)]) { const res = Engine.tapUnit(G, r, c); if (res.msg) toast(res.msg); }
+}
+
+// ====== 自動玩家：模擬器的「通用」打法搬過來（sim/simulate.js decide 的 good 版）======
+const BIG = Object.keys(ENEMIES).filter(k => ENEMIES[k].boss);
+function freeCell(r, want) { for (let d = 0; d < COLS; d++) for (const c of [want + d, want - d]) { if (c < 0 || c >= COLS) continue; if (!G.units[key(r, c)] && !G.rocks.has(key(r, c))) return c; } return -1; }
+function has(r, pred) { for (let c = 0; c < COLS; c++) { const u = G.units[key(r, c)]; if (u && pred(u, c)) return true; } return false; }
+const kindOf = u => UNITS[u.type].kind;
+function tryPlace(r, c, k) { if (c < 0 || !G.level.units.includes(k)) return false; return Engine.place(G, r, c, k).ok; }
+function decide() {
+  if (G.level.conveyor) { for (const k of G.hand.slice()) { const want = UNITS[k].kind === 'blocker' ? 4 : UNITS[k].kind === 'shooter' ? 1 : 2; for (const r of [2, 1, 3, 0, 4]) if (tryPlace(r, freeCell(r, want), k)) return; } return; }
+  const can = k => G.level.units.includes(k) && G.food >= UNITS[k].cost;
+  const count = k => Object.values(G.units).filter(u => u.type === k).length;
+  const rowEnemies = r => G.enemies.filter(e => e.r === r && !e.dead);
+  const threat = new Set(G.enemies.map(e => e.r)); if (G.nextRow !== null && G.nextVisible) threat.add(G.nextRow);
+  for (const s of G.strays) threat.add(s.r);
+  const shepCap = G.level.maxUnits && G.level.maxUnits.shepherd;
+  if (shepCap !== undefined && count('shepherd') >= shepCap && G.food >= 100) for (const k in G.units) { const u = G.units[k]; if (u.type === 'shepherd' && !u.elder && Engine.tapUnit(G, u.r, u.c).ok) return; }
+  if (count('shepherd') < (G.diff === 'storm' ? 4 : 3) && can('shepherd')) { for (const r of [2, 1, 3, 0]) if (!has(r, u => u.type === 'shepherd') && tryPlace(r, freeCell(r, 0), 'shepherd')) return; }
+  const spare = k => G.food >= UNITS[k].cost + UNITS.slinger.cost || Object.values(G.units).filter(u => kindOf(u) === 'shooter').length >= 3;
+  if (G.level.moonless && can('lamp') && spare('lamp') && count('lamp') < 2 && G.wave >= 1) { for (const r of [1, 3]) if (!has(r, u => u.type === 'lamp') && tryPlace(r, freeCell(r, 2), 'lamp')) return; }
+  if (can('staff') && spare('staff') && G.wave >= 1) { for (const r of [0, 4]) if (!has(r, u => u.type === 'staff' || kindOf(u) === 'shooter') && tryPlace(r, freeCell(r, 3), 'staff')) return; }
+  for (const k in G.units) { const u = G.units[k]; if (u.type === 'horn' && !u.upgraded && UNITS.horn.upgrade && Engine.posOf(G.level.id) >= UNITS.horn.upgrade.from && G.food >= UNITS.horn.upgrade.cost && Engine.tapUnit(G, u.r, u.c).ok) return; }
+  for (const k in G.units) { const u = G.units[k]; if (u.type === 'healer' && !u.upgraded && UNITS.healer.upgrade && Engine.posOf(G.level.id) >= UNITS.healer.upgrade.from && G.food >= UNITS.healer.upgrade.cost && Engine.tapUnit(G, u.r, u.c).ok) return; }
+  for (const k in G.units) { const u = G.units[k]; if (kindOf(u) === 'blocker' && u.hp < u.maxHp * 0.4 && G.food >= REPAIR_COST && has(u.r, v => kindOf(v) === 'shooter') && Engine.tapUnit(G, u.r, u.c).ok) return; }
+  if (can('jar')) {
+    let best = null, bn = 2;
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const n = G.enemies.filter(e => !e.underground && Math.abs(e.r - r) <= 1 && Math.abs(e.x - c) <= 1.3).length; if (n > bn && !G.units[key(r, c)] && !G.rocks.has(key(r, c))) { bn = n; best = [r, c]; } }
+    if (best) { Engine.place(G, best[0], best[1], 'jar'); return; }
+  }
+  const rows = [...threat].sort((a, b) => Math.min(...rowEnemies(a).map(e => e.x), 9) - Math.min(...rowEnemies(b).map(e => e.x), 9));
+  for (const r of rows) {
+    const es = rowEnemies(r);
+    const types = new Set(es.map(e => e.type)); if (G.nextRow === r && G.nextType) types.add(G.nextType);
+    const volleyNear = [r - 1, r, r + 1].some(rr => rr >= 0 && rr < ROWS && has(rr, u => u.type === 'volley'));
+    const hasShooter = has(r, u => kindOf(u) === 'shooter' && !UNITS[u.type].flees) || volleyNear;
+    const hasSling = has(r, u => u.type === 'sling');
+    const hasDog = has(r, u => u.type === 'dog' && !u.resting);
+    const hasBlock = has(r, (u, c) => kindOf(u) === 'blocker' && c >= 3);
+    const big = [...types].some(t => BIG.includes(t) || t === 'boar');
+    const needArcher = types.has('locust');
+    const strayHere = G.strays.some(s => s.r === r) || G.strayNextRow === r;
+    const near = es.some(e => !e.underground && !ENEMIES[e.type].flying && e.x < 5.2);
+    if (!hasShooter) {
+      if (needArcher && can('archer') && tryPlace(r, freeCell(r, 1), 'archer')) return;
+      if ((r === 1 || r === 3 || types.has('owl')) && can('volley') && tryPlace(r, freeCell(r, 1), 'volley')) return;
+      if (big && can('sling') && tryPlace(r, freeCell(r, 1), 'sling')) return;
+      if (can('slinger') && tryPlace(r, freeCell(r, 1), 'slinger')) return;
+    }
+    if (big && !hasSling && can('sling') && tryPlace(r, freeCell(r, 2), 'sling')) return;
+    if (!hasDog && can('dog') && (strayHere || (G.level.fresh.includes('dog') && types.has('fast')) || [...types].some(t => ['alpha', 'lion', 'bear', 'fox', 'rustler', 'thief', 'jackal', 'leopard'].includes(t))) && tryPlace(r, freeCell(r, 3), 'dog')) return;
+    if (strayHere && can('cradle') && !has(r, u => u.type === 'cradle') && tryPlace(r, freeCell(r, 2), 'cradle')) return;
+    if (es.length >= 3 && r >= 1 && r <= 3 && can('patrol') && ![r - 1, r, r + 1].some(rr => has(rr, u => u.type === 'patrol')) && tryPlace(r, freeCell(r, 2), 'patrol')) return;
+    if (needArcher && !has(r, u => u.type === 'archer') && can('archer') && tryPlace(r, freeCell(r, 2), 'archer')) return;
+    if (types.has('digger') && can('thorns')) { const dg = es.find(e => e.type === 'digger' && e.underground); if (dg && !G.units[key(r, dg.emergeX)] && tryPlace(r, dg.emergeX, 'thorns')) return; }
+    for (let c = 0; c < COLS; c++) { const u = G.units[key(r, c)]; if (u && u.type === 'thorns' && !u.upgraded && Engine.posOf(G.level.id) >= UNITS.thorns.upgrade.from && G.food >= UNITS.thorns.upgrade.cost + 50) { Engine.tapUnit(G, r, c); return; } }
+    if (types.has('bear') && can('thorns') && !has(r, u => u.type === 'thorns') && tryPlace(r, freeCell(r, 4), 'thorns')) return;
+    if (es.length >= 4 && can('horn') && !has(r, u => u.type === 'horn') && tryPlace(r, freeCell(r, 2), 'horn')) return;
+    if (es.length >= 4 && can('catapult') && !has(r, u => u.type === 'catapult') && tryPlace(r, freeCell(r, 1), 'catapult')) return;
+    if (near && !hasBlock) {
+      if ((types.has('thief') || types.has('boar') || types.has('jackal')) && can('tower') && tryPlace(r, freeCell(r, 4), 'tower')) return;
+      if (can('wall') && !types.has('lion') && tryPlace(r, freeCell(r, 4), 'wall')) return;
+    }
+    if (hasDog && can('healer') && !has(r, u => u.type === 'healer')) { const d = Object.values(G.units).find(u => u.type === 'dog' && u.r === r); if (d && d.hp < d.maxHp * 0.6 && tryPlace(r, freeCell(r, d.c - 1), 'healer')) return; }
+  }
+  if (G.food >= 200) {
+    if (can('brazier')) for (let r = 0; r < ROWS; r++) if (has(r, (u, c) => kindOf(u) === 'shooter' && c <= 1) && !has(r, u => u.type === 'brazier') && !G.units[key(r, 2)] && tryPlace(r, 2, 'brazier')) return;
+    for (const r of [2, 1, 3, 0, 4]) if (!has(r, u => kindOf(u) === 'shooter' && !UNITS[u.type].flees) && can('slinger') && tryPlace(r, freeCell(r, 1), 'slinger')) return;
+    if (count('shepherd') < 5 && can('shepherd')) { for (const r of [0, 4]) if (tryPlace(r, freeCell(r, 0), 'shepherd')) return; }
+    if (G.food >= 250) for (const k in G.units) { const u = G.units[k]; if (u.type === 'shepherd' && !u.elder) { Engine.tapUnit(G, u.r, u.c); return; } }
+    if (G.food >= 300) for (const r of [2, 1, 3, 0, 4]) if (Object.values(G.units).filter(u => u.r === r && kindOf(u) === 'shooter').length < 2 && can('slinger') && tryPlace(r, freeCell(r, 2), 'slinger')) return;
+  }
+}
+
+// ====== 每一幀 ======
+let duskT = 0, stormT = 0, dawned = false;
+const shake = { t: 0, amp: 0 };
+function frame(dt) {
+  layout();
+  if (!G) return;
+  if (!over) {
+    for (let i = 0; i < speed; i++) { Engine.step(G, dt); flushEvents(); if (G.over) break; }
+    gameT += dt * speed; autoT += dt * speed;
+    if (auto && autoT >= 0.4) { autoT = 0; decide(); }
+    if (waveWas !== 'wave' && G.phase === 'wave' && diff === 'storm' && Math.random() < .5) lightning();
+    waveWas = G.phase;
+  }
+  syncHud();
+  drawUnits(dt); drawEnemies(dt); drawMovers(dt); drawShots(dt); drawMarks();
+  updateParticles(dt); updateTweens(dt); drawSky(dt); drawDark(); drawShake(dt);
+}
+function syncHud() {
+  $('#food').textContent = G.level.conveyor ? '—' : Math.floor(G.food);
+  const t = Math.ceil(G.timer), n = G.waves.length;
+  $('#wave').textContent = G.phase === 'prep' ? (G.started ? `第 1 波 ${t} 秒後` : '放下第一個單位才開始') : G.phase === 'rest' ? (G.wave >= n ? '天快亮了' : `第 ${G.wave + 1} 波 ${t} 秒後`) : `第 ${G.wave} / ${n} 波`;
+  $('#sheep-n').textContent = G.sheep;
+  syncCards();
+}
+
+// 引擎這一步發生的事，一件件畫出來
+function flushEvents() {
+  for (const e of G.events) {
+    switch (e.t) {
+      case 'spawn': if (ENEMIES[e.e.type].boss) bossEnter(); break;
+      case 'toast': toast(e.msg); break;
+      case 'die': dieFx(e.e); break;
+      case 'hit': hitFx(e.id); break;
+      case 'pop': popText(e.r, e.c, e.text); if (String(e.text)[0] === '+') hopUnit(e.r, e.c); break;
+      case 'unit': renderUnit(e.r, e.c); break;
+      case 'fx': fx(e.kind, e.r, e.x, e.id, e); break;
+      case 'marker': setMarker(e.r, e.type); break;
+      case 'strayMark': setStrayMark(e.r); break;
+      case 'hand': buildCards(); break;
+      case 'win': over = true; endScreen(true); break;
+      case 'lose': over = true; endScreen(false); break;
+    }
+  }
+  G.events.length = 0;
+}
+
+// ====== 單位（格子裡的）======
+const UN = new Map(); // key → { cont, bg, spr, hp, badge, glow, phase, recoil, hop, squash }
+function renderUnit(r, c) {
+  const k = key(r, c), u = G.units[k];
+  const old = UN.get(k);
+  if (old) { old.cont.destroy({ children: true }); if (old.glow) old.glow.destroy(); UN.delete(k); }
+  if (!u) return;
+  const def = UNITS[u.type];
+  const cont = new PIXI.Container(); cont.x = LANE + (c + .5) * cw; cont.y = (r + .5) * ch; L.units.addChild(cont);
+  const bg = new PIXI.Graphics(); cont.addChild(bg);
+  const ico = def.kind === 'dog' ? '🦴' : def.kind === 'patrol' ? '🪵' : def.ico;
+  const spr = new PIXI.Sprite(texOf(ico)); spr.anchor.set(.5, .62); spr.width = spr.height = ch * .5; cont.addChild(spr);
+  const v = { cont, bg, spr, u, hpLast: -1, phase: (r * COLS + c) % 8 * .6, recoil: 0, hop: 0, isNew: !old, glow: null };
+  if (u.upgraded && def.upgrade && def.upgrade.ico) { const b = new PIXI.Sprite(texOf(def.upgrade.ico)); b.anchor.set(.5); b.width = b.height = ch * .22; b.x = cw * .28; b.y = -ch * .26; cont.addChild(b); }
+  if (u.maxHp > 1 && def.kind !== 'dog') { v.hp = new PIXI.Graphics(); cont.addChild(v.hp); }
+  // 火盆、油燈：加一圈柔光（相加混合，蓋在單位上面會發亮）
+  if (u.type === 'brazier' || u.type === 'lamp') { const gl = new PIXI.Sprite(radialTex); gl.anchor.set(.5); gl.blendMode = 'add'; gl.tint = u.type === 'lamp' ? 0xffc46a : 0xff8a3a; gl.x = cont.x; gl.y = cont.y; L.glow.addChild(gl); v.glow = gl; }
+  UN.set(k, v);
+  drawUnitBg(v);
+  if (!old) squash(v);
+  else { v.isNew = false; }
+}
+function drawUnitBg(v) {
+  const u = v.u, def = UNITS[u.type], w = cw * .8, h = ch * .8;
+  v.bg.clear().roundRect(-w / 2, -h / 2, w, h, 8).fill({ color: UCOL[u.type] || 0x555555, alpha: .92 });
+  if (u.elder) v.bg.stroke({ width: 2, color: 0xe6b84a });
+  if (u.fear > 0) v.bg.stroke({ width: 2, color: 0x9fb4ff, alpha: .8 });
+}
+function drawUnits(dt) {
+  for (const [k, v] of UN) {
+    const u = G.units[k]; if (!u) { renderUnit(...k.split(',').map(Number)); continue; }
+    if (u !== v.u) { v.u = u; drawUnitBg(v); } // 引擎換了物件（修補、升級）
+    const def = UNITS[u.type];
+    v.cont.x = LANE + (u.c + .5) * cw + (v.recoil > 0 ? -3 * (v.recoil / .09) : 0); v.cont.y = (u.r + .5) * ch - (v.hop > 0 ? ch * .09 * Math.sin((1 - v.hop / .24) * Math.PI) : 0);
+    v.recoil = Math.max(0, v.recoil - dt); v.hop = Math.max(0, v.hop - dt);
+    if (speed <= 1) {
+      if (BREATHERS.has(u.type)) { const b = Math.sin((gameT + v.phase) * 2.6) * .03; v.spr.scale.set(v.spr.scale.x, v.spr.scale.x * (1 + b)); }
+      if (v.glow) { const f = .9 + Math.sin(gameT * 13 + v.phase) * .06 + Math.sin(gameT * 31) * .04; v.glow.width = v.glow.height = (u.type === 'lamp' ? 2.6 : 1.9) * ch * f; v.glow.alpha = u.type === 'lamp' ? .55 : .5;
+        if (Math.random() < dt * (u.type === 'brazier' ? 14 : 5)) spark(v.cont.x, v.cont.y - ch * .1, u.type === 'brazier' ? 0xffa040 : 0xffd080, 1, 0.02 * ch, -ch * .5, 0.7, 2.2); }
+    } else if (v.glow) { v.glow.width = v.glow.height = 2.2 * ch; v.glow.alpha = .5; }
+    if (v.hp && v.hpLast !== u.hp) { v.hpLast = u.hp; const w = cw * .6, f = clamp(u.hp / u.maxHp, 0, 1); v.hp.clear().rect(-w / 2, ch * .32, w, 3).fill({ color: 0x000000, alpha: .4 }).rect(-w / 2, ch * .32, w * f, 3).fill(f > .4 ? 0x6fc46a : 0xe06a4a); }
+    if (def.light !== undefined) ensureHole(k, v.cont.x, v.cont.y, def.light); else removeHole(k);
+  }
+}
+function squash(v) { tween(.2, k => { const e = easeOut(k); const sx = 1.12 + (1 - 1.12) * e, sy = .86 + (1 - .86) * e; v.cont.scale.set(sx, sy); v.cont.pivot.y = 0; }); }
+function hopUnit(r, c) { const v = UN.get(key(r, c)); if (v && UNITS[v.u.type].kind === 'producer') v.hop = .24; }
+function recoil(r, c) { const v = UN.get(key(r, c)); if (v && speed <= 1) v.recoil = .09; }
+
+// 無月夜：油燈把黑暗擦出一個洞（橢圓，寬兩格半、高三排）
+const holes = new Map();
+function ensureHole(k, x, y, light) {
+  let h = holes.get(k);
+  if (!h) { h = new PIXI.Sprite(radialTex); h.anchor.set(.5); h.blendMode = 'erase'; L.darkHoles.addChild(h); holes.set(k, h); }
+  h.x = x; h.y = y; h.width = cw * 3.4; h.height = ch * (light * 2 + 1) * 1.25; h.alpha = 1;
+}
+function removeHole(k) { const h = holes.get(k); if (h) { h.destroy(); holes.delete(k); } }
+function drawDark() {
+  const on = !!G.level.moonless && G.phase !== 'prep';
+  L.dark.visible = on; if (!on) return;
+  app.renderer.render({ container: L.darkScene, target: L.darkRT, clear: true });
+}
+
+// ====== 敵人 ======
+const EN = new Map(); // id → { cont, body, spr, flash, hp, hpLast, phase, k, fly, burnAcc }
+function enemyVisual(e) {
+  const def = ENEMIES[e.type], cls = (def.cls || '').split(' ').filter(Boolean);
+  const cont = new PIXI.Container(); L.movers.addChild(cont);
+  let k = 1; for (const c of cls) if (KSIZE[c]) k = KSIZE[c];
+  const w = G.waves[G.wave - 1]; if (w && w.hpMul > 1.2) k *= 1 + (w.hpMul - 1) * .2;
+  const fly = cls.includes('fly') || cls.includes('owl') || cls.includes('swarm');
+  const body = new PIXI.Graphics(); const bodyCol = cls.map(c => BODY[c]).find(c => c !== undefined);
+  const br = ch * .33 * k;
+  if (!cls.includes('owl') && !cls.includes('fly')) {
+    if (cls.includes('human')) body.roundRect(-br, -br, br * 2, br * 2, br * .6).fill(bodyCol); else body.circle(0, 0, br).fill(bodyCol ?? 0x5b5b66);
+    if (cls.includes('alpha') || cls.includes('lion')) body.stroke({ width: 3, color: 0xe6b84a });
+    else body.stroke({ width: 1.5, color: 0x8a2a2a, alpha: .8 }); // 暗紅細圈＝敵人
+  }
+  cont.addChild(body);
+  const spr = new PIXI.Sprite(texOf(def.ico)); spr.anchor.set(.5, .6); spr.width = spr.height = ch * .46 * k; cont.addChild(spr);
+  const flash = new PIXI.Sprite(texOf(def.ico)); flash.anchor.set(.5, .6); flash.width = flash.height = spr.width; flash.blendMode = 'add'; flash.alpha = 0; cont.addChild(flash);
+  const hp = new PIXI.Graphics(); cont.addChild(hp);
+  const v = { cont, body, spr, flash, hp, hpLast: -1, phase: Math.random() * 6.28, k, fly, flashT: 0, burnAcc: 0, poisonAcc: 0, swarm: cls.includes('swarm') };
+  EN.set(e.id, v); return v;
+}
+function drawEnemies(dt) {
+  const alive = new Set();
+  for (const e of G.enemies) {
+    if (e.dead) continue;
+    alive.add(e.id);
+    const v = EN.get(e.id) || enemyVisual(e);
+    const rv = e.rv === undefined ? e.r : e.rv;
+    const x = LANE + (e.x + .5) * cw, y = (rv + .5 - (e.lift || 0) * .6) * ch;
+    v.cont.x = x; v.cont.y = y;
+    const still = e.st.stun || e.st.distract || e.underground || e.crouchT > 0;
+    let rot = 0, bob = 0, lunge = 0;
+    if (speed <= 1 && !still) {
+      const f = v.fly ? 3 : v.k >= 1.2 ? 4 : e.type === 'fast' ? 9 : 6.5;
+      if (v.fly) bob = Math.sin((gameT + v.phase) * f) * ch * .06; else { rot = Math.sin((gameT + v.phase) * f) * .06; bob = -Math.abs(Math.sin((gameT + v.phase) * f)) * ch * .03; }
+    }
+    if (e.biting && !still) lunge = -Math.abs(Math.sin(gameT * 14 + v.phase)) * cw * .12;
+    v.spr.rotation = rot; v.spr.y = bob; v.spr.x = lunge; v.flash.rotation = rot; v.flash.y = bob; v.flash.x = lunge; v.body.x = lunge * .5; v.body.y = bob * .5;
+    v.cont.alpha = e.underground ? .3 : e.crouchT > 0 ? .55 : 1;
+    v.spr.tint = e.st.burn ? 0xffb080 : e.st.poison ? 0x9fe07a : 0xffffff;
+    if (v.flashT > 0) { v.flashT -= dt; v.flash.alpha = Math.max(0, v.flashT / .09) * (v.fly ? .5 : .9); } else v.flash.alpha = 0;
+    // 狀態粒子：燃燒冒火、中毒冒泡、暈眩轉星
+    if (speed <= 1) {
+      if (e.st.burn) { v.burnAcc += dt; while (v.burnAcc > .07) { v.burnAcc -= .07; spark(x + (Math.random() - .5) * cw * .3, y, Math.random() < .5 ? 0xff8a30 : 0xffd060, 1, .018 * ch, -ch * .7, .5, 2); } }
+      if (e.st.poison) { v.poisonAcc += dt; while (v.poisonAcc > .2) { v.poisonAcc -= .2; spark(x + (Math.random() - .5) * cw * .4, y - ch * .1, 0x8fe06a, .8, .012 * ch, -ch * .35, .7, 1.2); } }
+      if (e.st.stun || e.st.distract) { if (Math.random() < dt * 6) { const a = gameT * 5; spark(x + Math.cos(a) * cw * .25, y - ch * .3 + Math.sin(a) * ch * .08, 0xffe28a, .6, .012 * ch, 0, .3, 1); } }
+    }
+    if (v.hpLast !== e.hp) { v.hpLast = e.hp; const w = cw * .55, f = clamp(e.hp / e.maxHp, 0, 1); v.hp.clear().rect(-w / 2, ch * .3, w, 3).fill({ color: 0x000000, alpha: .45 }).rect(-w / 2, ch * .3, w * f, 3).fill(f > .4 ? 0x6fc46a : 0xe06a4a); }
+    if (e.carrying && !v.carry) { v.carry = new PIXI.Sprite(texOf('🐑')); v.carry.anchor.set(.5); v.carry.width = v.carry.height = ch * .22; v.carry.x = -cw * .18; v.carry.y = -ch * .25; v.cont.addChild(v.carry); }
+    if (!e.carrying && v.carry) { v.carry.destroy(); v.carry = null; }
+  }
+  for (const [id, v] of EN) if (!alive.has(id) && !v.dying) { v.cont.destroy({ children: true }); EN.delete(id); }
+}
+function hitFx(id) {
+  const v = EN.get(id); if (!v) return;
+  if (!v.swarm) v.flashT = .09;
+  if (speed <= 1) for (let i = 0; i < 3; i++) spark(v.cont.x + (Math.random() - .5) * cw * .3, v.cont.y - ch * .05, 0xfff0c0, .9, .014 * ch, -ch * .3, .25, 2.5);
+}
+function dieFx(e) {
+  const v = EN.get(e.id); if (!v) return;
+  EN.delete(e.id); v.dying = true;
+  const c = v.cont; tween(.22, k => { c.alpha = 1 - k; c.scale.set(1 - .15 * easeOut(k)); }, () => c.destroy({ children: true }));
+  if (speed > 1 || e.underground || v.fly) return;
+  for (let i = 0; i < 7; i++) spark(c.x + (Math.random() - .5) * cw * .3, c.y + ch * .2, 0xc9bda0, .5, (.02 + Math.random() * .02) * ch, -ch * .25, .35, 1.2, true);
+}
+function bossEnter() {
+  shake.t = .35; shake.amp = 2;
+  const g = new PIXI.Graphics().roundRect(1.5, 1.5, W - 3, H - 3, 10).stroke({ width: 4, color: 0xe6b84a }); L.frame.addChild(g);
+  tween(.7, k => { g.alpha = 1 - k; }, () => g.destroy());
+}
+function drawShake(dt) {
+  if (shake.t > 0 && speed <= 1) { shake.t -= dt; const a = shake.amp * (shake.t / .35); L.frame.x = (Math.random() - .5) * 2 * a; L.frame.y = (Math.random() - .5) * 2 * a; }
+  else { L.frame.x = L.frame.y = 0; }
+}
+
+// ====== 狗、巡夜人、迷羊（在格子外走的）======
+const MV = new Map();
+function moverVisual(id, emoji, hasBody, col) {
+  const cont = new PIXI.Container(); L.movers.addChild(cont);
+  if (hasBody) { cont.addChild(new PIXI.Graphics().circle(0, 0, ch * .3).fill({ color: col, alpha: .9 }).stroke({ width: 1.5, color: 0xffffff, alpha: .35 })); }
+  const spr = new PIXI.Sprite(texOf(emoji)); spr.anchor.set(.5, .6); spr.width = spr.height = ch * .44; cont.addChild(spr);
+  const hp = new PIXI.Graphics(); cont.addChild(hp);
+  const v = { cont, spr, hp, hpLast: -1, phase: Math.random() * 6 }; MV.set(id, v); return v;
+}
+function drawMovers(dt) {
+  const alive = new Set();
+  const put = (id, emoji, hasBody, col, x, y, hpv, max, still) => {
+    alive.add(id); const v = MV.get(id) || moverVisual(id, emoji, hasBody, col);
+    v.cont.x = LANE + x * cw; v.cont.y = y * ch;
+    v.spr.rotation = speed <= 1 && !still ? Math.sin((gameT + v.phase) * 8) * .07 : 0;
+    if (max && v.hpLast !== hpv) { v.hpLast = hpv; const w = cw * .5, f = clamp(hpv / max, 0, 1); v.hp.clear().rect(-w / 2, ch * .3, w, 3).fill({ color: 0x000000, alpha: .45 }).rect(-w / 2, ch * .3, w * f, 3).fill(f > .4 ? 0x6fc46a : 0xe06a4a); }
+  };
+  for (const k in G.units) { const u = G.units[k]; if (u.type === 'dog') put(u.id, '🐕', true, UCOL.dog, u.x + .5, u.r + .5, u.hp, u.maxHp, u.resting); if (u.type === 'patrol') put(u.id, UNITS.patrol.ico, true, UCOL.patrol, u.c + .5, u.rv + .5, u.hp, u.maxHp, false); }
+  for (const s of G.strays) put(s.id, '🐑', false, 0, s.x + .5, s.r + .5, 0, 0, false);
+  for (const [id, v] of MV) if (!alive.has(id)) { v.cont.destroy({ children: true }); MV.delete(id); }
+}
+
+// ====== 投射物：石子帶灰塵拖尾、箭是光痕、投石機拋物線有影子、燃燒的拖火 ======
+const SH = new Map();
+function drawShots(dt) {
+  const alive = new Set();
+  for (const s of G.shots) {
+    alive.add(s.id);
+    let v = SH.get(s.id);
+    if (!v) {
+      const cont = new PIXI.Container(); L.shots.addChild(cont);
+      const g = new PIXI.Graphics();
+      if (s.kind === 'arrow') g.moveTo(-cw * .18, 0).lineTo(cw * .1, 0).stroke({ width: 2.5, color: 0xf3ead8 }).moveTo(cw * .1, 0).lineTo(cw * .04, -3).moveTo(cw * .1, 0).lineTo(cw * .04, 3).stroke({ width: 2, color: 0xf3ead8 });
+      else g.circle(0, 0, s.kind === 'lob' ? ch * .09 : s.kind === 'sling' ? ch * .075 : ch * .055).fill(s.kind === 'lob' ? 0x8a7a66 : 0xb9b1a3).stroke({ width: 1, color: 0x000000, alpha: .4 });
+      const glow = new PIXI.Sprite(radialTex); glow.anchor.set(.5); glow.blendMode = 'add'; glow.width = glow.height = ch * .5; glow.alpha = 0; cont.addChild(glow); cont.addChild(g);
+      let shadow = null; if (s.kind === 'lob') { shadow = new PIXI.Graphics().ellipse(0, 0, ch * .1, ch * .04).fill({ color: 0x000000, alpha: .35 }); L.shots.addChildAt(shadow, 0); }
+      v = { cont, g, glow, shadow, acc: 0 }; SH.set(s.id, v);
+      recoil(s.ur === undefined ? s.r : s.ur, s.uc === undefined ? Math.floor(s.x) : s.uc);
+    }
+    const lift = s.kind === 'lob' ? Math.sin(Math.min(1, s.t) * Math.PI) * .6 : 0;
+    const x = LANE + s.x * cw, y = (s.r + .5 - lift) * ch;
+    v.cont.x = x; v.cont.y = y;
+    if (v.shadow) { v.shadow.x = x; v.shadow.y = (s.r + .5) * ch + ch * .25; v.shadow.alpha = .35 - lift * .3; }
+    if (s.burn) { v.glow.alpha = .8; v.glow.tint = 0xff9a40; v.g.tint = 0xffc080; }
+    if (speed <= 1) { v.acc += dt; while (v.acc > .03) { v.acc -= .03; if (s.burn) spark(x - cw * .05, y, Math.random() < .5 ? 0xff8a30 : 0xffd060, .9, .016 * ch, -ch * .3, .3, 1.5); else if (s.kind !== 'arrow') spark(x - cw * .08, y + ch * .02, 0xd8d0c0, .35, .012 * ch, 0, .22, .4); } }
+  }
+  for (const [id, v] of SH) if (!alive.has(id)) { v.cont.destroy({ children: true }); if (v.shadow) v.shadow.destroy(); SH.delete(id); }
+}
+
+// ====== 一次性效果 ======
+const mounds = new Map();
+function fx(kind, r, x, id, e) {
+  const px = LANE + (x + .5) * cw, py = (r + .5) * ch;
+  switch (kind) {
+    case 'blast': ring(px, py, cw * 1.6, 0xffb060, .45); burst(px, py, 18, [0xff8a30, 0xffd060, 0x777777], ch * .9, .5); shake.t = .2; shake.amp = 2; break;
+    case 'splash': case 'slam': ring(px, py, cw * .9, 0xffe0a0, .3); burst(px, py, 8, [0xc9bda0, 0xffd060], ch * .5, .35); break;
+    case 'ignite': burst(px, py, 10, [0xff8a30, 0xffd060], ch * .6, .5); break;
+    case 'howl': ring(px, py, cw * 2.2, 0xc9a0dc, .9); break;
+    case 'roar': ring(px, py, cw * 2.8, 0xe6b84a, .9); shake.t = .3; shake.amp = 2; break;
+    case 'horn': { const g = new PIXI.Graphics(); L.fx.addChild(g); tween(.45, k => { const e2 = easeOut(k); g.clear().ellipse(px + e2 * bw * .9, py, cw * .25, ch * .45).stroke({ width: 3, color: 0xffe28a, alpha: 1 - k }); }, () => g.destroy()); break; }
+    case 'trample': case 'emerge': case 'flee': burst(px, py + ch * .2, 6, [0xc9bda0], ch * .4, .3); break;
+    case 'gate': { const g = new PIXI.Graphics(); L.fx.addChild(g); tween(.8, k => { const e2 = easeOut(k); g.clear().rect(LANE, py - ch * .35, e2 * bw, ch * .7).fill({ color: 0xe6b84a, alpha: .35 * (1 - k) }); }, () => g.destroy()); burst(LANE + bw * .5, py, 6, [0xffe28a], ch * .3, .4); break; }
+    case 'strike': burst(px, py, 6, [0xffe28a, 0xffffff], ch * .4, .25); break;
+    case 'mound': { const g = new PIXI.Graphics().ellipse(0, 0, cw * .3, ch * .14).fill(0x6a4a2a).stroke({ width: 1, color: 0x000000, alpha: .3 }); g.x = px; g.y = py + ch * .25; L.marks.addChild(g); mounds.set(id, g); break; }
+    case 'bark': case 'dodge': case 'hop': case 'catch': break;
+    default: if (FX_TEXT[kind]) popText(r, x, FX_TEXT[kind]);
+  }
+  if (kind === 'emerge') { const g = mounds.get(id); if (g) { g.destroy(); mounds.delete(id); } }
+}
+function ring(x, y, R, color, dur) {
+  const g = new PIXI.Graphics(); L.fx.addChild(g);
+  tween(dur, k => { const e = easeOut(k); g.clear().circle(x, y, R * e).stroke({ width: 3 * (1 - k) + 1, color, alpha: 1 - k }); }, () => g.destroy());
+}
+function burst(x, y, n, cols, v, life) { if (speed > 1) n = Math.ceil(n / 3); for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, s = v * (.4 + Math.random() * .8); spawnParticle(x, y, Math.cos(a) * s, Math.sin(a) * s - v * .3, life * (.6 + Math.random() * .6), cols[Math.floor(Math.random() * cols.length)], .018 * ch * (.6 + Math.random()), ch * 1.6, .8); } }
+function popText(r, c, text) {
+  const t = new PIXI.Text({ text: String(text), style: { fontSize: Math.max(12, ch * .22), fill: String(text)[0] === '+' ? 0xffd98a : 0xf3ead8, fontWeight: 'bold', stroke: { color: 0x000000, width: 3 } } });
+  t.anchor.set(.5); t.x = LANE + (c + .5) * cw; t.y = (r + .3) * ch; L.text.addChild(t);
+  tween(.8, k => { t.y = (r + .3) * ch - k * ch * .5; t.alpha = 1 - k * k; }, () => t.destroy());
+}
+function endScreen(win) {
+  L.endRect.clear().rect(0, 0, W, H).fill({ color: win ? 0xffd98a : 0x1a2440, alpha: 0 });
+  tween(.9, k => { L.endRect.clear().rect(0, 0, W, H).fill({ color: win ? 0xffd98a : 0x1a2440, alpha: k * (win ? .45 : .6) }); });
+  const t = new PIXI.Text({ text: win ? '天亮了' : '羊圈失守', style: { fontSize: Math.max(22, ch * .6), fill: win ? 0xfff2cc : 0xc9d2e8, fontWeight: 'bold', stroke: { color: 0x000000, width: 4 } } });
+  t.anchor.set(.5); t.x = LANE + bw / 2; t.y = H / 2; t.alpha = 0; L.text.addChild(t); tween(.9, k => { t.alpha = k; });
+}
+
+// ====== 腳印預告 ======
+let markerSpr = null, strayMarkSpr = null;
+function setMarker(r, type) {
+  if (markerSpr) { markerSpr.destroy({ children: true }); markerSpr = null; }
+  if (r === null || r === undefined) return;
+  const cont = new PIXI.Container(); L.marks.addChild(cont);
+  const special = type && type !== 'wolf' && type !== 'fast';
+  if (special) { cont.addChild(new PIXI.Graphics().circle(0, 0, ch * .28).fill({ color: 0x000000, alpha: .35 }).stroke({ width: 2, color: ENEMIES[type].boss ? 0xe6b84a : 0xc0392b })); }
+  const s = new PIXI.Sprite(texOf(special ? ENEMIES[type].ico : '🐾')); s.anchor.set(.5); s.width = s.height = ch * .38; cont.addChild(s);
+  cont.x = LANE + bw - cw * .5; cont.y = (r + .5) * ch; cont.rowIdx = r; markerSpr = cont;
+}
+function setStrayMark(r) {
+  if (strayMarkSpr) { strayMarkSpr.destroy(); strayMarkSpr = null; }
+  if (r === null || r === undefined) return;
+  const s = new PIXI.Sprite(texOf('🐑')); s.anchor.set(.5); s.width = s.height = ch * .36; s.x = LANE + bw - cw * .5; s.y = (r + .5) * ch; L.marks.addChild(s); strayMarkSpr = s;
+}
+function drawMarks() {
+  const vis = G.nextVisible || !G.level.moonless;
+  if (markerSpr) { markerSpr.alpha = (vis || litRow(markerSpr.rowIdx) ? 1 : 0) * (.7 + Math.sin(gameT * 4) * .3); }
+  if (strayMarkSpr) strayMarkSpr.alpha = .7 + Math.sin(gameT * 4) * .3;
+  for (const g of L.gates.children) g.alpha = G.gates.includes(g.rowIdx) ? 1 : .35;
+}
+function litRow(r) { for (const k in G.units) { const u = G.units[k], d = UNITS[u.type]; if (d.light !== undefined && Math.abs(u.r - r) <= d.light) return true; } return false; }
+
+// ====== 天色：入夜暖橘退成夜色、暴風夜冷罩與雨絲、閃電、暗角 ======
+let rainAcc = 0;
+function drawSky(dt) {
+  if (duskT > 0) { duskT -= dt; L.duskRect.clear().rect(0, 0, W, H).fill({ color: 0xff9a40, alpha: .32 * clamp(duskT / 4, 0, 1) }); } else L.duskRect.clear();
+  const storm = diff === 'storm';
+  L.stormRect.clear(); if (storm) L.stormRect.rect(0, 0, W, H).fill({ color: 0x3a4a7a, alpha: G.level.moonless ? .08 : .14 });
+  if (storm && speed <= 1) { rainAcc += dt; while (rainAcc > .012) { rainAcc -= .012; spawnParticle(Math.random() * (W + 40) - 20, -20, -ch * .6, ch * 7, .5, 0xcfd8ff, 1, 0, .28, true, rainTex); } }
+  if (L.flashT > 0) { L.flashT -= dt; L.flashRect.clear().rect(0, 0, W, H).fill({ color: 0xffffff, alpha: .5 * clamp(L.flashT / .18, 0, 1) }); if (L.flashT <= 0) { L.flashRect.clear(); if (L.bolt) { L.bolt.destroy(); L.bolt = null; } } }
+}
+function lightning() {
+  if (G.level.moonless) return; // 無月夜不閃電（閃了反而看得到腳印）
+  L.flashT = .18;
+  const g = new PIXI.Graphics(); let x = LANE + Math.random() * bw, y = 0; g.moveTo(x, y);
+  while (y < H * .55) { x += (Math.random() - .5) * cw * .8; y += ch * (.25 + Math.random() * .3); g.lineTo(x, y); }
+  g.stroke({ width: 2.5, color: 0xffffff, alpha: .9 }); L.weather.addChild(g); L.bolt = g;
+}
+
+// ====== 粒子與補間（簡單的池）======
+const particles = [];
+function spawnParticle(x, y, vx, vy, life, color, size, grav, alpha, plain, t) {
+  if (particles.length > 500) return;
+  const s = new PIXI.Sprite(t || dotTex); s.anchor.set(.5); s.x = x; s.y = y; s.tint = color; s.alpha = alpha;
+  if (t) { s.width = 2; s.height = 18; s.rotation = Math.atan2(vy, vx) - Math.PI / 2; } else { s.width = s.height = size * 2; }
+  if (!plain && !t) { s.blendMode = 'add'; }
+  L[t ? 'weather' : plain ? 'fx' : 'fx'].addChild(s);
+  particles.push({ s, vx, vy, life, ttl: life, grav, a0: alpha, sz: size * 2, dot: !t });
+}
+// 火花：往上飄的小亮點（火盆、燃燒、受擊）
+function spark(x, y, color, alpha, size, vy, life, spread) { spawnParticle(x, y, (Math.random() - .5) * ch * .3 * spread, vy * (.6 + Math.random() * .8), life * (.7 + Math.random() * .6), color, size, -ch * .1, alpha); }
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.life -= dt;
+    if (p.life <= 0 || p.s.y > H + 30) { p.s.destroy(); particles.splice(i, 1); continue; }
+    p.vy += p.grav * dt; p.s.x += p.vx * dt; p.s.y += p.vy * dt;
+    const k = p.life / p.ttl; p.s.alpha = p.a0 * k; if (p.dot) p.s.width = p.s.height = p.sz * (.5 + k * .5);
+  }
+}
+const tweens = [];
+function tween(dur, fn, done) { tweens.push({ t: 0, dur, fn, done }); fn(0); }
+function updateTweens(dt) {
+  for (let i = tweens.length - 1; i >= 0; i--) { const w = tweens[i]; w.t += dt; const k = Math.min(1, w.t / w.dur); try { w.fn(k); } catch (e) {} if (k >= 1) { tweens.splice(i, 1); if (w.done) try { w.done(); } catch (e) {} } }
+}
+</script>
+</body>
+</html>
