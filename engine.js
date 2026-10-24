@@ -17,9 +17,10 @@
   // level.hill＝坡從第幾格起（程式欄號，第三章是 4：右邊三格是下坡）。沒設就沒有坡，前兩章完全不受影響
   const hillOf = G => (G.level.hill === undefined || G.level.hill === null ? null : G.level.hill);
   const onHillCell = (G, c) => { const h = hillOf(G); return h !== null && c >= h; }; // 這一格在坡上
-  // 這隻敵人站在坡下：身體已經過了坡頂那條線（HILL_EDGE）。剛掉進坡頂陷坑的（x≈hill）算卡在坡緣，坡上的射手打得到；咬坡上第一格牆的站 x≈hill+0.6，打不到
-  const HILL_EDGE = 0.3;
+  // 這隻敵人站在坡下：身體已經過了坡頂那條線（HILL_EDGE，正本在 data.js）。剛掉進坡頂陷坑的（x≈hill）算卡在坡緣，坡上的射手打得到；咬坡上第一格牆的站 x≈hill+0.6，打不到。走路減速也用這條線
+  const HILL_EDGE = D.HILL_EDGE ?? 0.3;
   const downhill = (G, e) => { const h = hillOf(G); return h !== null && e.x > h + HILL_EDGE; };
+  const hillCells = G => COLS - hillOf(G); // 坡上有幾格（文案用）
   // 這一排有沒有還站著的守望樓（高的牆）：有的話大鷹在這排飛不高（James 2026-10-24 拍板：守望樓兼職剋大鷹）
   function rowHasTall(G, r) { for (const k in G.units) { const u = G.units[k]; if (u.r === r && u.hp > 0 && UNITS[u.type].tall) return true; } return false; }
   // 升級後的欄位蓋過原本的（投石機→巧匠的機器、荊棘→蠍窩、纏裹的牧人→膏油共用這一條）
@@ -144,8 +145,8 @@
     if (!def) return { ok: false };
     if (!G.level.units.includes(k)) return { ok: false, msg: '這一關還沒有這張卡' };
     if (G.rocks.has(key(r, c))) return { ok: false, msg: '這格是石頭' };
-    if (G.units[key(r, c)] && def.kind !== 'instant') return { ok: false, msg: '這格已經有人了' }; // 一次性的（瓦瓶、水袋）可以直接倒在有人的格子上：水袋就是要倒在受傷的守望樓上
-    if (def.hillOnly && !onHillCell(G, c)) return { ok: false, msg: hillOf(G) === null ? '這一夜沒有山坡，石堆沒處堆' : '石堆只能堆在坡上那三格' };
+    if (G.units[key(r, c)] && !def.healAll) return { ok: false, msg: '這格已經有人了' }; // 只有水袋可以直接倒在有人的格子上（它就是要倒在受傷的守望樓上）；瓦瓶照舊要空格，前兩章行為不變
+    if (def.hillOnly && !onHillCell(G, c)) return { ok: false, msg: hillOnlyMsg(G) };
     const cap = G.level.maxUnits && G.level.maxUnits[k]; // 關卡對某種單位的數量上限（歌珊的夜：牧人最多 3 位）
     if (cap !== undefined && countUnits(G, k) >= cap) return { ok: false, msg: `${def.name}今晚最多 ${cap} 位` };
     if (G.level.conveyor) {
@@ -165,6 +166,7 @@
     return { ok: true, msg: `${def.name}就位` };
   }
 
+  const hillOnlyMsg = G => (hillOf(G) === null ? '這一夜沒有山坡，石堆沒處堆' : `石堆只能堆在坡上那 ${hillCells(G)} 格`);
   // 真的把單位放上場（place 與檢查點還原共用）
   function makeUnit(G, r, c, k) {
     const def = UNITS[k];
@@ -253,8 +255,12 @@
     const u = G.units[key(r, c)];
     if (!u) return { ok: false, msg: '先點一張卡' };
     const def = UNITS[u.type];
-    // 石堆：點一下＝推倒，石頭滾下坡（不退糧、不算損失）。排在送卡模式的擋門前：推倒不花糧
-    if (def.rolls) { rollStones(G, u); removeUnit(G, u, false); return { ok: true, msg: '石堆推倒了，石頭滾下坡' }; }
+    // 石堆：點一下＝推倒，石頭滾下坡（不退糧、不算損失）。排在送卡模式的擋門前：推倒不花糧。
+    // 右邊沒有地面敵人時不推（手機上點一下想看它，50 糧的牆就沒了；跟 tapHint 掛「推倒」角標同一個條件）
+    if (def.rolls) {
+      if (!rollTargets(G, u).length) return { ok: false, msg: '石堆好好的。右邊有敵人時再點它推倒，石頭會滾下去撞牠們' };
+      rollStones(G, u); removeUnit(G, u, false); return { ok: true, msg: '石堆推倒了，石頭滾下坡' };
+    }
     if (G.level.conveyor) return { ok: false, msg: '今晚沒有糧，不能升級也不能修補' };
     if (def.kind === 'producer' && !u.elder) {
       if (G.food < ELDER_COST) return { ok: false, msg: `升老牧人要 ${ELDER_COST} 糧` };
@@ -286,7 +292,7 @@
   function tapHint(G, u) {
     if (G.level.conveyor) return '';
     const def = UNITS[u.type], f = Math.floor(G.food);
-    if (def.rolls) return G.enemies.some(e => e.r === u.r && targetable(e) && !ENEMIES[e.type].flying && e.x >= u.c - 0.2) ? '推倒' : ''; // 石堆：右邊有地面敵人時提示推倒
+    if (def.rolls) return rollTargets(G, u).length ? '推倒' : ''; // 石堆：右邊有地面敵人時提示推倒
     if (def.kind === 'producer' && !u.elder && f >= ELDER_COST) return '升級';
     if (def.kind === 'blocker' && !def.norepair && u.hp < u.maxHp * (D.REPAIR_HINT ?? 0.7) && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) return '修補';
     if (def.upgrade && !u.upgraded && posOf(G.level.id) >= def.upgrade.from && f >= def.upgrade.cost) return '升級';
@@ -323,6 +329,7 @@
     const u = G.units[key(r, c)], def = UNITS[k];
     if (!u || !def) return false;
     const old = UNITS[u.type];
+    if (def.hillOnly && !onHillCell(G, c)) return false; // 石堆只能換到坡上（swap 同一條）
     return SWAP_KINDS.includes(def.kind) && old.kind === def.kind && u.type !== k && def.cost > old.cost;
   }
 
@@ -336,7 +343,7 @@
     if (u.type === k) return { ok: false, msg: old.kind === 'blocker' && u.hp < u.maxHp ? `已經是${old.name}了，被咬壞的空手點它修補` : `這格已經是${old.name}了` };
     if (!SWAP_KINDS.includes(def.kind) || old.kind !== def.kind) return { ok: false, msg: `${old.name}不能直接換成${def.name}，要先用鏟子拆` };
     if (def.cost <= old.cost) return { ok: false, msg: `${def.name}沒有比${old.name}貴，要換請先用鏟子拆` };
-    if (def.hillOnly && !onHillCell(G, c)) return { ok: false, msg: '石堆只能堆在坡上那三格' };
+    if (def.hillOnly && !onHillCell(G, c)) return { ok: false, msg: hillOnlyMsg(G) };
     if (G.level.conveyor) {
       const i = G.hand.indexOf(k); if (i < 0) return { ok: false, msg: `${def.name}還沒送到手上` };
       G.hand.splice(i, 1); ev(G, { t: 'hand' });
@@ -589,11 +596,12 @@
     ev(G, { t: 'unit', r: u.r, c: u.c });
   }
 
-  // 石堆滾石：這排在它右邊（坡下）的地面敵人各受傷、往後退一格、暈一下；野牛只受傷不退。叼著羊的丟下羊
+  // 石堆滾石會撞到誰：這排在它右邊（坡下）、站在地上的敵人（飛的、翻牆半空中的不算）
+  const rollTargets = (G, u) => G.enemies.filter(e => e.r === u.r && targetable(e) && !ENEMIES[e.type].flying && !(e.vaulting > 0) && e.x >= u.c - 0.2);
+  // 石堆滾石：撞到的各受傷、往後退一格、暈一下；野牛只受傷不退。叼著羊的丟下羊
   function rollStones(G, u) {
     const def = UNITS[u.type], moved = [];
-    for (const e of G.enemies) {
-      if (e.r !== u.r || !targetable(e) || ENEMIES[e.type].flying || e.x < u.c - 0.2) continue;
+    for (const e of rollTargets(G, u)) {
       hurt(G, e, def.rollDmg); ev(G, { t: 'hit', id: e.id });
       if (ENEMIES[e.type].heavy) continue;
       dropSheep(G, e, '被滾石撞到'); release(G, e);
@@ -619,7 +627,7 @@
       } else if (def.kind === 'shooter') {
         // 雇工：狼靠近就逃走，該排的狼追牠停三秒
         if (def.flees && inRow.some(e => !ENEMIES[e.type].flying && e.x - u.c < def.flees && e.x > u.c - 0.5)) {
-          for (const e of inRow) if (!ENEMIES[e.type].flying && e.x > u.c - 0.5) { e.st.distract = 3; release(G, e); }
+          for (const e of inRow) if (!ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && e.x > u.c - 0.5) { e.st.distract = 3; release(G, e); } // 野牛不會為了追雇工停下來（只有陷坑困得住牠）
           ev(G, { t: 'toast', msg: '雇工看見狼來，撇下羊逃走了' });
           ev(G, { t: 'fx', kind: 'flee', r: u.r, x: u.c });
           u.hp = 0; continue;
@@ -628,7 +636,7 @@
         if (u.timer > 0) continue;
         const eff = effOf(u, def); // 投石機升級「巧匠的機器」：裝填與濺射讀升級值
         const range = eff.range || COLS + 1;
-        // 直射（石子、箭、機弦）從坡上射出去，坡下的地面敵人在腳底下打不到：這顆投射物標記 hill，飛過坡緣後只打得到飛的
+        // 直射（石子、箭、機弦）從坡上射出去，坡下的地面敵人在腳底下打不到：這顆投射物標記 fromHill，飛過坡緣後只打得到飛的
         const hillShot = !onHillCell(G, u.c) && hillOf(G) !== null;
         // 能瞄的：飛得高的大鷹不算（直射與拋射都打不到牠，也不能吸走拋石手的瞄準與冷卻）。
         // 坡下的地面敵人照瞄：坡上的射手會照常出手，石子從牠頭頂飛過去——玩家要親眼看到這一幕才學得會（PvZ 屋頂章的豌豆也是照射、撞屋頂）
@@ -638,7 +646,7 @@
           let fired = false;
           for (let rr = Math.max(0, u.r - def.lanes); rr <= Math.min(ROWS - 1, u.r + def.lanes); rr++) {
             if (!byRow[rr].some(e => canAim(e) && e.x > u.c - 0.2 && e.x - u.c <= range)) continue;
-            G.shots.push({ id: G.nextId++, kind: def.shot, r: rr, x: u.c + 0.6, ur: u.r, uc: u.c, dmg: eff.dmg, pierce: false, falloff: 1, hit: new Set(), burn: false, hill: hillShot }); fired = true; // ur／uc：發射者的格子，畫面層做出手回彈用（不從投射物位置反推）
+            G.shots.push({ id: G.nextId++, kind: def.shot, r: rr, x: u.c + 0.6, ur: u.r, uc: u.c, dmg: eff.dmg, pierce: false, falloff: 1, hit: new Set(), burn: false, fromHill: hillShot }); fired = true; // ur／uc：發射者的格子，畫面層做出手回彈用（不從投射物位置反推）
           }
           if (fired) u.timer = eff.every;
           continue;
@@ -651,14 +659,14 @@
           const aim = targets.reduce((a, b) => ((def.lobNear ? b.x < a.x : b.x > a.x) ? b : a));
           G.shots.push({ id: G.nextId++, kind: 'lob', r: u.r, x: u.c + 0.5, ur: u.r, uc: u.c, from: u.c + 0.5, landX: aim.x + 0.5, t: 0, dmg: eff.dmg, splash: eff.splash });
         } else {
-          G.shots.push({ id: G.nextId++, kind: def.shot, r: u.r, x: u.c + 0.6, ur: u.r, uc: u.c, dmg: eff.dmg, pierce: !!def.pierce, falloff: def.falloff || 1, hit: new Set(), burn: false, hill: hillShot });
+          G.shots.push({ id: G.nextId++, kind: def.shot, r: u.r, x: u.c + 0.6, ur: u.r, uc: u.c, dmg: eff.dmg, pierce: !!def.pierce, falloff: def.falloff || 1, hit: new Set(), burn: false, fromHill: hillShot });
         }
       } else if (def.kind === 'dog') {
         dogAct(G, u, def, dt);
       } else if (def.kind === 'patrol') {
         patrolAct(G, u, def, dt);
       } else if (def.kind === 'floor') {
-        const eff = u.upgraded ? { ...def, ...def.upgrade } : def;
+        const eff = effOf(u, def);
         if (def.trap) { // 陷坑：第一隻踩進來的地面敵人困住幾秒（頭目短一點），坑就塌了。半空中（翻牆）的不算、迷羊不算
           const e = G.enemies.find(e => e.r === u.r && targetable(e) && !ENEMIES[e.type].flying && !(e.vaulting > 0) && Math.abs(e.x - u.c) < 0.3);
           if (e) {
@@ -686,7 +694,7 @@
           u.timer -= dt;
           if (u.timer > 0) continue;
           if (def.heal) {
-            const eff = u.upgraded && def.upgrade ? { ...def, ...def.upgrade } : def; // 膏油後範圍與回血都用升級值
+            const eff = effOf(u, def); // 膏油後範圍與回血都用升級值
             const rg = eff.range || 1;
             u.timer = def.every;
             for (const k2 in G.units) { const v = G.units[k2]; if (v === u || Math.abs(v.r - u.r) > rg || Math.abs(v.c - u.c) > rg) continue; if (v.hp < v.maxHp && v.maxHp > 1) { v.hp = Math.min(v.maxHp, v.hp + eff.heal); ev(G, { t: 'unit', r: v.r, c: v.c }); } }
@@ -849,7 +857,7 @@
         if (e.r !== s.r || !targetable(e) || s.hit.has(e.id) || e.high) continue; // 飛得高的大鷹，什麼投射物都打不到
         if (Math.abs(e.x + 0.5 - s.x) >= 0.35) continue;
         // 從坡上射的直射，飛到坡下只剩飛的打得到：地面敵人在腳底下，石子從頭頂飛過去（第一次冒「咻」＋提示）
-        if (s.hill && !ENEMIES[e.type].flying && downhill(G, e)) {
+        if (s.fromHill && !ENEMIES[e.type].flying && downhill(G, e)) {
           if (!s.overflew) { s.overflew = true; ev(G, { t: 'fx', kind: 'overfly', r: s.r, x: e.x, id: s.id }); if (!G.toldOverfly) { G.toldOverfly = true; ev(G, { t: 'toast', msg: `石子從${ENEMIES[e.type].name}的頭頂飛過去了。坡下的敵人在你腳底下，直射打不到` }); } }
           continue;
         }
@@ -995,10 +1003,11 @@
 
       // 走到底
       if (e.x < -0.6) {
+        const type = e.type;
         if (def.steals && G.sheep > 0) {
           e.carrying = true; e.x = -0.5;
           if (def.flying) { e.carryStray = true; e.carryOwn = true; e.high = false; } // 大鷹抓了羊就飛低了，打下來羊會落地自己走回來
-          ev(G, { t: 'toast', msg: def.flying ? `${def.name}抓起一隻羊往回飛了！現在牠飛低了，打下來` : '偷羊人抱起一隻羊往回跑了！' }); ev(G, { t: 'fx', kind: 'grab', r: e.r, x: 0 }); continue;
+          ev(G, { t: 'toast', msg: def.flying ? `${def.name}抓起一隻羊往回飛了！現在牠飛低了，打下來` : '偷羊人抱起一隻羊往回跑了！' }); ev(G, { t: 'fx', kind: 'grab', r: e.r, x: 0, type }); continue; // type：畫面層放誰的聲音（大鷹抓羊再尖嘯一聲）
         }
         if (!def.flying && G.gates.includes(e.r)) { useGate(G, e.r); continue; } // 看門的擋下：整排趕出去，這排的門用掉了。飛的不經過門
         return lose(G, def.flying ? 'bird' : 'wolf', e.type); // reason 分三類給結局文案與測試用；by 記是哪一種敵人，標題要寫牠的名字（以前夜鴞也寫成鷙鳥）
@@ -1013,7 +1022,7 @@
     for (const e of G.enemies) {
       if (e.r !== r || e.dead || ENEMIES[e.type].flying) continue;
       release(G, e);
-      if (e.carrying && e.carryStray) spawnStray(G, r, Math.max(0, Math.min(COLS, e.x)));
+      if (e.carrying && e.carryStray) spawnStray(G, r, Math.max(0, Math.min(COLS, e.x)), e.carryOwn); // 自己的羊（大鷹抓走又落地的）放下來還是自己的羊，不會變成多一隻迷羊
       e.carrying = false; e.carryStray = false; e.dead = true; n++;
     }
     ev(G, { t: 'fx', kind: 'gate', r, x: 0 });
@@ -1025,7 +1034,7 @@
     let best = null;
     for (const k in G.units) {
       const u = G.units[k], d = UNITS[u.type];
-      if (u.hp <= 0 || d.kind === 'floor' || u.c > e.x) continue;
+      if (u.hp <= 0 || d.kind === 'floor' || u.resting || u.c > e.x) continue; // 休息中的狗在窩裡養傷，不是靶（不然一顆石頭就讓牠重新趴回去）
       const row = d.kind === 'patrol' ? patrolRow(u) : u.r;
       if (row !== e.r) continue;
       if (!best || u.c > best.c) best = u;

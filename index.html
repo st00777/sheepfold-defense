@@ -447,7 +447,7 @@ function unlocked(id) { return unlockAll || Engine.isUnlocked(P.cleared, id); } 
 function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k); return all; }
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
-const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來' };
+const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來', 3: '羊圈在山上，坡下的敵人直射打不到：要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛' };
 const HOME_UPDATE = '最近更新 10/20：右上角 ⏩ 可以二倍速；暫停層有「大字」；看門的依難度五位／三位／兩位；圖鑑出處改全名、敵方也有出處';
 
 // ====== 圖示：Microsoft Fluent Emoji 3D（MIT；圖在 img/ico/，128px WebP；授權全文 img/ico/LICENSE-fluentui-emoji.txt）======
@@ -557,7 +557,7 @@ function openIntro(L) {
     : lo
     ? `今晚上場：${lo.map(k => icoImg(UNITS[k].ico)).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「隊伍」可換</span>`
     : `今晚上場：${L.units.map(k => icoImg(UNITS[k].ico)).join(' ')}${extra > 0 ? `　<span class="new">這一夜只有這 ${L.units.length} 位，後來認識的夥伴要到後面的夜才會同行，不能帶回來</span>` : ''}`;
-  if (L.noShepherd) $('#intro-loadout').innerHTML += `　<span class="new">🌾 開局 ${L.startFood} 糧，今晚不會再來：沒有牧人，糧也不會自己滴</span>`; // 第 25 夜一筆糧
+  if (L.noShepherd) $('#intro-loadout').innerHTML += `　<span class="new">🌾 開局 ${L.startFood} 糧（起風夜 ×${DIFFS.windy.budgetMul}、暴風夜 ×${DIFFS.storm.budgetMul}），今晚不會再來：沒有牧人，糧也不會自己滴</span>`; // 第 25 夜一筆糧；難度在這頁可以換，所以三個數一起講
   $('#intro-roster').textContent = lo ? '隊伍' : '圖鑑';
   const cp = loadCheckpoint(L.id), mine = !!cp, hasCp = mine && Engine.checkSnapshot(cp, L.id);
   if (mine && !hasCp) clearCheckpoint(L.id); // 壞掉或舊版的存檔：清掉，並告訴玩家
@@ -704,8 +704,8 @@ function tapCell(r, c) {
   if (selected === 'shovel') { const res = Engine.sell(G, r, c); flushEvents(); if (res.ok) clearSelection(); toast(res.msg || ''); return; }
   if (!selected) { if (tut.on) { toast(tut.waiting ? TUT_STEPS[tut.step].wait : TUT_STEPS[tut.step].say, true); return; } const res = Engine.tapUnit(G, r, c); flushEvents(); if (res.msg) toast(res.msg); return; }
   if (tut.on) { const [tr, tc] = TUT_STEPS[tut.step].cell; if (r !== tr || c !== tc) { toast('放在亮著的那一格', true); return; } }
-  // 格子有人就走「直接換」（同類更貴才會成功，其餘回原因）；沒人才是放下。一次性的（瓦瓶、水袋）例外：直接倒在那一格，水袋就是要倒在受傷的守望樓上
-  const res = G.units[r + ',' + c] && UNITS[selected].kind !== 'instant' ? Engine.swap(G, r, c, selected) : Engine.place(G, r, c, selected);
+  // 格子有人就走「直接換」（同類更貴才會成功，其餘回原因）；沒人才是放下。水袋例外：直接倒在那一格（它就是要倒在受傷的守望樓上）；瓦瓶照舊要空格
+  const res = G.units[r + ',' + c] && !UNITS[selected].healAll ? Engine.swap(G, r, c, selected) : Engine.place(G, r, c, selected);
   flushEvents();
   if (!res.ok) { toast(res.msg || ''); return; }
   if (UNITS[selected].kind !== 'instant') { Sound.play('place'); Board.placed(r, c, selected); } // 放下壓扁回彈；火盆油燈先點亮。瓦瓶的聲音走 fx blast，也不回彈
@@ -748,7 +748,7 @@ function flushEvents() {
       case 'callout': if (!seenEnemy(e.type)) { toast(`${ENEMIES[e.type].ico} ${e.tip}`, true); markSeenEnemy(e.type); } break;
       case 'pop': Board.event(e, G); if (String(e.text)[0] === '+') Sound.play('food'); break;
       case 'unit': Board.event(e, G); break;
-      case 'fx': Board.event(e, G); if (FX_SFX[e.kind]) Sound.play(FX_SFX[e.kind]); if (e.kind === 'gate') Sound.play('horn'); break;
+      case 'fx': Board.event(e, G); if (FX_SFX[e.kind]) Sound.play(FX_SFX[e.kind]); if (e.kind === 'gate') Sound.play('horn'); if (e.kind === 'grab' && SPAWN_SFX[e.type]) Sound.play(SPAWN_SFX[e.type]); break; // 大鷹抓羊再尖嘯一聲（提案 §5 #11）
       case 'marker': case 'strayMark': Board.event(e, G); break;
       case 'sheep': $('#sheep-n').textContent = G.sheep; break;
       case 'hand': buildCards(); if (selected && selected !== 'shovel' && !G.hand.includes(selected)) clearSelection(); break; // 送卡模式：手上的卡變了；選著的那張已經不在就取消
@@ -1235,7 +1235,7 @@ function clearCheckpoint(id) { try { localStorage.removeItem(CKEY(id)); } catch 
 try { const old = JSON.parse(localStorage.getItem('sheepfold-checkpoint') || 'null'); if (old && old.levelId && !localStorage.getItem(CKEY(old.levelId))) localStorage.setItem(CKEY(old.levelId), JSON.stringify(old)); localStorage.removeItem('sheepfold-checkpoint'); } catch (e) {}
 // 續玩前要點兵：存檔裡場上的單位一定勾著，其餘照預設補滿，卡列和棋盤才對得上
 function prepickFromCp(cp) {
-  const s = new Set(['shepherd']);
+  const s = new Set(level.units.includes('shepherd') ? ['shepherd'] : []); // 一筆糧的夜沒有牧人這張卡
   for (const u of cp.units) if (level.units.includes(u.type)) s.add(u.type);
   for (const k of pickedFor(level)) if (s.size < MAX_CARDS) s.add(k);
   roster.picked = s; renderRoster();

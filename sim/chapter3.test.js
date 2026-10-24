@@ -196,6 +196,31 @@ test('關卡守門：有會抓羊的沒 sheep、有石堆沒 hill 都報', () =>
   assert.deepStrictEqual(E.validateLevels(), []);
 });
 
+test('四部奏修正：看門的放下自己的羊仍是自己的、雇工不定身野牛、滾石不撞翻牆中的賊、強盜不丟休息中的狗、石堆右邊沒敵人不推、瓦瓶照舊要空格', () => {
+  // 看門的清場：自己的羊（大鷹抓走又落地的）被叼著、同排另一隻觸發看門的 → 放下的還是自己的羊，不多算一隻、不給糧
+  const G = setup(24); G.level = { ...G.level, noTrickle: true }; G.gates = [1];
+  E.dev.stray(G, 1, 2.5, true); const w = spawn(G, 'wolf', 1, 2.7); run(G, 0.5); assert.ok(w.carrying && w.carryOwn);
+  const food = G.food; spawn(G, 'fast', 1, -0.59); run(G, 0.3); // 快狼下一步就踩到門口（x < -0.6）
+  assert.strictEqual(G.strays.length, 1); assert.ok(G.strays[0].own, '看門的放下的仍是自己的羊');
+  run(G, 30); assert.strictEqual(G.sheep, 3, '回圈不多一隻'); assert.strictEqual(G.food, food, '不給糧');
+  // 雇工逃跑：同排的狼愣 3 秒，野牛不會
+  const G2 = setup(27); assert.ok(E.place(G2, 2, 3, 'hireling').ok);
+  const a = spawn(G2, 'aurochs', 2, 3.6), b = spawn(G2, 'wolf', 2, 3.9); run(G2, 0.2);
+  assert.ok(!G2.units['2,3'], '雇工跑了'); assert.ok(b.st.distract, '狼愣住'); assert.ok(!a.st.distract, '野牛不愣');
+  // 滾石：翻牆中的賊不撞（不然會被推回弧線上）
+  const G3 = setup(22); assert.ok(E.place(G3, 2, 4, 'cairn').ok); assert.ok(E.place(G3, 2, 5, 'wall').ok);
+  const t = spawn(G3, 'thief', 2, 5.6); run(G3, 0.8); assert.ok(t.vaulting > 0, '正在翻牆 ' + t.vaulting);
+  const tx = t.x; E.tapUnit(G3, 2, 4); run(G3, 0.05); assert.strictEqual(t.hp, t.maxHp, '半空中的賊沒被撞'); assert.ok(Math.abs(t.x - tx) < 0.2);
+  // 強盜：休息中的狗不是靶
+  const G4 = setup(22); assert.ok(E.place(G4, 2, 2, 'dog').ok); const d = G4.units['2,2']; d.hp = 1; d.resting = true; d.restT = 5;
+  const r = spawn(G4, 'robber', 2, 5); r.throwT = 0.1; run(G4, 2); assert.ok(d.resting && d.restT < 5 && d.restT > 2, '狗照樣休息 ' + d.restT);
+  // 石堆：右邊沒地面敵人，點一下不推
+  const G5 = setup(22); assert.ok(E.place(G5, 2, 5, 'cairn').ok); assert.ok(!E.tapUnit(G5, 2, 5).ok); assert.ok(G5.units['2,5'], '石堆還在');
+  assert.ok(!E.canSwap(G5, 2, 3, 'cairn'), 'canSwap 也擋坡外');
+  // 瓦瓶：前兩章行為不變，有人的格子放不了
+  const G6 = setup(6); assert.ok(E.place(G6, 2, 3, 'wall').ok); assert.ok(!E.place(G6, 2, 3, 'jar').ok, '瓦瓶要空格');
+});
+
 test('檢查點：第三章的單位種類能存能還原', () => {
   const G = setup(29);
   for (const [r, c, k] of [[2, 4, 'cairn'], [2, 1, 'lobber'], [1, 3, 'pit'], [3, 0, 'catapult']]) assert.ok(E.place(G, r, c, k).ok);
