@@ -844,7 +844,7 @@
         s.x = s.from + (s.landX - s.from) * Math.min(1, s.t);
         if (s.t >= 1) {
           s.dead = true;
-          ev(G, { t: 'fx', kind: 'splash', r: s.r, x: s.landX - 0.5 });
+          ev(G, { t: 'fx', kind: 'splash', r: s.r, x: s.landX - 0.5, splash: s.splash }); // 帶半徑給畫面：拋石手與投石機的落地圈要畫成不同大小
           for (const e of G.enemies) if (e.r === s.r && targetable(e) && !e.high && Math.abs(e.x + 0.5 - s.landX) < s.splash) { hurt(G, e, s.dmg); ev(G, { t: 'hit', id: e.id }); } // 飛得高的大鷹，石頭落地也砸不到
         }
         continue;

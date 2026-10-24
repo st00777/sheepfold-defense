@@ -319,8 +319,10 @@ const Board = (() => {
       else bg.circle(0, 0, br).fill(bodyCol);
       if (boss) bg.stroke({ width: 3, color: GOLD }); else if (!swarm) bg.stroke({ width: 1.5, color: ENEMY_RING }); // 暗紅細圈＝敵人、金粗圈＝頭目（要緊接在身體後面：Pixi 的 stroke 只套用到最後一個形狀）
       if (dig) bg.rect(-br, br * .1, br * 2, br).fill(0x5a4a2a); // 鑽地的：上下分色
-      if (cls.includes('fast')) bg.rect(br * .9, -2, br * 1.4, 4).fill({ color: 0xf3ead8, alpha: .8 }); // 快狼的速度線（4px、.8，跟一般狼一眼分得開）
     } else { const sh = new PIXI.Graphics().ellipse(0, ch * .36, cw * .18, 3).fill({ color: 0x000000, alpha: .32 }); cont.addChildAt(sh, 0); } // 飛的：腳下影子
+    if (!fly && cls.includes('fast')) { // 快狼的速度線：兩道細殘影，畫在身體外層（cont）不跟著走路搖，否則看起來像尾巴（James 10/24 第 21 夜回饋）
+      const sl = new PIXI.Graphics(); sl.rect(br * .9, -3.5, br * 1.4, 1.6).fill({ color: 0xf3ead8, alpha: .8 }); sl.rect(br * 1.1, 1.5, br * 1.1, 1.6).fill({ color: 0xf3ead8, alpha: .8 }); cont.addChild(sl);
+    }
     const burnGlow = new PIXI.Sprite(radialTex); burnGlow.anchor.set(.5); burnGlow.blendMode = 'add'; burnGlow.tint = 0xff8a3d; burnGlow.width = burnGlow.height = br * 3.2; burnGlow.alpha = 0; body.addChildAt(burnGlow, 0);
     const spr = makeIcon(def.ico, ch * (small ? .34 : swarm ? .3 : .46) * k); spr.y = fly ? -ch * .12 : -ch * .02; body.addChild(spr);
     const flash = makeIcon(def.ico, spr.width || ch * .46 * k); flash.y = spr.y; flash.blendMode = 'add'; flash.alpha = 0; body.addChild(flash);
@@ -463,7 +465,8 @@ const Board = (() => {
     if (reduce() && ['blast', 'splash', 'slam', 'ignite', 'trample', 'emerge'].includes(kind)) popText(r, x, FX_TEXT[kind]); // 減少動態：粒子不出，改飄一個字讓人知道發生了什麼
     switch (kind) {
       case 'blast': ring(px, py, cw * 1.6, 0xffb060, .45); burst(px, py, 18, [0xff8a30, 0xffd060, 0x777777], ch * .9, .5); break;
-      case 'splash': case 'slam': ring(px, py, cw * .9, 0xffe0a0, .3); burst(px, py, 8, [0xc9bda0, 0xffd060], ch * .5, .35); break;
+      case 'splash': { const R = ev && ev.splash ? ev.splash * cw : cw * .9, k = R / (cw * .9); ring(px, py, R, 0xffe0a0, .3); burst(px, py, Math.max(3, Math.round(8 * k)), [0xc9bda0, 0xffd060], ch * .5 * k, .35); break; } // 圓環＝引擎真正的濺射半徑：拋石手 .45 格畫小圈、投石機 1.2 畫大圈，不再同一個尺寸
+      case 'slam': ring(px, py, cw * .9, 0xffe0a0, .3); burst(px, py, 8, [0xc9bda0, 0xffd060], ch * .5, .35); break;
       case 'ignite': burst(px, py, 10, [0xff8a30, 0xffd060], ch * .6, .5); break;
       case 'howl': ripple(px, py, 0xc9a0dc); break;
       case 'roar': ripple(px, py, GOLD); break;
