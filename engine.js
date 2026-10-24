@@ -944,8 +944,8 @@
     G.sheep += G.strayQueue.length; G.sheepSaved = (G.sheepSaved || 0) + G.strayQueue.length; G.strays = []; G.strayQueue = []; G.strayNextRow = null; ev(G, { t: 'strayMark', r: null });
     G.over = true; G.result = { win: true, stars: starsOf(G) }; ev(G, { t: 'win' });
   }
-  // 星級：每夜三顆，自動累積、不解鎖任何東西。守過／零損失（沒失羊、沒有人被咬倒或逃走；舊存檔續玩的那局 unitsLost 是 null，不給）／五位看門的都在（關卡關掉看門的就只有兩顆）
-  function starsOf(G) { return { win: true, noLoss: G.sheepLost === 0 && G.unitsLost === 0, gates: G.level.gates !== false && G.gates.length === G.gateRows.length }; }
+  // 星級：每夜三顆，自動累積、不解鎖任何東西。守過／零損失（沒失羊就算；2026-10-24 James 定：牆、射手被咬垮不算損失，unitsLost 只留著當統計）／五位看門的都在（關卡關掉看門的就只有兩顆）
+  function starsOf(G) { return { win: true, noLoss: G.sheepLost === 0, gates: G.level.gates !== false && G.gates.length === G.gateRows.length }; }
   function starSlots(level) { return level.gates === false ? 2 : 3; }
   function lose(G, reason, by) { G.over = true; G.result = { win: false, reason, by }; ev(G, { t: 'strayMark', r: null }); ev(G, { t: 'lose', reason, by }); }
 

@@ -436,7 +436,7 @@ function saveProgress(p) {
 }
 const SAVE_FAILED_NOTE = '這一夜的紀錄沒能存進這支手機（可能是空間不足、無痕瀏覽或瀏覽器擋了存檔）。上一波的檢查點先留著，下次進來可以「繼續上次」再守一次最後一波。';
 const unlockAll = /[?&]all/.test(location.search);
-// 星級：每夜三顆——守過／零損失（沒失羊、沒有人被咬倒或逃走）／看門的都在（這個難度一開始有幾位就要幾位都在）。自動累積（不同局拿到的可以合起來）、不解鎖任何東西，只是看得見的完整度
+// 星級：每夜三顆——守過／零損失（沒失羊就算；單位被咬垮不算，2026-10-24 James 定）／看門的都在（這個難度一開始有幾位就要幾位都在）。自動累積（不同局拿到的可以合起來）、不解鎖任何東西，只是看得見的完整度
 function starsOf(id) { const s = P.stars[id] || {}; return { win: !!P.cleared[id], noLoss: !!s.noLoss, gates: !!s.gates }; }
 function starCount(id) { const s = starsOf(id); return (s.win ? 1 : 0) + (s.noLoss ? 1 : 0) + (s.gates ? 1 : 0); }
 function starText(L) { const n = starCount(L.id), tot = Engine.starSlots(L); return '★'.repeat(n) + '☆'.repeat(Math.max(0, tot - n)); }
@@ -849,7 +849,7 @@ function showStars() {
   const box = $('#stars'); box.innerHTML = '';
   items.forEach(([k, name], i) => { const d = document.createElement('span'); d.className = 'st' + (st[k] ? ' on' : ''); d.style.setProperty('--i', i); d.textContent = (st[k] ? '★ ' : '☆ ') + name; box.appendChild(d); });
   const why = [];
-  if (!st.noLoss) { const parts = []; if (G.sheepLost) parts.push(`失了 ${G.sheepLost} 隻羊`); if (G.unitsLost) parts.push(`${G.unitsLost} 位被咬倒或逃走`); if (G.unitsLost === null) parts.push('續玩的存檔不知道前面有沒有損失'); if (parts.length) why.push(parts.join('、')); }
+  if (!st.noLoss && G.sheepLost) why.push(`失了 ${G.sheepLost} 隻羊`);
   if (slots > 2 && !st.gates) why.push(`用掉了 ${G.gateRows.length - G.gates.length} 位看門的`);
   const got = items.filter(([k]) => st[k]).length;
   $('#stars-note').textContent = devUsed ? '開著開發者模式，這局的星不記' : got >= slots ? '這一夜的星全拿了' : why.length ? `差的：${why.join('；')}` : '';
