@@ -90,9 +90,11 @@ test('快照帶著看門的、路上的迷羊、還沒出來的迷羊', () => {
 });
 
 test('第二章十夜在正確位置', () => {
-  assert.deepStrictEqual(LEVELS.slice(10).map(l => l.id), [8, 9, 10, 18, 11, 12, 19, 13, 20, 14]);
-  assert.strictEqual(LEVELS.length, 20);
+  assert.deepStrictEqual(LEVELS.slice(10, 20).map(l => l.id), [8, 9, 10, 18, 11, 12, 19, 13, 20, 14]);
+  assert.deepStrictEqual(LEVELS.slice(20).map(l => l.id), [21, 22, 23, 24, 25, 26, 27, 28, 29, 30]); // 第三章接在後面
+  assert.strictEqual(LEVELS.length, 30);
   assert.strictEqual(E.posOf(14), 20); assert.strictEqual(D.UNITS.horn.upgrade.from, 20);
+  assert.strictEqual(E.posOf(28), 28); assert.strictEqual(D.UNITS.catapult.upgrade.from, 28);
 });
 
 // 2026-10-20：看門的依難度——寧靜五位、起風中間三排、暴風第 2、4 排；星級「看門的都在」以這一局開局的人數為準

@@ -11,6 +11,17 @@
   const THICK_MUL = D.THICK_MUL ?? 0.35; // 厚皮敵人吃石子、箭的比例（正本在 data.js）
   const LOB_TIME = 0.8;
   const VAULT_TIME = 1.2; // 賊翻牆要幾秒：這段時間牠連續越過牆，畫面層用 lift 畫弧線
+  const HILL_SLOW = D.HILL_SLOW ?? 0.85; // 第三章：地面敵人在坡下走得慢的倍數（野牛 heavy 例外）
+
+  // ====== 第三章：山坡 ======
+  // level.hill＝坡從第幾格起（程式欄號，第三章是 4：右邊三格是下坡）。沒設就沒有坡，前兩章完全不受影響
+  const hillOf = G => (G.level.hill === undefined || G.level.hill === null ? null : G.level.hill);
+  const onHillCell = (G, c) => { const h = hillOf(G); return h !== null && c >= h; }; // 這一格在坡上
+  const downhill = (G, e) => { const h = hillOf(G); return h !== null && e.x >= h; };  // 這隻敵人站在坡下（坡上的格子裡）
+  // 這一排有沒有還站著的守望樓（高的牆）：有的話大鷹在這排飛不高（James 2026-10-24 拍板：守望樓兼職剋大鷹）
+  function rowHasTall(G, r) { for (const k in G.units) { const u = G.units[k]; if (u.r === r && u.hp > 0 && UNITS[u.type].tall) return true; } return false; }
+  // 升級後的欄位蓋過原本的（投石機→巧匠的機器、荊棘→蠍窩、纏裹的牧人→膏油共用這一條）
+  const effOf = (u, def) => (u.upgraded && def.upgrade ? { ...def, ...def.upgrade } : def);
 
   // 牧人送糧間隔：暴風夜拉長，但後面的關卡一樣打折
   function shepherdEvery(G) { const sc = G.level.shepherdScale ?? G.level.diffScale ?? 0.6; return UNITS.shepherd.every + (DIFFS[G.diff].shepherdEvery - UNITS.shepherd.every) * sc; } // shepherdScale：只調產糧的折扣（歌珊的夜）
@@ -44,14 +55,14 @@
   // ====== 點兵 ======
   // 這一關卡太多時預設帶哪幾張：牧人、新開的卡、關卡指定的 must 一定帶，其餘照 PICK_ORDER 補到上限
   function defaultPick(level) {
-    const p = ['shepherd'];
+    const p = level.units.includes('shepherd') ? ['shepherd'] : []; // 一筆糧的夜（第 25 夜）沒有牧人這張卡
     for (const k of [...level.fresh, ...(level.must || [])]) if (!p.includes(k) && level.units.includes(k)) p.push(k);
     for (const k of PICK_ORDER) if (p.length < MAX_CARDS && level.units.includes(k) && !p.includes(k)) p.push(k);
     return p;
   }
   // 存起來的名單還能不能用（關卡改過卡、少了牧人、太少、太多、重複都不算）
   function validPick(level, s) {
-    return Array.isArray(s) && s.length >= MIN_CARDS && s.length <= MAX_CARDS && new Set(s).size === s.length && s.includes('shepherd') && s.every(k => level.units.includes(k));
+    return Array.isArray(s) && s.length >= MIN_CARDS && s.length <= MAX_CARDS && new Set(s).size === s.length && (s.includes('shepherd') || !level.units.includes('shepherd')) && s.every(k => level.units.includes(k));
   }
   // 讓這一局只用名單上的卡
   function applyPick(G, keys) { G.level = { ...G.level, units: keys, fresh: G.level.fresh.filter(k => keys.includes(k)) }; }
@@ -95,6 +106,7 @@
       gateRows: gateRows(level, diffKey), // 這一局一開始哪幾排有看門的（星級「看門的都在」與畫面用；用掉的從 gates 拿掉、這裡不動）
       strayNextRow: null, // 下一隻迷羊要從哪排來（提前 STRAY_LEAD 秒決定並印腳印）
     };
+    if (level.noShepherd) G.taughtElder = true; // 一筆糧的夜：沒有牧人，不教升老牧人
     if (level.conveyor) { // 沒有糧：不教升級修補；開局先給固定幾張（至少有一個射手），之後才抽
       G.food = 0; G.taughtElder = G.taughtRepair = true;
       const st = level.conveyor.start;
@@ -130,7 +142,8 @@
     if (!def) return { ok: false };
     if (!G.level.units.includes(k)) return { ok: false, msg: '這一關還沒有這張卡' };
     if (G.rocks.has(key(r, c))) return { ok: false, msg: '這格是石頭' };
-    if (G.units[key(r, c)]) return { ok: false, msg: '這格已經有人了' };
+    if (G.units[key(r, c)] && def.kind !== 'instant') return { ok: false, msg: '這格已經有人了' }; // 一次性的（瓦瓶、水袋）可以直接倒在有人的格子上：水袋就是要倒在受傷的守望樓上
+    if (def.hillOnly && !onHillCell(G, c)) return { ok: false, msg: hillOf(G) === null ? '這一夜沒有山坡，石堆沒處堆' : '石堆只能堆在坡上那三格' };
     const cap = G.level.maxUnits && G.level.maxUnits[k]; // 關卡對某種單位的數量上限（歌珊的夜：牧人最多 3 位）
     if (cap !== undefined && countUnits(G, k) >= cap) return { ok: false, msg: `${def.name}今晚最多 ${cap} 位` };
     if (G.level.conveyor) {
@@ -140,10 +153,11 @@
       if (G.food < def.cost) return { ok: false, msg: `糧不夠，${def.name}要 ${def.cost} 糧` };
       G.food -= def.cost;
     }
-    if (def.kind === 'instant') { useInstant(G, r, c, k); return { ok: true, msg: `${def.name}打破了` }; }
+    if (def.kind === 'instant') { useInstant(G, r, c, k); return { ok: true, msg: def.healAll ? `${def.name}倒了，九格內的夥伴回滿血` : `${def.name}打破了` }; }
     makeUnit(G, r, c, k);
     // 第一次放牧人／石牆，順便教「再點一下」
     if (def.kind === 'producer' && !G.taughtElder) { G.taughtElder = true; return { ok: true, msg: `牧人就位。糧夠 ${ELDER_COST} 時再點牧人一下，升老牧人送糧更快` }; }
+    if (def.rolls) return { ok: true, msg: `${def.name}堆好了。被咬垮或自己點它一下推倒，石頭就滾下坡` };
     if (def.kind === 'blocker' && !G.taughtRepair) { G.taughtRepair = true; return { ok: true, msg: `${def.name}就位。被咬壞時點它一下，花 ${REPAIR_COST} 糧修補` }; }
     if (def.light !== undefined) { const lo = Math.max(0, r - def.light) + 1, hi = Math.min(ROWS - 1, r + def.light) + 1; return { ok: true, msg: `${def.name}就位，照亮第 ${lo} 到 ${hi} 排。沒有月亮時這幾排的腳印預告會回來` }; }
     return { ok: true, msg: `${def.name}就位` };
@@ -167,7 +181,7 @@
   function snapshot(G) {
     return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep, sheepLost: G.sheepLost, sheepSaved: G.sheepSaved || 0, unitsLost: G.unitsLost ?? undefined, seen: [...G.seen], hand: G.hand.slice(),
       gates: G.gates.slice(), // 還在的看門的
-      strays: G.strays.filter(s => !s.dead).map(s => ({ r: s.r, x: Math.round(s.x * 10) / 10 })), // 還在路上的迷羊
+      strays: G.strays.filter(s => !s.dead).map(s => ({ r: s.r, x: Math.round(s.x * 10) / 10, ...(s.own ? { own: true } : {}) })), // 還在路上的迷羊（own＝被大鷹抓走又打下來的自己的羊）
       strayQueue: G.strayQueue.map(t => Math.max(0, Math.round((t - G.waveT) * 10) / 10)),       // 還沒出來的迷羊（距現在幾秒）
       units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded,
         cd: u.repairAt ? Math.max(0, Math.round((u.repairAt - G.time) * 10) / 10) : 0,
@@ -188,7 +202,7 @@
     if (snap.seen !== undefined && !Array.isArray(snap.seen)) return false;
     if (snap.hand !== undefined && !(Array.isArray(snap.hand) && snap.hand.length <= 12 && snap.hand.every(k => UNITS[k]))) return false;
     if (snap.gates !== undefined && !(Array.isArray(snap.gates) && snap.gates.length <= ROWS && snap.gates.every(r => isInt(r, 0, ROWS - 1)))) return false;
-    if (snap.strays !== undefined && !(Array.isArray(snap.strays) && snap.strays.length <= 20 && snap.strays.every(s => s && isInt(s.r, 0, ROWS - 1) && Number.isFinite(s.x) && s.x >= -1 && s.x <= COLS + 1))) return false;
+    if (snap.strays !== undefined && !(Array.isArray(snap.strays) && snap.strays.length <= 20 && snap.strays.every(s => s && isInt(s.r, 0, ROWS - 1) && Number.isFinite(s.x) && s.x >= -1 && s.x <= COLS + 1 && (s.own === undefined || typeof s.own === 'boolean')))) return false;
     if (snap.strayQueue !== undefined && !(Array.isArray(snap.strayQueue) && snap.strayQueue.length <= 20 && snap.strayQueue.every(t => Number.isFinite(t) && t >= 0 && t <= 600))) return false;
     if (!Array.isArray(snap.units) || snap.units.length > ROWS * COLS) return false;
     return snap.units.every(s => s && UNITS[s.type] && isInt(s.r, 0, ROWS - 1) && isInt(s.c, 0, COLS - 1)
@@ -223,7 +237,7 @@
     G.unitsLost = Number.isInteger(snap.unitsLost) ? snap.unitsLost : null; // 舊存檔沒這欄：這局不知道有沒有損失，「零損失」那顆星不給
     if (Array.isArray(snap.seen)) for (const t of snap.seen) if (ENEMIES[t]) G.seen.add(t);
     if (Array.isArray(snap.gates)) G.gates = snap.gates.filter(r => G.gateRows.includes(r)); // 舊存檔沒這欄：這個難度該有的都在；存檔裡多出這難度沒有的排就丟掉
-    if (Array.isArray(snap.strays) && snap.strays.length) { G.toldStray = true; for (const s of snap.strays) spawnStray(G, s.r, s.x); }
+    if (Array.isArray(snap.strays) && snap.strays.length) { G.toldStray = true; for (const s of snap.strays) spawnStray(G, s.r, s.x, s.own); }
     if (Array.isArray(snap.strayQueue)) { G.strayQueue = snap.strayQueue.slice().sort((a, b) => a - b); G.waveT = 0; G.strayNextRow = null; }
     G.wave = snap.wave;
     G.phase = 'rest'; G.timer = restOf(G) + 4; G.started = true; G.taughtElder = G.taughtRepair = true;
@@ -237,6 +251,8 @@
     const u = G.units[key(r, c)];
     if (!u) return { ok: false, msg: '先點一張卡' };
     const def = UNITS[u.type];
+    // 石堆：點一下＝推倒，石頭滾下坡（不退糧、不算損失）。排在送卡模式的擋門前：推倒不花糧
+    if (def.rolls) { rollStones(G, u); removeUnit(G, u, false); return { ok: true, msg: '石堆推倒了，石頭滾下坡' }; }
     if (G.level.conveyor) return { ok: false, msg: '今晚沒有糧，不能升級也不能修補' };
     if (def.kind === 'producer' && !u.elder) {
       if (G.food < ELDER_COST) return { ok: false, msg: `升老牧人要 ${ELDER_COST} 糧` };
@@ -250,10 +266,11 @@
       if (posOf(G.level.id) < up.from) return { ok: false, msg: `第 ${up.from} 夜起才學會${up.name}` }; // from 是夜的位置，不是 id
       if (G.food < up.cost) return { ok: false, msg: `${up.name}要 ${up.cost} 糧` };
       G.food -= up.cost; u.upgraded = true;
+      if (up.every && u.timer > up.every) u.timer = up.every; // 升級後裝填變快（巧匠的機器），正在數的冷卻也跟著縮
       ev(G, { t: 'unit', r, c }); ev(G, { t: 'pop', r, c, text: up.name });
       return { ok: true, msg: `${up.name}好了，${up.desc}` };
     }
-    if (def.kind === 'blocker' && u.hp < u.maxHp) {
+    if (def.kind === 'blocker' && u.hp < u.maxHp && !def.norepair) {
       if (G.food < REPAIR_COST) return { ok: false, msg: `修補要 ${REPAIR_COST} 糧` };
       if (u.repairAt && G.time < u.repairAt) return { ok: false, msg: '剛修過，等一下再修' };
       G.food -= REPAIR_COST; u.hp = Math.min(u.maxHp, u.hp + REPAIR_HP); u.repairAt = G.time + REPAIR_CD;
@@ -267,8 +284,9 @@
   function tapHint(G, u) {
     if (G.level.conveyor) return '';
     const def = UNITS[u.type], f = Math.floor(G.food);
+    if (def.rolls) return G.enemies.some(e => e.r === u.r && targetable(e) && !ENEMIES[e.type].flying && e.x >= u.c - 0.2) ? '推倒' : ''; // 石堆：右邊有地面敵人時提示推倒
     if (def.kind === 'producer' && !u.elder && f >= ELDER_COST) return '升級';
-    if (def.kind === 'blocker' && u.hp < u.maxHp * (D.REPAIR_HINT ?? 0.7) && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) return '修補';
+    if (def.kind === 'blocker' && !def.norepair && u.hp < u.maxHp * (D.REPAIR_HINT ?? 0.7) && f >= REPAIR_COST && !(u.repairAt && G.time < u.repairAt)) return '修補';
     if (def.upgrade && !u.upgraded && posOf(G.level.id) >= def.upgrade.from && f >= def.upgrade.cost) return '升級';
     return '';
   }
@@ -316,6 +334,7 @@
     if (u.type === k) return { ok: false, msg: old.kind === 'blocker' && u.hp < u.maxHp ? `已經是${old.name}了，被咬壞的空手點它修補` : `這格已經是${old.name}了` };
     if (!SWAP_KINDS.includes(def.kind) || old.kind !== def.kind) return { ok: false, msg: `${old.name}不能直接換成${def.name}，要先用鏟子拆` };
     if (def.cost <= old.cost) return { ok: false, msg: `${def.name}沒有比${old.name}貴，要換請先用鏟子拆` };
+    if (def.hillOnly && !onHillCell(G, c)) return { ok: false, msg: '石堆只能堆在坡上那三格' };
     if (G.level.conveyor) {
       const i = G.hand.indexOf(k); if (i < 0) return { ok: false, msg: `${def.name}還沒送到手上` };
       G.hand.splice(i, 1); ev(G, { t: 'hand' });
@@ -331,11 +350,17 @@
 
   function useInstant(G, r, c, k) {
     const def = UNITS[k];
+    if (def.healAll) { // 水袋：九格內的夥伴血量回滿、不再害怕。休息中的狗不算（牠在窩裡自己養傷）
+      ev(G, { t: 'fx', kind: 'water', r, x: c });
+      for (const k2 in G.units) { const v = G.units[k2]; if (Math.abs(v.r - r) > 1 || Math.abs(v.c - c) > 1 || v.resting) continue; if (v.hp < v.maxHp || v.fear > 0) { v.hp = v.maxHp; v.fear = 0; ev(G, { t: 'unit', r: v.r, c: v.c }); } }
+      return;
+    }
     ev(G, { t: 'fx', kind: 'blast', r, x: c });
     for (const e of G.enemies) {
-      if (e.underground) continue;
+      if (e.underground || e.high) continue; // 飛得高的大鷹，瓦瓶炸不到
       if (Math.abs(e.r - r) <= 1 && Math.abs(e.x + 0.5 - (c + 0.5)) <= 1.3) {
         hurt(G, e, def.dmg);
+        if (ENEMIES[e.type].heavy) continue; // 野牛：只受傷，嚇不跑、推不動
         dropSheep(G, e, '被嚇到');
         e.st.panic = def.panic;
         release(G, e);
@@ -414,6 +439,7 @@
     const def = ENEMIES[type];
     const hp = Math.round(def.hp * (hpMul || 1));
     const e = { id: G.nextId++, type, r, x, hp, maxHp: hp, st: {}, heldBy: null, biting: null,
+      high: !!def.high, throwT: def.throws ? def.throws.every * 0.5 : 0, carryOwn: false, // high：大鷹飛得高（投射物、瓦瓶都打不到）；throwT：強盜丟石倒數；carryOwn：叼的是圈內自己的羊（救回不算新羊、不給糧）
       underground: !!def.digs, vaulted: false, vaulting: 0, vaultFrom: 0, vaultTo: 0, lift: 0, carrying: false, enraged: false, abilityT: def.howl ? 3 : def.roar ? 4 : 0, dead: false,
       rv: r, deflectCd: 0, detourCd: 0, deflectFrom: -1, shiftT: def.shiftEvery ? def.shiftEvery * 0.5 : 0, crouchT: 0, crouched: false, dashLeft: 0, slamTarget: null, carryStray: false }; // rv：畫面上的排（換排時從舊排滑過去）
     if (def.drift) { e.r0 = Math.max(def.drift, Math.min(ROWS - 1 - def.drift, r)); e.r = e.rv = e.r0; e.driftT = G.rng() < 0.5 ? 0 : def.driftT / 2; } // 夜鴞：以中間幾排為軸飄，不會飄出棋盤；相位取正弦為 0 的點，出生那一幀不會跳排
@@ -448,15 +474,16 @@
   function dropSheep(G, e, why) {
     if (!e.carrying) return;
     e.carrying = false;
-    if (e.carryStray) { e.carryStray = false; spawnStray(G, e.r, Math.min(COLS, e.x)); }
+    if (e.carryStray) { e.carryStray = false; spawnStray(G, e.r, Math.min(COLS, e.x), e.carryOwn); e.carryOwn = false; }
     ev(G, { t: 'toast', msg: `${ENEMIES[e.type].name}${why}，把羊丟下了 🐑` });
   }
 
-  function speedOf(e) {
+  function speedOf(e, G) {
     const def = ENEMIES[e.type];
     if (e.underground) return def.digSpeed;
     let s = def.speed;
-    if (e.st.slow) s *= STATUS.slow.mul;
+    if (e.st.slow) s *= def.heavy ? (STATUS.slow.heavyMul ?? STATUS.slow.mul) : STATUS.slow.mul; // 野牛：荊棘減得慢
+    if (G && !def.flying && !def.heavy && downhill(G, e)) s *= HILL_SLOW; // 坡下爬得慢；野牛不受影響
     if (e.st.howl) s *= STATUS.howl.mul;
     if (e.enraged) s *= 2;
     if (e.dashLeft > 0) s *= STATUS.dash.mul; // 豹蹲完衝刺
@@ -471,7 +498,7 @@
   }
   const targetable = e => !e.underground && !e.dead && e.hp > 0; // 零血的（這一步剛被打死、還沒清掉）不當目標：不吃石子、不被狗咬、不叼羊、不被嚎叫鼓舞
   // 偷雞摸狗的：狗專咬（翻牆、偷羊、閃避、鑽地）
-  const sneaky = e => { const d = ENEMIES[e.type]; return !!(d.vaults || d.steals || d.dodge || d.digs); };
+  const sneaky = e => { const d = ENEMIES[e.type]; return !!(d.vaults || d.steals || d.dodge || d.digs || d.throws); }; // 強盜站著丟石頭，也算狗的獵物
 
   // ====== 每一步 ======
   function step(G, dt) {
@@ -484,7 +511,7 @@
     if (G.level.conveyor) {
       G.convT -= dt;
       if (G.convT <= 0) { dealCard(G); G.convT = conveyorEvery(G); }
-    } else {
+    } else if (!G.level.noTrickle) { // 一筆糧的夜（第 25 夜）：糧不會自己滴
       G.trickle += dt;
       if (G.trickle >= TRICKLE.every) { G.trickle -= TRICKLE.every; G.food += TRICKLE.gives; }
     }
@@ -533,7 +560,7 @@
       if (e.hp <= 0 || e.dead) {
         release(G, e);
         if (e.carrying && !e.dead) {
-          if (e.carryStray) { spawnStray(G, e.r, Math.min(COLS, e.x)); ev(G, { t: 'toast', msg: '追上了，迷羊落地繼續走 🐑' }); } // 叼著迷羊的倒下，羊從那裡繼續走
+          if (e.carryStray) { spawnStray(G, e.r, Math.max(0, Math.min(COLS, e.x)), e.carryOwn); ev(G, { t: 'toast', msg: e.carryOwn ? '打下來了，羊落地往圈裡走 🐑' : '追上了，迷羊落地繼續走 🐑' }); } // 叼著羊的倒下，羊從那裡繼續走（大鷹抓的圈內羊也一樣）
           else ev(G, { t: 'toast', msg: '追上了，羊抱回來了 🐑' });
         }
         G.killed++; // 逃走的偷羊人也算這一波結束了，進度條才會走滿
@@ -554,9 +581,25 @@
   // lost：這次移除算不算「損失」（星級零損失用）。只有敵人造成的才算：咬垮、撞垮、踩爛、雇工逃走
   function removeUnit(G, u, lost) {
     if (lost) G.unitsLost++;
+    if (lost && UNITS[u.type].rolls) rollStones(G, u); // 石堆被咬垮、撞垮：石頭一樣滾下坡（鏟除、換樓不滾）
     if (u.holding) { const e = G.enemies.find(x => x.id === u.holding); if (e) e.heldBy = null; }
     delete G.units[key(u.r, u.c)];
     ev(G, { t: 'unit', r: u.r, c: u.c });
+  }
+
+  // 石堆滾石：這排在它右邊（坡下）的地面敵人各受傷、往後退一格、暈一下；野牛只受傷不退。叼著羊的丟下羊
+  function rollStones(G, u) {
+    const def = UNITS[u.type], moved = [];
+    for (const e of G.enemies) {
+      if (e.r !== u.r || !targetable(e) || ENEMIES[e.type].flying || e.x < u.c - 0.2) continue;
+      hurt(G, e, def.rollDmg); ev(G, { t: 'hit', id: e.id });
+      if (ENEMIES[e.type].heavy) continue;
+      dropSheep(G, e, '被滾石撞到'); release(G, e);
+      const x0 = e.x; e.x = Math.min(COLS + 0.2, e.x + def.rollPush); e.st.stun = Math.max(e.st.stun || 0, def.rollStun); e.biting = null;
+      moved.push({ id: e.id, dx: e.x - x0 });
+    }
+    ev(G, { t: 'fx', kind: 'roll', r: u.r, x: u.c, moved });
+    if (!G.toldRoll) { G.toldRoll = true; ev(G, { t: 'toast', msg: '石堆垮了，石頭滾下坡，把坡下的狼撞退一格' }); }
   }
 
   // 單位做事
@@ -581,25 +624,32 @@
         }
         u.timer -= dt;
         if (u.timer > 0) continue;
-        const range = def.range || COLS + 1;
+        const eff = effOf(u, def); // 投石機升級「巧匠的機器」：裝填與濺射讀升級值
+        const range = eff.range || COLS + 1;
+        // 直射（石子、箭、機弦）從坡上射出去，坡下的地面敵人在腳底下打不到：這顆投射物標記 hill，飛過坡緣後只打得到飛的
+        const hillShot = !onHillCell(G, u.c) && hillOf(G) !== null;
+        // 能瞄的：飛得高的大鷹不算（直射與拋射都打不到牠，也不能吸走拋石手的瞄準與冷卻）。
+        // 坡下的地面敵人照瞄：坡上的射手會照常出手，石子從牠頭頂飛過去——玩家要親眼看到這一幕才學得會（PvZ 屋頂章的豌豆也是照射、撞屋頂）
+        const canAim = e => !e.high;
         // 投石隊：自己這排和上下 lanes 排，有敵人的排各丟一顆
         if (def.lanes) {
           let fired = false;
           for (let rr = Math.max(0, u.r - def.lanes); rr <= Math.min(ROWS - 1, u.r + def.lanes); rr++) {
-            if (!byRow[rr].some(e => e.x > u.c - 0.2 && e.x - u.c <= range)) continue;
-            G.shots.push({ id: G.nextId++, kind: def.shot, r: rr, x: u.c + 0.6, ur: u.r, uc: u.c, dmg: def.dmg, pierce: false, falloff: 1, hit: new Set(), burn: false }); fired = true; // ur／uc：發射者的格子，畫面層做出手回彈用（不從投射物位置反推）
+            if (!byRow[rr].some(e => canAim(e) && e.x > u.c - 0.2 && e.x - u.c <= range)) continue;
+            G.shots.push({ id: G.nextId++, kind: def.shot, r: rr, x: u.c + 0.6, ur: u.r, uc: u.c, dmg: eff.dmg, pierce: false, falloff: 1, hit: new Set(), burn: false, hill: hillShot }); fired = true; // ur／uc：發射者的格子，畫面層做出手回彈用（不從投射物位置反推）
           }
-          if (fired) u.timer = def.every;
+          if (fired) u.timer = eff.every;
           continue;
         }
-        const targets = inRow.filter(e => e.x > u.c - 0.2 && e.x - u.c <= range);
+        const targets = inRow.filter(e => canAim(e) && e.x > u.c - 0.2 && e.x - u.c <= range);
         if (!targets.length) continue;
-        u.timer = def.every;
+        u.timer = eff.every;
         if (def.shot === 'lob') {
-          const far = targets.reduce((a, b) => (a.x > b.x ? a : b));
-          G.shots.push({ id: G.nextId++, kind: 'lob', r: u.r, x: u.c + 0.5, ur: u.r, uc: u.c, from: u.c + 0.5, landX: far.x + 0.5, t: 0, dmg: def.dmg, splash: def.splash });
+          // 投石機拋最遠的（砸擠成串的尾巴）；拋石手拋最前面的（lobNear，坡下第一隻）
+          const aim = targets.reduce((a, b) => ((def.lobNear ? b.x < a.x : b.x > a.x) ? b : a));
+          G.shots.push({ id: G.nextId++, kind: 'lob', r: u.r, x: u.c + 0.5, ur: u.r, uc: u.c, from: u.c + 0.5, landX: aim.x + 0.5, t: 0, dmg: eff.dmg, splash: eff.splash });
         } else {
-          G.shots.push({ id: G.nextId++, kind: def.shot, r: u.r, x: u.c + 0.6, ur: u.r, uc: u.c, dmg: def.dmg, pierce: !!def.pierce, falloff: def.falloff || 1, hit: new Set(), burn: false });
+          G.shots.push({ id: G.nextId++, kind: def.shot, r: u.r, x: u.c + 0.6, ur: u.r, uc: u.c, dmg: eff.dmg, pierce: !!def.pierce, falloff: def.falloff || 1, hit: new Set(), burn: false, hill: hillShot });
         }
       } else if (def.kind === 'dog') {
         dogAct(G, u, def, dt);
@@ -607,6 +657,17 @@
         patrolAct(G, u, def, dt);
       } else if (def.kind === 'floor') {
         const eff = u.upgraded ? { ...def, ...def.upgrade } : def;
+        if (def.trap) { // 陷坑：第一隻踩進來的地面敵人困住幾秒（頭目短一點），坑就塌了。半空中（翻牆）的不算、迷羊不算
+          const e = G.enemies.find(e => e.r === u.r && targetable(e) && !ENEMIES[e.type].flying && !(e.vaulting > 0) && Math.abs(e.x - u.c) < 0.3);
+          if (e) {
+            const sec = ENEMIES[e.type].boss ? def.trapBoss : def.trap;
+            e.st.stun = Math.max(e.st.stun || 0, sec); e.biting = null; e.dashLeft = 0; dropSheep(G, e, '掉進坑裡');
+            ev(G, { t: 'fx', kind: 'pit', r: u.r, x: u.c, id: e.id, sec }); ev(G, { t: 'hit', id: e.id });
+            if (!G.toldPit) { G.toldPit = true; ev(G, { t: 'toast', msg: `${ENEMIES[e.type].name}掉進坑裡了，困住 ${sec} 秒，趁現在打` }); }
+            u.hp = 0; u.worn = true; // 坑塌了：自己用掉的，不算損失
+          }
+          continue;
+        }
         for (const e of G.enemies) {
           if (e.r !== u.r || !targetable(e) || ENEMIES[e.type].flying) continue;
           if (Math.abs(e.x - u.c) >= 0.5) continue;
@@ -629,7 +690,7 @@
             for (const k2 in G.units) { const v = G.units[k2]; if (v === u || Math.abs(v.r - u.r) > rg || Math.abs(v.c - u.c) > rg) continue; if (v.hp < v.maxHp && v.maxHp > 1) { v.hp = Math.min(v.maxHp, v.hp + eff.heal); ev(G, { t: 'unit', r: v.r, c: v.c }); } }
           } else if (def.push) {
             const all = u.upgraded && def.upgrade && def.upgrade.all; // 銀號：五排一起退
-            const ground = (all ? G.enemies.filter(targetable) : inRow).filter(e => !ENEMIES[e.type].flying && !(e.vaulting > 0)); // 半空中的推不動
+            const ground = (all ? G.enemies.filter(targetable) : inRow).filter(e => !ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && !(e.vaulting > 0)); // 半空中的推不動；野牛推不動也嚇不暈
             if (!ground.length) continue;
             u.timer = def.every; u.cdLen = def.every;
             const moved = []; // 每隻實際被推了多遠（靠邊的會被夾住，推不到整格），畫面層照這個滑
@@ -658,7 +719,7 @@
     }
     if (held) { held.heldBy = null; }
     u.holding = null;
-    const cands = G.enemies.filter(e => e.r === u.r && targetable(e) && !ENEMIES[e.type].flying && !e.heldBy && !e.st.panic && e.x > -0.3 && e.x < COLS + 0.2);
+    const cands = G.enemies.filter(e => e.r === u.r && targetable(e) && !ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && !e.heldBy && !e.st.panic && e.x > -0.3 && e.x < COLS + 0.2); // 野牛狗咬不住，直接不理
     if (cands.length) {
       const pr = e => (e.carrying ? 9 : (ENEMIES[e.type].prio || 1));
       const e = cands.reduce((a, b) => (pr(b) > pr(a) || (pr(b) === pr(a) && Math.abs(b.x - u.x) < Math.abs(a.x - u.x)) ? b : a));
@@ -732,16 +793,19 @@
 
   // ====== 迷羊 ======
   function pickStrayRow(G) { const w = G.waves[G.wave - 1]; const rows = (w && w.rows) || [0, 1, 2, 3, 4]; return rows[Math.floor(G.rng() * rows.length)]; }
-  function spawnStray(G, r, x) {
-    const s = { id: G.nextId++, r: r === null || r === undefined ? pickStrayRow(G) : r, x, dead: false };
+  // own：這是圈內自己的羊（被大鷹抓走又打下來的）。牠的名額一直算在 sheep 裡，走回圈不加羊、不給糧；再被叼出場才算失落
+  function spawnStray(G, r, x, own) {
+    const s = { id: G.nextId++, r: r === null || r === undefined ? pickStrayRow(G) : r, x, dead: false, own: !!own };
     G.strays.push(s); ev(G, { t: 'stray', s });
-    if (!G.toldStray) { G.toldStray = true; ev(G, { t: 'toast', msg: '有一隻迷羊從東邊走過來了，別讓狼碰到牠' }); }
+    if (!own && !G.toldStray) { G.toldStray = true; ev(G, { t: 'toast', msg: '有一隻迷羊從東邊走過來了，別讓狼碰到牠' }); }
     return s;
   }
   // 迷羊回圈：自己走到最左邊，或被抱羊羔的牧人接回（receiver）。接回的畫面要看得出是誰接的（2026-10-21 小居第 5 項）：
   // fx catch 落在牧人那一格（可能在迷羊的上下鄰排），id 帶牧人，畫面好找到他跳一下
   function strayHome(G, s, c, receiver) {
-    s.dead = true; G.sheep++; G.sheepSaved = (G.sheepSaved || 0) + 1; G.food += STRAY.reward;
+    s.dead = true;
+    if (s.own) { ev(G, { t: 'fx', kind: 'home', r: s.r, x: Math.max(0, c) }); ev(G, { t: 'toast', msg: '被抓走的羊回圈了 🐑' }); return; } // 自己的羊回來：名額本來就在，不加羊、不給糧
+    G.sheep++; G.sheepSaved = (G.sheepSaved || 0) + 1; G.food += STRAY.reward;
     ev(G, { t: 'sheep' }); ev(G, { t: 'pop', r: s.r, c: Math.max(0, c), text: `+${STRAY.reward}` });
     if (receiver) { ev(G, { t: 'fx', kind: 'catch', r: receiver.r, x: receiver.c, id: receiver.id }); ev(G, { t: 'toast', msg: `${UNITS[receiver.type].name}接回一隻迷羊 🐑` }); }
     else { ev(G, { t: 'fx', kind: 'home', r: s.r, x: Math.max(0, c) }); ev(G, { t: 'toast', msg: '一隻迷羊走回圈了 🐑' }); }
@@ -756,7 +820,7 @@
       // 地面敵人碰到就叼走（被咬住、嚇退、暈眩、翻牆中的不會）
       for (const e of G.enemies) {
         if (e.r !== s.r || !targetable(e) || ENEMIES[e.type].flying || e.carrying || e.heldBy || e.st.panic || e.st.stun || e.vaulting > 0 || e.crouchT > 0) continue;
-        if (Math.abs(e.x - s.x) < 0.45) { e.carrying = true; e.carryStray = true; s.dead = true; ev(G, { t: 'toast', msg: `${ENEMIES[e.type].name}叼走了一隻迷羊，追上去！` }); ev(G, { t: 'fx', kind: 'grab', r: s.r, x: s.x }); break; }
+        if (Math.abs(e.x - s.x) < 0.45) { e.carrying = true; e.carryStray = true; e.carryOwn = !!s.own; s.dead = true; ev(G, { t: 'toast', msg: `${ENEMIES[e.type].name}叼走了一隻迷羊，追上去！` }); ev(G, { t: 'fx', kind: 'grab', r: s.r, x: s.x }); break; }
       }
     }
     G.strays = G.strays.filter(s => !s.dead);
@@ -771,7 +835,7 @@
         if (s.t >= 1) {
           s.dead = true;
           ev(G, { t: 'fx', kind: 'splash', r: s.r, x: s.landX - 0.5 });
-          for (const e of G.enemies) if (e.r === s.r && targetable(e) && Math.abs(e.x + 0.5 - s.landX) < s.splash) { hurt(G, e, s.dmg); ev(G, { t: 'hit', id: e.id }); }
+          for (const e of G.enemies) if (e.r === s.r && targetable(e) && !e.high && Math.abs(e.x + 0.5 - s.landX) < s.splash) { hurt(G, e, s.dmg); ev(G, { t: 'hit', id: e.id }); } // 飛得高的大鷹，石頭落地也砸不到
         }
         continue;
       }
@@ -780,8 +844,13 @@
       // 穿過火盆就著火
       for (const k in G.units) { const u = G.units[k]; if (u.r === s.r && UNITS[u.type].ignite && prev < u.c + 0.5 && s.x >= u.c + 0.5) s.burn = true; }
       for (const e of G.enemies) {
-        if (e.r !== s.r || !targetable(e) || s.hit.has(e.id)) continue;
+        if (e.r !== s.r || !targetable(e) || s.hit.has(e.id) || e.high) continue; // 飛得高的大鷹，什麼投射物都打不到
         if (Math.abs(e.x + 0.5 - s.x) >= 0.35) continue;
+        // 從坡上射的直射，飛到坡下只剩飛的打得到：地面敵人在腳底下，石子從頭頂飛過去（第一次冒「咻」＋提示）
+        if (s.hill && !ENEMIES[e.type].flying && downhill(G, e)) {
+          if (!s.overflew) { s.overflew = true; ev(G, { t: 'fx', kind: 'overfly', r: s.r, x: e.x, id: s.id }); if (!G.toldOverfly) { G.toldOverfly = true; ev(G, { t: 'toast', msg: `石子從${ENEMIES[e.type].name}的頭頂飛過去了。坡下的敵人在你腳底下，直射打不到` }); } }
+          continue;
+        }
         s.hit.add(e.id);
         const def = ENEMIES[e.type];
         if (def.dodge && G.rng() < def.dodge) { ev(G, { t: 'fx', kind: 'dodge', r: e.r, x: e.x }); continue; }
@@ -815,9 +884,11 @@
         e.shiftT -= dt;
         if (e.shiftT <= 0 && e.x < COLS - 0.5) { e.shiftT = def.shiftEvery; const cand = [e.r - 1, e.r + 1].filter(r => r >= 0 && r < ROWS); moveRow(G, e, cand[Math.floor(G.rng() * cand.length)]); }
       }
+      // 大鷹：守望樓那一排飛不高（樓還在就一直壓低、樓拆了就飛回去）；抓了羊往回飛就一直低
+      if (def.high) e.high = !e.carrying && !rowHasTall(G, e.r);
       if (e.st.burn) {
         hurt(G, e, STATUS.burn.dps * dt);
-        for (const o of G.enemies) if (o !== e && o.r === e.r && targetable(o) && !o.st.burn && Math.abs(o.x - e.x) < 0.6) ignite(G, o);
+        for (const o of G.enemies) if (o !== e && o.r === e.r && targetable(o) && !o.st.burn && !o.high && Math.abs(o.x - e.x) < 0.6) ignite(G, o); // 火傳不到天上飛高的
       }
       if (e.st.poison) hurt(G, e, STATUS.poison.dps * dt);
       if (e.hp <= 0) continue; // 被燒死、毒死的這一步也不走、不咬、不嚎叫（跟步首的零血檢查同一個道理）
@@ -841,7 +912,7 @@
       // 鑽地：到了位置才冒出來；快到前先出土堆
       if (e.underground) {
         if (e.x <= e.emergeX + 0.5) { e.underground = false; ev(G, { t: 'fx', kind: 'emerge', r: e.r, x: e.x, id: e.id }); }
-        else { e.x -= speedOf(e) * dt; continue; }
+        else { e.x -= speedOf(e, G) * dt; continue; }
       }
 
       // 翻牆中：已經跳起來就一定落地，定身／驚慌等落地後才算（不然會懸在半空或被推回去再彈回弧線）
@@ -863,8 +934,21 @@
       // 抱著羊往回跑
       if (e.carrying) {
         e.x += (def.fleeSpeed || def.speed * 1.4) * dt;
-        if (e.x > COLS + 0.3) { e.dead = true; G.sheep--; G.sheepLost++; ev(G, { t: 'toast', msg: e.carryStray ? '迷羊被叼走了 🐑' : '一隻羊被抱走了 🐑' }); ev(G, { t: 'sheep' }); if (G.sheep <= 0) return lose(G, 'sheep'); }
+        if (e.x > COLS + 0.3) { e.dead = true; G.sheep--; G.sheepLost++; ev(G, { t: 'toast', msg: e.carryOwn ? `一隻羊被${def.name}抓走了 🐑` : e.carryStray ? '迷羊被叼走了 🐑' : '一隻羊被抱走了 🐑' }); ev(G, { t: 'sheep' }); if (G.sheep <= 0) return lose(G, 'sheep'); }
         continue;
+      }
+      // 強盜：走到坡下定點就站住，朝這排最前面的夥伴丟石頭；這排沒夥伴了才繼續走（被推回去就再走回來站好）
+      if (def.throws && e.x <= def.throws.at) {
+        const t = throwTarget(G, e);
+        if (t) {
+          e.biting = null; e.throwT -= dt;
+          if (e.throwT <= 0) {
+            e.throwT = def.throws.every; t.hp -= def.throws.dmg;
+            ev(G, { t: 'fx', kind: 'throw', r: e.r, x: e.x, id: e.id, tc: t.c }); ev(G, { t: 'unit', r: t.r, c: t.c });
+            if (!G.toldThrow) { G.toldThrow = true; ev(G, { t: 'toast', msg: `${def.name}站在坡下丟石頭，專丟最前面的夥伴。直射打不到牠，派狗咬、拋石手砸` }); }
+          }
+          continue;
+        }
       }
 
       // 前面那格有沒有東西擋著（飛的直接飛過）
@@ -905,11 +989,15 @@
           else if (G.rng() < dt * 4) ev(G, { t: 'unit', r: e.r, c: frontCol });
         }
       }
-      if (!blocked) { e.biting = null; const mv = speedOf(e) * dt; e.x -= mv; if (e.dashLeft > 0) e.dashLeft -= mv; }
+      if (!blocked) { e.biting = null; const mv = speedOf(e, G) * dt; e.x -= mv; if (e.dashLeft > 0) e.dashLeft -= mv; }
 
       // 走到底
       if (e.x < -0.6) {
-        if (def.steals && G.sheep > 0) { e.carrying = true; e.x = -0.5; ev(G, { t: 'toast', msg: '偷羊人抱起一隻羊往回跑了！' }); ev(G, { t: 'fx', kind: 'grab', r: e.r, x: 0 }); continue; }
+        if (def.steals && G.sheep > 0) {
+          e.carrying = true; e.x = -0.5;
+          if (def.flying) { e.carryStray = true; e.carryOwn = true; e.high = false; } // 大鷹抓了羊就飛低了，打下來羊會落地自己走回來
+          ev(G, { t: 'toast', msg: def.flying ? `${def.name}抓起一隻羊往回飛了！現在牠飛低了，打下來` : '偷羊人抱起一隻羊往回跑了！' }); ev(G, { t: 'fx', kind: 'grab', r: e.r, x: 0 }); continue;
+        }
         if (!def.flying && G.gates.includes(e.r)) { useGate(G, e.r); continue; } // 看門的擋下：整排趕出去，這排的門用掉了。飛的不經過門
         return lose(G, def.flying ? 'bird' : 'wolf', e.type); // reason 分三類給結局文案與測試用；by 記是哪一種敵人，標題要寫牠的名字（以前夜鴞也寫成鷙鳥）
       }
@@ -930,6 +1018,19 @@
     ev(G, { t: 'toast', msg: `看門的把這一排的 ${n} 隻地面敵人全趕了出去。這排的門沒人看了，再漏一隻就守不住` });
   }
 
+  // 強盜的靶：這排在牠前面（左邊）最前面那個夥伴。地板（荊棘、陷坑）不算靶；狗用窩的位置；巡夜人只在他正站在這排時算
+  function throwTarget(G, e) {
+    let best = null;
+    for (const k in G.units) {
+      const u = G.units[k], d = UNITS[u.type];
+      if (u.hp <= 0 || d.kind === 'floor' || u.c > e.x) continue;
+      const row = d.kind === 'patrol' ? patrolRow(u) : u.r;
+      if (row !== e.r) continue;
+      if (!best || u.c > best.c) best = u;
+    }
+    return best;
+  }
+
   function biteDog(G, e, dt) {
     const d = findUnitById(G, e.heldBy);
     if (!d) { e.heldBy = null; return; }
@@ -940,7 +1041,7 @@
   // ====== 勝負 ======
   function win(G) {
     // 天亮了：還在路上的、還沒走到的迷羊都算回圈
-    for (const s of G.strays) if (!s.dead) { s.dead = true; G.sheep++; G.sheepSaved = (G.sheepSaved || 0) + 1; }
+    for (const s of G.strays) if (!s.dead) { s.dead = true; if (!s.own) { G.sheep++; G.sheepSaved = (G.sheepSaved || 0) + 1; } } // 自己的羊（大鷹抓走又落地的）名額本來就在
     G.sheep += G.strayQueue.length; G.sheepSaved = (G.sheepSaved || 0) + G.strayQueue.length; G.strays = []; G.strayQueue = []; G.strayNextRow = null; ev(G, { t: 'strayMark', r: null });
     G.over = true; G.result = { win: true, stars: starsOf(G) }; ev(G, { t: 'win' });
   }
@@ -956,9 +1057,23 @@
     nextWave(G) { if (G.over) return; G.started = true; G.holdWaves = false; if (G.phase === 'wave') { dev.clear(G); } G.timer = Math.min(G.timer, 0.5); },
     food(G, n) { G.food += n; },
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; if (G.level.conveyor) for (const k of Object.keys(UNITS)) if (!G.hand.includes(k)) G.hand.push(k); ev(G, { t: 'hand' }); },
-    stray(G, r, x) { if (G.over) return; spawnStray(G, r, x); },
+    stray(G, r, x, own) { if (G.over) return; spawnStray(G, r, x, own); },
   };
 
-  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, rowLit, starSlots, dev };
+  // 關卡資料守門：會抓羊的（大鷹、偷羊人）出現的夜一定要有 sheep；只能放坡上的卡出現的夜一定要有 hill。載入時印錯誤，測試也能叫
+  function validateLevels() {
+    const bad = [];
+    for (const L of LEVELS) {
+      const types = new Set(L.waves.flatMap(w => w.list.map(([t]) => t)));
+      if ([...types].some(t => ENEMIES[t] && ENEMIES[t].steals) && !L.sheep) bad.push(`第 ${L.id} 夜有會抓羊的敵人卻沒有 sheep`);
+      if (L.units.some(k => UNITS[k] && UNITS[k].hillOnly) && (L.hill === undefined || L.hill === null)) bad.push(`第 ${L.id} 夜有只能放坡上的卡卻沒有 hill`);
+      for (const t of types) if (!ENEMIES[t]) bad.push(`第 ${L.id} 夜的波表有不認識的敵人 ${t}`);
+      for (const k of L.units) if (!UNITS[k]) bad.push(`第 ${L.id} 夜的卡表有不認識的卡 ${k}`);
+    }
+    return bad;
+  }
+  for (const msg of validateLevels()) console.error(msg);
+
+  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, rowLit, starSlots, validateLevels, onHillCell, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);

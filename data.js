@@ -43,7 +43,9 @@ const UNITS = {
               // 升級：再點一下花糧膏油，範圍 1 格→2 格（5×5 共 24 格）、回血 8→12；brave＝獅子咆哮嚇不停它
               upgrade: { name: '膏油', ico: '🫗', cost: 50, fromId: 7, heal: 12, range: 2, desc: '膏油後周圍 5×5 共 24 格的夥伴每秒回復 12 血量，一位顧整條防線', ref: '詩 23:5' } },
   catapult: { name: '投石機',   ico: '🛞',   cost: 200, hp: 80,  kind: 'shooter', every: 4, dmg: 45, shot: 'lob', splash: 1.2,
-              desc: '攻擊同排最遠的敵人，濺射傷害波及落點周圍', ref: '代下 26:15' },
+              desc: '攻擊同排最遠的敵人，濺射傷害波及落點周圍。拋射飛得過山坡。第 {from} 夜起再點一下換巧匠的機器，裝填快一半、濺射更大', ref: '代下 26:15',
+              // 升級（第三章）：巧匠的機器，裝填 4 秒→2.6 秒、濺射 1.2→1.5 格；every／splash 蓋過原本的
+              upgrade: { name: '巧匠的機器', ico: '⚙️', cost: 100, fromId: 28, every: 2.6, splash: 1.5, desc: '裝填 4 秒變 2.6 秒、濺射 1.2 格變 1.5 格，坡下擠成串的狼一砸一片', ref: '代下 26:15' } },
   // ====== 第二章「另外的羊」 ======
   staff:    { name: '牧人杖',   ico: '🦯',   cost: 50,  hp: 150, kind: 'deflector', deflect: 10, deflectCd: 4,
               desc: '不攻擊。地面敵人走到它面前就被趕到隔壁排，放在沒有射手的排，把敵人趕進有射手的那排。頭目趕不動', ref: '詩 23:4' },
@@ -55,6 +57,17 @@ const UNITS = {
               desc: '同時投石攻擊自己這排和上下兩排。放中間一次顧三排，夜鴞飄到哪排都打得到', ref: '代上 12:2' },
   cradle:   { name: '抱羊羔的牧人', ico: '🫂', cost: 75, hp: 100, kind: 'support', cradle: true,
               desc: '不攻擊。本排與上下鄰排的迷羊走到他所在的那一欄，就立刻安全。放前面接得早，但仍需保護他', ref: '賽 40:11' },
+  // ====== 第三章「諸山間」 ======
+  // lobNear 拋最前面那隻（投石機是拋最遠的）；hillOnly 只能放坡上；rolls 被咬垮或點一下推倒會滾石（rollDmg 傷害、rollPush 退幾格、rollStun 暈幾秒）；norepair 不能修補
+  // trap 困住第一隻踩進來的地面敵人幾秒、trapBoss 頭目幾秒（一次性）；healAll 倒在哪格，九格內的夥伴回滿血
+  lobber:    { name: '拋石手',  ico: '🪃',  cost: 125, hp: 60,  kind: 'shooter', every: 2.0, dmg: 28, shot: 'lob', lobNear: true, splash: 0.45,
+               desc: '把石頭拋到同排最前面那隻敵人頭上。拋得過山坡，厚皮也全額；落點小，通常只中一隻', ref: '傳 3:5' },
+  cairn:     { name: '石堆',    ico: '⛰️',  cost: 50,  hp: 200, kind: 'blocker', hillOnly: true, rolls: true, norepair: true, rollDmg: 80, rollPush: 1, rollStun: 1,
+               desc: '只能堆在坡上，是一道便宜的牆。被咬垮或自己點一下推倒，石頭就滾下坡：右邊的地面敵人受傷、退一格、暈一下。不能修補、推倒不退糧', ref: '傳 3:5' },
+  pit:       { name: '陷坑',    ico: '🕳️',  cost: 75,  hp: 1,   kind: 'floor', trap: 4, trapBoss: 2.5,
+               desc: '一次性。第一隻踩進來的地面敵人困住 4 秒（頭目 2.5 秒），坑就塌了。挖在坡緣，困住的敵人正好在射手打得到的地方', ref: '結 19:8' },
+  waterskin: { name: '水袋',    ico: '🥛',  cost: 75,  hp: 0,   kind: 'instant', healAll: true,
+               desc: '一次性。倒在哪一格，九格內的夥伴血量回滿、不再害怕。守望樓被撞到剩一口氣時用', ref: '創 21:14' },
 };
 const ELDER_MUL = 0.6;    // 老牧人送糧間隔倍數
 const ELDER_COST = 75;
@@ -67,7 +80,7 @@ const SELL_RATE = 0.5;    // 鏟子拆掉單位退幾成糧（含升老牧人花
 // 只開牆類與投手類；輔助類（油燈／火盆／吹角手…）各做各的事不互換。只能換成更貴的，守望樓換回石牆這種「倒拿糧又回滿血」先擋掉
 const SWAP_KINDS = ['blocker', 'shooter'];
 // 預設帶卡的先後：這關新開的一定帶、牧人一定帶，其餘依這個順序補滿
-const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'volley', 'staff', 'lamp', 'tower', 'archer', 'brazier', 'horn', 'catapult', 'healer', 'cradle', 'patrol', 'jar', 'thorns', 'hireling'];
+const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'lobber', 'cairn', 'pit', 'volley', 'staff', 'lamp', 'tower', 'archer', 'brazier', 'horn', 'catapult', 'healer', 'waterskin', 'cradle', 'patrol', 'jar', 'thorns', 'hireling'];
 
 // ====== 敵人 ======
 // 特殊欄位：flying 飛的／dodge 閃避率／digs 鑽地／vaults 翻牆／steals 偷羊／enrage 狂暴／howl 嚎叫秒數／roar 咆哮秒數
@@ -107,6 +120,16 @@ const ENEMIES = {
              tip: '在排與排之間飄，單排射手常打空。投石隊一次打三排' },
   leopard: { name: '豹',     ico: '🐆', hp: 650, speed: 0.28, bite: 28, cls: 'big leopard', thick: true, vaults: true, shiftEvery: 7, crouchAt: 5, crouch: 2, dash: 2, prio: 2, boss: true, ref: '耶 5:6',
              tip: '跳過牆、每隔幾秒換一排走，蹲下來就要衝了。牧羊犬咬住牠，投石隊三排盯著' },
+  // ====== 第三章「諸山間」 ======
+  // throws 強盜：走到第 at 格就站住，每 every 秒朝這排最前面的夥伴丟一顆石頭（dmg）；這排沒夥伴了才繼續走
+  // high 大鷹：飛進來時飛得高，投射物與瓦瓶都打不到；守望樓那一排飛不高；抓了羊往回飛就一直低
+  // heavy 野牛：推不動（角聲、瓦瓶、滾石只傷不推、不暈）、狗不理、坡下不減速、荊棘減得慢；陷坑照 trapBoss 困得住
+  robber:  { name: '強盜',   ico: '🧔‍♂️', hp: 80,  speed: 0.25, bite: 10, cls: 'human', throws: { at: 5, every: 1.5, dmg: 10 }, prio: 3, ref: '路 10:30',
+             tip: '站在坡下丟石頭，專丟最前面的夥伴，直射打不到牠。派狗咬牠、拋石手砸、或推倒石堆' },
+  eagle:   { name: '大鷹',   ico: '🦅', hp: 90,  speed: 0.25, bite: 0,  cls: 'fly eagle', flying: true, high: true, steals: true, fleeSpeed: 0.45, ref: '伯 39:27',
+             tip: '飛得高，投射物打不到，只有守望樓那排牠飛不高。抓了羊往回飛就低了，飛出場前打下來' },
+  aurochs: { name: '野牛',   ico: '🐂', hp: 900, speed: 0.14, bite: 30, cls: 'big aurochs', thick: true, heavy: true, boss: true, slam: 150, slamStun: 1.0, wallMul: 2, ref: '詩 22:21',
+             tip: '撞牆很重，推不動、狗咬不住、坡下也不慢。陷坑困住牠 2.5 秒，所有人一起打' },
 };
 
 // 迷羊（中立，不是敵人）：從右邊走進來往羊圈走，走到最左邊或抱羊羔的牧人那格就回圈；地面敵人碰到就叼走
@@ -121,7 +144,7 @@ const SPEED_FAST = 0.35, SPEED_SLOW = 0.15;
 const STATUS = {
   burn:   { t: 5,   dps: 4 },        // 燃燒：每秒掉血，碰到隔壁沒燒的會傳火
   poison: { t: 8,   dps: 4, biteMul: 0.6 },
-  slow:   { mul: 0.5 },
+  slow:   { mul: 0.5, heavyMul: 0.75 },  // heavyMul：野牛被荊棘減得慢
   howl:   { t: 5,   mul: 1.5 },
   fear:   { t: 3 },                  // 掛在我方單位
   panic:  { speed: 1.0 },            // 驚慌：往右跑
@@ -142,6 +165,7 @@ const WAVE_REST = 6;       // 清完一波後休息幾秒
 const FORESHADOW_LEAD = 3; // 倒數剩幾秒先印腳印
 const START_FOOD = 150;
 const TRICKLE = { every: 5, gives: 5 }; // 沒放牧人也會慢慢有糧
+const HILL_SLOW = 0.85;    // 第三章：地面敵人在坡下走得慢的倍數（模擬無差就改 1）
 
 // ====== 關卡 ======
 // units：這一關能用的卡（順序＝卡片順序）；fresh：這一關新開的卡（會閃光）
@@ -149,6 +173,10 @@ const TRICKLE = { every: 5, gives: 5 }; // 沒放牧人也會慢慢有糧
 // waves：list [[種類, 隻數]…]；gap 隔幾秒放一隻；rows 走哪幾排；hpMul 血量倍數；ordered 不洗牌（教學用，新敵人排在固定位置）
 // say：這波開始時的一句；hint：上一波清完休息時的「牧人提醒」
 // outroLose：依死因的失敗文案（wolf 狼闖入／bird 鷙鳥飛入／sheep 羊被偷光）
+// 第三章每一夜的底牌＝前兩章全部 19 張，再加本章已開的卡
+const CH3 = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle'];
+const ALL5 = [0, 1, 2, 3, 4];
+
 const LEVELS = [
   {
     id: 1, name: '雅各的夜', title: '羊圈守夜', ref: '取材：創世記 31 章，雅各替拉班看守羊群',
@@ -493,7 +521,168 @@ const LEVELS = [
       bird: '夜鴞飛進來了。投石隊放中間，天上三排一起顧。',
     },
   },
+
+  // ====== 第三章「諸山間」（id 21-30）：山坡＋高低差 ======
+  // hill：坡從第幾格起（程式欄號 4＝玩家看到的第 5 格起，右邊三格是下坡）。坡上的直射從坡緣起打不到坡下的地面敵人；拋射、飛的不受影響；坡下地面敵人走 HILL_SLOW 倍
+  // noTrickle：糧不自己滴；noShepherd：沒有牧人這張卡（第 25 夜一筆糧，開局糧用 startFood）
+  {
+    id: 21, chapter: 3, hill: 4, name: '基列山的夜', title: '諸山間', ref: '取材：創世記 31:23-25、44，拉班在基列山追上雅各',
+    speaker: '雅各',
+    intro: '拉班追了七日，在基列山追上我們。今晚羊群在山上過夜，狼從山下爬上來。你站在高處，石子會從牠們頭頂飛過去；要打坡下的，得用拋的。',
+    units: [...CH3, 'lobber'], fresh: ['lobber'], must: ['slinger', 'wall'],
+    tips: ['⛰️ 右邊三格是下坡。坡下的敵人在你腳底下，坡上的直射打不到，石子從牠們頭頂飛過去', '🪃 拋石手把石頭拋到坡下，從後面也打得到', '🧱 牆放在坡緣（第 4 格），狼上了坡才咬得到牆，那時射手就打得到牠'],
+    waves: [
+      { list: [['wolf', 5]],                              gap: 4.5, rows: [1, 2, 3], hpMul: 1,    say: '第 1 波，狼從山下上來' },
+      { list: [['wolf', 8], ['fast', 3]],                 gap: 2.4, rows: ALL5,      hpMul: 1.25, say: '五排都來了', hint: '狼會在坡上咬牆，坡上的射手打不到牠。把牆退到坡緣，或放拋石手' },
+      { list: [['jackal', 2], ['wolf', 8], ['fast', 3]],  gap: 2.2, rows: ALL5,      hpMul: 1.45, say: '豺狼來了', hint: '豺狼繞過牆就換排；牆退到坡緣後，隔壁排也要有牆' },
+      { list: [['wolf', 11], ['fast', 5], ['jackal', 3]], gap: 1.8, rows: ALL5,      hpMul: 1.7,  say: '最後一波', hint: '最後一波更多。拋石手放中間三排，一路砸到牠們上坡' },
+    ],
+    outroWin: '天亮了，羊一隻沒少。拉班說：「你我二人可以立約，作你我中間的證據。」（創 31:44）',
+    outroLose: { wolf: '雅各說：山上的石子落不到山下。牆退到坡緣，狼上了坡才打得到。' },
+  },
+  {
+    id: 22, chapter: 3, hill: 4, name: '拋擲有時，堆聚有時', title: '石頭滾下坡', ref: '取材：傳道書 3:5、創世記 31:46，雅各一家在基列山堆石',
+    speaker: '基列的牧人',
+    intro: '雅各一家走了，石堆還在山上。這山上石頭多，堆起來是牆，推倒了就滾下坡。拋擲有時，堆聚有時。今晚山下有人不急著上來，站在坡上丟石頭。',
+    units: [...CH3, 'lobber', 'cairn'], fresh: ['cairn'], must: ['dog', 'lobber'],
+    tips: ['⛰️ 石堆只能堆在坡上。被咬垮或自己點一下推倒，石頭就滾下坡撞退右邊的敵人', '🧔‍♂️ 強盜站在坡下丟石頭，直射打不到牠；狗跑過去咬、拋石手砸、或推倒石堆'],
+    waves: [
+      { list: [['wolf', 6]],                                           gap: 4.5, rows: [1, 2, 3], hpMul: 1,    say: '第 1 波，狼' },
+      { list: [['wolf', 8], ['fast', 4]],                              gap: 2.2, rows: ALL5,      hpMul: 1.25, say: '狼多起來', hint: '坡上堆石堆當牆，狼擠在它前面的時候點一下推倒，整串一起滾下去' },
+      { list: [['robber', 1], ['wolf', 7], ['robber', 2]],             gap: 2.6, rows: ALL5,      hpMul: 1.45, ordered: true, say: '有人站在坡下不走', hint: '是強盜。牠站在坡下丟石頭，直射打不到。派狗咬牠，或拋石手砸' },
+      { list: [['robber', 3], ['wolf', 10], ['jackal', 3], ['fast', 4]], gap: 1.8, rows: ALL5,    hpMul: 1.7,  say: '最後一波', hint: '強盜專丟最前面的夥伴。牆前面堆石堆替它擋石頭，狗守強盜那排' },
+    ],
+    outroWin: '天亮了。「拋擲石頭有時，堆聚石頭有時；」（傳 3:5）今晚兩樣都有時。',
+    outroLose: { wolf: '強盜站著丟石頭，你的牆就一直掉血。狗跑過去咬牠，比什麼都快。' },
+  },
+  {
+    id: 23, chapter: 3, hill: 4, name: '野羊的磐石', title: '困在對的地方', ref: '取材：撒母耳記上 24:2，掃羅在野羊的磐石找大衛',
+    speaker: '隱基底的牧人',
+    intro: '大衛和跟隨他的人住在這山寨，掃羅的人在野羊的磐石那裡找他。熊也住這山上。熊走在坡下，你的機弦打不到牠；挖個坑在坡緣，牠掉進去就在你眼前了。',
+    units: [...CH3, 'lobber', 'cairn', 'pit'], fresh: ['pit'], must: ['sling', 'tower', 'pit'],
+    tips: ['🕳️ 陷坑一次性，第一隻踩進來的地面敵人困住 4 秒，熊這種頭目 2.5 秒。挖在坡緣（第 4 格），困住的敵人正好在射手打得到的第一格', '🐻 熊在坡下走得慢但打不到，拋石手先砸；上坡掉進坑，機弦手趁那時打'],
+    waves: [
+      { list: [['wolf', 6]],                                                 gap: 4.5, rows: [1, 2, 3], hpMul: 1,    say: '第 1 波，狼' },
+      { list: [['boar', 1], ['wolf', 7], ['fast', 3]],                       gap: 2.4, rows: ALL5,      hpMul: 1.3,  ordered: true, say: '野豬上山了', hint: '野豬撞牆第一下很重，牆在坡上就白白被撞。守望樓放坡緣，坑挖它前面' },
+      { list: [['bear', 1], ['wolf', 6], ['robber', 2]],                     gap: 2.8, rows: ALL5,      hpMul: 1.5,  ordered: true, say: '熊來了', hint: '熊在坡下走得慢，拋石手先砸；坡緣挖坑，牠掉進去的那兩秒半機弦手別停' },
+      { list: [['bear', 2], ['wolf', 9], ['jackal', 3], ['fast', 4]],        gap: 1.8, rows: ALL5,      hpMul: 1.75, ordered: true, say: '兩隻熊，最後一波', hint: '兩隻熊走不同排。兩個坑、兩個機弦手；拋石手放中間顧兩邊' },
+    ],
+    outroWin: '天亮了。隱基底的牧人說：掃羅帶了三千人來找一個人（撒上 24:2），你一個人守住了一群羊。',
+    outroLose: { wolf: '熊在坡下的時候你打不到牠，上了坡牠已經在咬牆。坑挖在坡緣，困住牠再打。' },
+  },
+  {
+    id: 24, chapter: 3, hill: 4, name: '諸山間', title: '天上有東西在看', ref: '取材：以西結書 34:6、13',
+    speaker: null, sheep: 3,
+    intro: '「我的羊在諸山間、在各高岡上流離，在全地上分散，無人去尋，無人去找。」（結 34:6）今晚羊圈裡有三隻羊，天上也有東西在看。',
+    units: [...CH3, 'lobber', 'cairn', 'pit'], fresh: [], must: ['volley', 'dog', 'tower'],
+    tips: ['🦅 大鷹飛進來時飛得高，投射物打不到牠；只有守望樓那一排牠飛不高，一進場就打得到', '🐑 大鷹抓了羊往回飛就低了，直射拋射都打得到。在牠飛出場前打下來，羊會落地自己走回圈'],
+    waves: [
+      { list: [['wolf', 6]],                                                 gap: 4.5, rows: [1, 2, 3], hpMul: 1,    say: '第 1 波，狼' },
+      { list: [['wolf', 8], ['jackal', 2]],                                  gap: 2.2, rows: ALL5,      hpMul: 1.3,  say: '狼和豺狼', hint: '守望樓放坡緣，牆被咬也擋得久；有守望樓的那排，天上來的東西也飛不高' },
+      { list: [['eagle', 1], ['wolf', 8], ['fast', 4]],                      gap: 2.4, rows: ALL5,      hpMul: 1.5,  ordered: true, say: '天上有影子', hint: '大鷹來了。牠飛得高，只有守望樓那排打得到。沒守望樓的排，等牠抓了羊飛低再打，那排要有射手等著' },
+      { list: [['eagle', 2], ['robber', 2], ['wolf', 10], ['jackal', 3]],    gap: 1.8, rows: ALL5,      hpMul: 1.75, ordered: true, say: '最後一波', hint: '兩隻鷹。投石隊放中間三排都顧到；鷹抓了羊飛出去前打下來' },
+    ],
+    outroWin: '天亮了。「我必從萬民中領出牠們，從各國內聚集牠們，引導牠們歸回故土，也必在以色列山上……牧養牠們。」（結 34:13）',
+    outroLose: { wolf: '狼進來了。顧天上的時候，坡緣的牆也要守。', sheep: '羊都被抓走了。大鷹飛出去前那幾秒，那排要有射手；守望樓那排牠一進場就飛不高。' },
+  },
+  {
+    id: 25, chapter: 3, hill: 4, name: '亞比該的禮物', title: '就這些了', ref: '取材：撒母耳記上 25:18、25，亞比該帶禮物見大衛',
+    speaker: '亞比該', sheep: 3, startFood: 1000, noTrickle: true, noShepherd: true,
+    intro: '拿八的牧人在山上，大衛的人晝夜作他們的保障。拿八不領情，我領。這些是我帶來的：二百餅，五隻收拾好了的羊，五細亞烘好了的穗子。今晚就這些了，沒有再多。',
+    units: [...CH3.filter(k => k !== 'shepherd'), 'lobber', 'cairn', 'pit'], fresh: [], must: ['cairn', 'pit', 'sling'],
+    tips: ['🌾 今晚沒有牧人，糧也不會自己來。開局那筆用完就沒了，放之前想清楚', '⛏️ 放錯了用鏟子拆，退一半'],
+    waves: [
+      { list: [['wolf', 6], ['fast', 2]],                                                 gap: 3.5, rows: [1, 2, 3], hpMul: 1.1, say: '第 1 波' },
+      { list: [['robber', 2], ['wolf', 8], ['jackal', 2]],                                gap: 2.2, rows: ALL5,      hpMul: 1.3, say: '強盜和豺狼', hint: '糧不會再來，石堆 50 糧最划算，推倒前讓狼先擠滿' },
+      { list: [['eagle', 1], ['boar', 1], ['wolf', 8], ['fast', 4]],                      gap: 2.0, rows: ALL5,      hpMul: 1.5, ordered: true, say: '天上地上', hint: '鷹要來抓羊，留一個射手在牠飛出去的那排等著；守望樓那排牠飛不高' },
+      { list: [['bear', 1], ['robber', 3], ['wolf', 10], ['jackal', 3], ['fast', 4]],     gap: 1.8, rows: ALL5,      hpMul: 1.7, ordered: true, say: '最後一波', hint: '最後一波有熊。坑留給牠，機弦手趁牠困住時打' },
+    ],
+    outroWin: '天亮了。亞比該說：「我主不要理這壞人拿八，他的性情與他的名相稱；」（撒上 25:25）羊守住了，餅也還有。',
+    outroLose: { wolf: '糧用完了，牆也沒了。這一夜每一塊糧都要算：石堆 50、牆 50，射手留給中間三排。', sheep: '羊被抓走了。鷹飛出去的那排要有射手等著。' },
+  },
+  {
+    id: 26, chapter: 3, hill: 4, name: '多坍的羊群', title: '平安不平安', ref: '取材：創世記 37:14、16-17，約瑟往多坍找哥哥們',
+    speaker: '約瑟', sheep: 3,
+    intro: '父親打發我來看哥哥們平安不平安，群羊平安不平安。他們離開示劍往多坍去了，羊群今晚在山上。這水袋是父親給我路上喝的，給你。',
+    units: [...CH3, 'lobber', 'cairn', 'pit', 'waterskin'], fresh: ['waterskin'], must: ['lobber', 'tower'],
+    tips: ['🥛 水袋一次性，倒在哪一格，九格內的夥伴血量回滿。守望樓被撞到剩一口氣的時候用', '🧔‍♂️ 強盜多的時候專丟最前面那個，牆前面堆石堆替它擋'],
+    waves: [
+      { list: [['wolf', 6]],                                                                gap: 4.0, rows: [1, 2, 3], hpMul: 1,    say: '第 1 波，狼' },
+      { list: [['robber', 3], ['wolf', 8], ['fast', 3]],                                    gap: 2.2, rows: ALL5,      hpMul: 1.3,  ordered: true, say: '強盜三個一起', hint: '三個強盜站著丟，守望樓會慢慢被丟壞。水袋留給它' },
+      { list: [['eagle', 1], ['leopard', 1], ['wolf', 8]],                                  gap: 2.4, rows: ALL5,      hpMul: 1.5,  ordered: true, say: '草叢裡的和天上的', hint: '豹跳過石牆、每幾秒換排；守望樓牠跳不過，狗咬住牠就不換排。鷹飛出去那排留射手' },
+      { list: [['robber', 4], ['boar', 2], ['wolf', 10], ['jackal', 3], ['eagle', 1]],      gap: 1.8, rows: ALL5,      hpMul: 1.75, ordered: true, say: '最後一波', hint: '強盜和野豬一起來，守望樓撐不住就水袋。拋石手砸強盜' },
+    ],
+    outroWin: '天亮了，群羊平安。約瑟說：「我找我的哥哥們，求你告訴我，他們在何處放羊。」那人說：「他們已經走了，我聽見他們說要往多坍去。」（創 37:16-17）約瑟就往多坍去了。',
+    outroLose: { wolf: '牆被丟壞了。強盜站著不走，狗咬牠最快；牆剩一口氣就用水袋。', sheep: '羊被抓走了。鷹飛出去那排要有射手。' },
+  },
+  {
+    id: 27, chapter: 3, hill: 4, name: '野牛的角', title: '推不動的', ref: '取材：詩篇 22:12、21',
+    speaker: '巴珊的牧人',
+    intro: '巴珊的公牛大力，野牛更不用說。牠撞牆像撞土，狗撲上去牠一甩就飛了，角聲也趕不動牠。坑困得住牠，就那兩秒半。',
+    units: [...CH3, 'lobber', 'cairn', 'pit', 'waterskin'], fresh: [], must: ['pit', 'sling', 'tower'],
+    tips: ['🐂 野牛撞牆第一下很重，推不動、狗咬不住，坡下也不減速。陷坑困住牠 2.5 秒，機弦手和投石機趁那時打；一個坑不夠就兩個', '🌿 荊棘減牠的速、蠍窩毒得到牠'],
+    waves: [
+      { list: [['wolf', 6], ['fast', 2]],                                      gap: 4.0, rows: [1, 2, 3], hpMul: 1.1,  say: '第 1 波' },
+      { list: [['boar', 2], ['wolf', 8], ['robber', 2]],                       gap: 2.2, rows: ALL5,      hpMul: 1.3,  ordered: true, say: '野豬打頭陣', hint: '野豬撞牆、強盜丟石頭。守望樓放坡緣，石堆堆它前面擋' },
+      { list: [['bear', 1], ['jackal', 3], ['wolf', 8], ['fast', 4]],          gap: 2.0, rows: ALL5,      hpMul: 1.5,  ordered: true, say: '熊來了', hint: '熊交給坑和機弦手。坑用掉就沒了，下一波還要一個' },
+      { list: [['aurochs', 1], ['wolf', 10], ['fast', 4]],                     gap: 2.4, rows: ALL5,      hpMul: 1.75, ordered: true, say: '地在震，最後一波', hint: '是野牛。狗咬不住、角聲推不動，坑困住牠 2.5 秒，機弦手、投石機、拋石手全部對準牠' },
+    ],
+    outroWin: '天亮了。「救我脫離獅子的口；你已經應允我，使我脫離野牛的角。」（詩 22:21）',
+    outroLose: { wolf: '野牛把牆撞穿了。坑挖在守望樓前面，牠掉進去的那 2.5 秒，所有人一起打；一個坑不夠就兩個。' },
+  },
+  {
+    id: 28, chapter: 3, hill: 4, name: '巧匠的機器', title: '坡下是靶場', ref: '取材：歷代志下 26:15，烏西雅使巧匠做機器',
+    speaker: '烏西雅的牧人',
+    intro: '王的巧匠又改了機器，裝得更快、砸得更遠。今晚狼群從山下擠著上來，坡下正好是機器的靶場。',
+    units: [...CH3, 'lobber', 'cairn', 'pit', 'waterskin'], fresh: [], must: ['catapult', 'lobber'],
+    tips: ['⚙️ 投石機放下後再點一下花 100 糧換巧匠的機器，裝填快一半、濺射更大。拋射從哪裡都打得到坡下', '🐺 狼擠在坡下走得慢，正好一砸一片'],
+    waves: [
+      { list: [['wolf', 7]],                                                                  gap: 3.5, rows: [1, 2, 3], hpMul: 1,   say: '第 1 波，狼' },
+      { list: [['wolf', 14], ['locust', 16]],                                                 gap: 0.9, rows: [2],       hpMul: 1.3, say: '擠成一串', hint: '這波擠在中排，投石機升級後一砸一片。坡下走得慢，砸得到更多' },
+      { list: [['boar', 2], ['robber', 3], ['wolf', 10], ['fast', 4]],                        gap: 1.6, rows: ALL5,      hpMul: 1.5, say: '五排一起來', hint: '強盜站坡下、野豬撞坡緣，投石機兩台放第 2、4 排' },
+      { list: [['bear', 2], ['alpha', 2], ['wolf', 12], ['fast', 6], ['locust', 16]],         gap: 1.2, rows: ALL5,      hpMul: 1.8, ordered: true, say: '最後一波，全來了', hint: '兩隻熊、兩隻領頭狼。坑留給熊，嚎叫前狗咬住領頭狼，機器一直砸' },
+    ],
+    outroWin: '天亮了。「又在耶路撒冷使巧匠做機器，安在城樓和角樓上，用以射箭發石。」（代下 26:15）今晚安在山上。',
+    outroLose: { wolf: '狼擠成串上來，一顆一顆打不完。投石機升級，坡下就是靶場。' },
+  },
+  {
+    id: 29, chapter: 3, hill: 4, name: '放羊的兒子', title: '牠們不會等你', ref: '取材：撒母耳記上 16:11、19，掃羅召放羊的大衛',
+    speaker: '耶西', sheep: 3, prep: 12, rest: 3,
+    intro: '掃羅王打發人來，要我放羊的兒子去宮裡彈琴。他一走，山上的羊群就沒人守了。今晚你來，牠們不會等你擺好。',
+    units: [...CH3, 'lobber', 'cairn', 'pit', 'waterskin'], fresh: [], must: ['lobber', 'pit', 'dog'],
+    tips: ['⏱ 今晚準備 12 秒、波與波之間只歇 3 秒，先放牆和拋石手', '🐻🦅 熊、強盜、大鷹都會來，坑和水袋先留在手上'],
+    waves: [
+      { list: [['wolf', 6], ['fast', 3]],                                                  gap: 3.0, rows: ALL5, hpMul: 1.2,  say: '第 1 波，五排' },
+      { list: [['robber', 3], ['jackal', 3], ['wolf', 8]],                                 gap: 1.8, rows: ALL5, hpMul: 1.4,  ordered: true, say: '強盜和豺狼', hint: '只歇 3 秒。強盜那排狗先放，豺狼換排後隔壁要有牆' },
+      { list: [['eagle', 2], ['boar', 2], ['wolf', 10], ['fast', 4]],                      gap: 1.6, rows: ALL5, hpMul: 1.6,  ordered: true, say: '天上地上', hint: '兩隻鷹，中間三排投石隊、守望樓那排牠飛不高；野豬撞坡緣的守望樓' },
+      { list: [['bear', 2], ['leopard', 1], ['robber', 3], ['wolf', 12], ['fast', 6]],     gap: 1.4, rows: ALL5, hpMul: 1.85, ordered: true, say: '最後一波', hint: '熊走兩排、豹換排。坑給熊、狗給豹、拋石手砸強盜。守不住的排推倒石堆' },
+    ],
+    outroWin: '天亮了。耶西說：「還有個小的，現在放羊。」（撒上 16:11）今晚放羊的是你。',
+    outroLose: { wolf: '來不及擺的就擺不上了。開場先放牆和拋石手，坑和水袋留在手上。', sheep: '羊被抓走了。鷹飛出去那排要有射手等著。', bird: '鷙鳥飛進羊圈了。每排都要有射手。' },
+  },
+  {
+    id: 30, chapter: 3, hill: 4, name: '往山裏去', title: '第三章最後一夜', ref: '取材：馬太福音 18:12-13、詩篇 121 篇',
+    speaker: null, sheep: 3,
+    intro: '「一個人若有一百隻羊，一隻走迷了路，你們的意思如何？他豈不撇下這九十九隻，往山裏去找那隻迷路的羊嗎？若是找著了，我實在告訴你們，他為這一隻羊歡喜，比為那沒有迷路的九十九隻歡喜還大呢！」（太 18:12-13）今晚山上的羊要一隻隻回來，野牛也在。',
+    units: [...CH3, 'lobber', 'cairn', 'pit', 'waterskin'], fresh: [], must: ['catapult', 'pit', 'dog', 'lobber'],
+    tips: ['🐂 今晚共五波，最後一波兩隻野牛走不同排，兩個坑先留著', '🐑 迷羊會從坡下上來，狼在坡下叼走牠你打不到；狗護送、拋石手砸坡下的狼'],
+    waves: [
+      { list: [['wolf', 8], ['fast', 3]],                                                         gap: 3.0, rows: ALL5, hpMul: 1.3, say: '第 1 波' },
+      { list: [['robber', 3], ['jackal', 4], ['wolf', 10], ['boar', 1]],                          gap: 1.8, rows: ALL5, hpMul: 1.5, ordered: true, strays: [10, 26], say: '強盜、豺狼、野豬', hint: '迷羊在坡下最危險，狗護送、拋石手砸狼。強盜站著丟，狗跑過去' },
+      { list: [['eagle', 2], ['owl', 3], ['wolf', 10], ['locust', 16]],                           gap: 1.4, rows: ALL5, hpMul: 1.6, say: '天上滿了', hint: '大鷹和夜鴞一起來，投石隊三排盯著、守望樓那排鷹飛不高；蝗群交給弓箭手' },
+      { list: [['bear', 2], ['leopard', 1], ['alpha', 2], ['wolf', 10]],                          gap: 1.6, rows: ALL5, hpMul: 1.8, ordered: true, strays: [12, 30], say: '熊、豹、領頭狼', hint: '兩隻熊兩個坑，豹交給狗和守望樓，銀號留給嚎叫那一刻' },
+      { list: [['aurochs', 2], ['robber', 4], ['wolf', 12], ['fast', 8], ['eagle', 1]],           gap: 1.4, rows: ALL5, hpMul: 2.1, ordered: true, say: '兩隻野牛，最後一波', hint: '最後一波兩隻野牛走不同排。坑挖在守望樓前面，一隻野牛至少一個坑，機器和機弦手輪著打' },
+    ],
+    outroWin: '天亮了。',
+    psalmTitle: '詩篇一百二十一篇',
+    psalm: ['我要向山舉目；我的幫助從何而來？我的幫助從造天地的耶和華而來。', '他必不叫你的腳搖動；保護你的必不打盹！保護以色列的，也不打盹也不睡覺。', '保護你的是耶和華；耶和華在你右邊蔭庇你。白日，太陽必不傷你；夜間，月亮必不害你。', '耶和華要保護你，免受一切的災害；他要保護你的性命。你出你入，耶和華要保護你，從今時直到永遠。'],
+    outroLose: {
+      wolf: '「他豈不撇下這九十九隻，往山裏去找那隻迷路的羊嗎？」（太 18:12）再守一夜。',
+      sheep: '羊被抓走了。再守一夜，鷹飛出去那排留射手。',
+      bird: '夜鴞飛進來了。投石隊放中間，三排一起顧。',
+    },
+  },
 ];
 
-const DATA = { THICK_MUL, REPAIR_HINT, SPEED_FAST, SPEED_SLOW, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
+const DATA = { THICK_MUL, REPAIR_HINT, SPEED_FAST, SPEED_SLOW, HILL_SLOW, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
 if (typeof module !== 'undefined') module.exports = DATA; else window.DATA = DATA;

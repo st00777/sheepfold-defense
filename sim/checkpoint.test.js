@@ -92,7 +92,7 @@ test('存檔不會被壞資料弄炸', () => {
 test('defaultPick 帶上關卡指定的 must 卡', () => {
   for (const l of LEVELS) {
     const p = E.defaultPick(l);
-    assert.ok(p.length <= D.MAX_CARDS && p.includes('shepherd'), `第 ${l.id} 關預設隊伍 ${p.length} 張`);
+    assert.ok(p.length <= D.MAX_CARDS && (p.includes('shepherd') || l.noShepherd || l.conveyor), `第 ${l.id} 關預設隊伍 ${p.length} 張`); // 一筆糧的夜（第 25 夜）與送卡夜（第 11 夜）沒有牧人這張卡
     for (const k of [...l.fresh, ...(l.must || [])]) assert.ok(p.includes(k), `第 ${l.id} 關預設沒帶 ${k}`);
   }
 });
