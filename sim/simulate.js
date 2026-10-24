@@ -58,6 +58,17 @@ function decide(G, skill) {
   if (can('staff') && spare('staff') && G.wave >= 1) { for (const r of [0, 4]) if (!has(G, r, u => u.type === 'staff' || kindOf(u) === 'shooter') && tryPlace(G, r, freeCell(G, r, 3), 'staff')) return; }
   // 吹角手升銀號、荊棘以外的升級
   for (const k in G.units) { const u = G.units[k]; if (u.type === 'horn' && !u.upgraded && UNITS.horn.upgrade && E.posOf(G.level.id) >= UNITS.horn.upgrade.from && G.food >= UNITS.horn.upgrade.cost && E.tapUnit(G, u.r, u.c).ok) return; }
+  // 第三章：投石機升巧匠的機器（手上留得起一道牆才升）
+  for (const k in G.units) { const u = G.units[k]; if (u.type === 'catapult' && !u.upgraded && UNITS.catapult.upgrade && E.posOf(G.level.id) >= UNITS.catapult.upgrade.from && G.food >= UNITS.catapult.upgrade.cost + 50 && E.tapUnit(G, u.r, u.c).ok) return; }
+  // 第三章：山坡。牆退到坡緣（hill-1）、石堆堆坡上、坑挖坡頂第一格、坡下有地面敵人就補拋石手
+  const hill = G.level.hill ?? null;
+  const wallCol = hill !== null ? hill - 1 : 4;
+  if (hill !== null) {
+    // 石堆：右邊 1.5 格內擠了兩隻以上（或一隻頭目）就推倒
+    for (const k in G.units) { const u = G.units[k]; if (UNITS[u.type].rolls) { const n = G.enemies.filter(e => e.r === u.r && !e.dead && !ENEMIES[e.type].flying && e.x >= u.c - 0.2 && e.x <= u.c + 1.5); if (n.length >= 2 || n.some(e => ENEMIES[e.type].boss)) { E.tapUnit(G, u.r, u.c); return; } } }
+    // 水袋：牆剩三成以下、那排還有兩隻以上敵人，倒在牆上
+    if (can('waterskin')) for (const k in G.units) { const u = G.units[k]; if (kindOf(u) === 'blocker' && u.hp < u.maxHp * 0.3 && G.enemies.filter(e => e.r === u.r && !e.dead).length >= 2 && E.place(G, u.r, u.c, 'waterskin').ok) return; }
+  }
 
   // 纏裹的牧人：糧夠就膏油（範圍 5×5）
   for (const k in G.units) { const u = G.units[k]; if (u.type === 'healer' && !u.upgraded && UNITS.healer.upgrade && E.posOf(G.level.id) >= UNITS.healer.upgrade.from && G.food >= UNITS.healer.upgrade.cost && E.tapUnit(G, u.r, u.c).ok) return; }
@@ -89,7 +100,22 @@ function decide(G, skill) {
     const big = [...types].some(t => BIG.includes(t) || t === 'boar');
     const needArcher = types.has('locust');
     const strayHere = G.strays.some(s => s.r === r) || G.strayNextRow === r; // 看到 🐑 腳印就先放狗（跟真人一樣）
-    const near = es.some(e => !e.underground && !ENEMIES[e.type].flying && e.x < 5.2);
+    const near = es.some(e => !e.underground && !ENEMIES[e.type].flying && e.x < (hill !== null ? 6.5 : 5.2)); // 有坡的夜牆在坡緣，敵人一進場就要補牆
+    if (hill !== null) {
+      // 大鷹那排要有守望樓（牠才飛不高）：牆原地換樓，沒牆就放樓
+      if (types.has('eagle') && can('tower') && !has(G, r, u => UNITS[u.type].tall)) {
+        const w = G.units[key(r, wallCol)];
+        if (w && kindOf(w) === 'blocker' && E.canSwap(G, r, wallCol, 'tower') && E.swap(G, r, wallCol, 'tower').ok) return;
+        if (!w && tryPlace(G, r, wallCol, 'tower')) return;
+      }
+      // 坡下有地面敵人、這排沒有拋射：補拋石手
+      const lobHere = has(G, r, u => UNITS[u.type].shot === 'lob');
+      if (!lobHere && can('lobber') && (!G.level.noTrickle || G.food >= 300) && es.some(e => !ENEMIES[e.type].flying && !e.underground && e.x > hill + 0.3) && tryPlace(G, r, freeCell(G, r, 2), 'lobber')) return;
+      // 大傢伙或強盜來：坑挖坡頂第一格（牆前面）
+      if ((big || types.has('aurochs')) && can('pit') && !has(G, r, u => UNITS[u.type].trap) && !G.units[key(r, hill)] && tryPlace(G, r, hill, 'pit')) return;
+      // 石堆堆坡上第二格，當消耗牆兼滾石
+      if (near && can('cairn') && (!G.level.noTrickle || G.food >= 200) && !has(G, r, u => UNITS[u.type].rolls) && !G.units[key(r, hill + 1)] && es.length >= 2 && tryPlace(G, r, hill + 1, 'cairn')) return;
+    }
     // 荊棘續航：荊棘鋪第 6 格（牆前面，咬牆的站在荊棘上）、牆第 5 格、纏裹的牧人在牆後第 4 格；射手照一般規則補
     if (S.thornsFirst) {
       if (can('thorns') && !has(G, r, u => u.type === 'thorns') && tryPlace(G, r, freeCell(G, r, 5), 'thorns')) return;
@@ -109,7 +135,7 @@ function decide(G, skill) {
       if (can('slinger')) { if (tryPlace(G, r, freeCell(G, r, 1), 'slinger')) return; }
     }
     if (big && !hasSling && can('sling')) { if (tryPlace(G, r, freeCell(G, r, 2), 'sling')) return; }
-    if (!hasDog && can('dog') && (strayHere || (G.level.fresh.includes('dog') && types.has('fast')) || [...types].some(t => ['alpha', 'lion', 'bear', 'fox', 'rustler', 'thief', 'jackal', 'leopard'].includes(t)))) { if (tryPlace(G, r, freeCell(G, r, 3), 'dog')) return; }
+    if (!hasDog && can('dog') && (strayHere || (G.level.fresh.includes('dog') && types.has('fast')) || [...types].some(t => ['alpha', 'lion', 'bear', 'fox', 'rustler', 'thief', 'jackal', 'leopard', 'robber'].includes(t)))) { if (tryPlace(G, r, freeCell(G, r, hill !== null ? 2 : 3), 'dog')) return; }
     if (strayHere && can('cradle') && !has(G, r, u => u.type === 'cradle')) { if (tryPlace(G, r, freeCell(G, r, Number(process.env.SIM_CRADLE_COL || 2)), 'cradle')) return; }
     if (es.length >= 3 && r >= 1 && r <= 3 && can('patrol') && ![r - 1, r, r + 1].some(rr => has(G, rr, u => u.type === 'patrol'))) { if (tryPlace(G, r, freeCell(G, r, 2), 'patrol')) return; }
     if (needArcher && !has(G, r, u => u.type === 'archer') && can('archer')) { if (tryPlace(G, r, freeCell(G, r, 2), 'archer')) return; }
@@ -119,16 +145,24 @@ function decide(G, skill) {
     }
     // 荊棘學會撒蠍子就升級
     for (let c = 0; c < COLS; c++) { const u = G.units[key(r, c)]; if (u && u.type === 'thorns' && !u.upgraded && E.posOf(G.level.id) >= UNITS.thorns.upgrade.from && G.food >= UNITS.thorns.upgrade.cost + 50) { E.tapUnit(G, r, c); return; } }
-    if (types.has('bear') && can('thorns') && !has(G, r, u => u.type === 'thorns')) { if (tryPlace(G, r, freeCell(G, r, 4), 'thorns')) return; }
+    if (types.has('bear') && can('thorns') && !has(G, r, u => u.type === 'thorns')) { if (tryPlace(G, r, freeCell(G, r, hill !== null ? hill + 2 : 4), 'thorns')) return; } // 有坡的夜荊棘鋪坡上
     if (es.length >= 4 && can('horn') && !has(G, r, u => u.type === 'horn')) { if (tryPlace(G, r, freeCell(G, r, 2), 'horn')) return; }
     if (es.length >= 4 && can('catapult') && !has(G, r, u => u.type === 'catapult')) { if (tryPlace(G, r, freeCell(G, r, 1), 'catapult')) return; }
     if (near && !hasBlock) {
-      if ((types.has('thief') || types.has('boar') || types.has('jackal')) && can('tower')) { if (tryPlace(G, r, freeCell(G, r, 4), 'tower')) return; }
-      if (can('wall') && !types.has('lion')) { if (tryPlace(G, r, freeCell(G, r, 4), 'wall')) return; }
+      if ((types.has('thief') || types.has('boar') || types.has('jackal') || types.has('aurochs') || types.has('eagle')) && can('tower')) { if (tryPlace(G, r, freeCell(G, r, wallCol), 'tower')) return; }
+      if (can('wall') && !types.has('lion')) { if (tryPlace(G, r, freeCell(G, r, wallCol), 'wall')) return; }
     }
     if (hasDog && can('healer') && !has(G, r, u => u.type === 'healer')) { const d = Object.values(G.units).find(u => u.type === 'dog' && u.r === r); if (d && d.hp < d.maxHp * 0.6) { if (tryPlace(G, r, freeCell(G, r, d.c - 1), 'healer')) return; } }
   }
 
+  // 有坡的夜：第一波過後每排都要有射手（坡吃掉三格射程，漏一排就補不回來），不等閒糧門檻
+  if (hill !== null && G.wave >= 1 && !G.level.noTrickle) for (const r of [2, 1, 3, 0, 4]) if (!has(G, r, u => kindOf(u) === 'shooter' && !UNITS[u.type].flees) && can('slinger') && tryPlace(G, r, freeCell(G, r, 1), 'slinger')) return;
+  // 一筆糧的夜（第 25 夜）：開場先把中間三排的射手和坡緣的牆擺好（不擺就不會開始倒數），之後只照威脅放，剩的留著修牆
+  if (G.level.noTrickle) {
+    for (const r of [2, 1, 3, 0, 4]) if (!has(G, r, u => kindOf(u) === 'shooter') && can('slinger') && tryPlace(G, r, freeCell(G, r, 1), 'slinger')) return;
+    for (const r of [2, 1, 3, 0, 4]) if (!has(G, r, u => kindOf(u) === 'blocker') && can('wall') && tryPlace(G, r, wallCol, 'wall')) return;
+    return;
+  }
   // 有閒糧：火盆、第二射手、更多牧人、升老牧人
   if (G.food >= (S.shooterEveryRow ? 150 : 200)) { // 射手守線：閒糧門檻低一點，先把每排射手補齊
     if (can('brazier')) for (let r = 0; r < ROWS; r++) if (has(G, r, (u, c) => kindOf(u) === 'shooter' && c <= 1) && !has(G, r, u => u.type === 'brazier') && !G.units[key(r, 2)]) { if (tryPlace(G, r, 2, 'brazier')) return; }
@@ -165,6 +199,7 @@ function decideConveyor(G) {
 
 function play(levelId, diff, seed, skill) {
   const G = E.create(levelId, diff, mulberry32(seed));
+  if (process.env.SIM_FOOD) G.food = Number(process.env.SIM_FOOD); // 試開局糧（第 25 夜一筆糧調預算用）
   if (!G.level.conveyor) { // 跟玩家一樣只帶 8 張；SIM_BAN=卡,卡 拿掉某幾張、SIM_ADD=卡,卡 硬塞進隊伍（滿了就擠掉名單最後一張）
     let pick = G.level.units.length > MAX_CARDS ? E.defaultPick(G.level) : G.level.units.slice();
     const S = STRATS[skill] || STRATS.good;
@@ -222,8 +257,12 @@ function compare(levelId, diff, n) {
   console.log(`  四套全贏 ${allWin.length}、全輸 ${allLose.length}、${solo}${allLose.length ? `（全輸的種子：${allLose.slice(0, 5).map(i => 1000 + i).join(' ')}${allLose.length > 5 ? ' …' : ''}）` : ''}`);
 }
 
-const [,, L = 'all', DF = 'all', N = '100', SK = 'good'] = process.argv;
-if (SK !== 'compare' && !STRATS[SK]) { console.error(`不認識的玩家／打法：${SK}（可用 ${Object.keys(STRATS).join(' ')} compare）`); process.exit(1); }
-const levels = L === 'all' ? LEVELS.map(l => l.id) : [Number(L)];
-const diffs = DF === 'all' ? Object.keys(D.DIFFS) : [DF];
-for (const l of levels) for (const d of diffs) (SK === 'compare' ? compare : run)(l, d, Number(N), SK);
+// 被別的腳本 require 時只匯出（診斷用），直接執行才跑模擬
+module.exports = { play, run, compare, decide, STRATS, mulberry32 };
+if (require.main === module) {
+  const [,, L = 'all', DF = 'all', N = '100', SK = 'good'] = process.argv;
+  if (SK !== 'compare' && !STRATS[SK]) { console.error(`不認識的玩家／打法：${SK}（可用 ${Object.keys(STRATS).join(' ')} compare）`); process.exit(1); }
+  const levels = L === 'all' ? LEVELS.map(l => l.id) : [Number(L)];
+  const diffs = DF === 'all' ? Object.keys(D.DIFFS) : [DF];
+  for (const l of levels) for (const d of diffs) (SK === 'compare' ? compare : run)(l, d, Number(N), SK);
+}

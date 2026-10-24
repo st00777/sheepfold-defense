@@ -446,7 +446,7 @@ function unlocked(id) { return unlockAll || Engine.isUnlocked(P.cleared, id); } 
 // 所有已開放關卡的卡總和（圖鑑用；也用來判斷玩家手上有沒有這一夜帶不了的卡）
 function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k); return all; }
 
-const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊' };
+const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來' };
 const HOME_UPDATE = '最近更新 10/20：右上角 ⏩ 可以二倍速；暫停層有「大字」；看門的依難度五位／三位／兩位；圖鑑出處改全名、敵方也有出處';
 
@@ -557,6 +557,7 @@ function openIntro(L) {
     : lo
     ? `今晚上場：${lo.map(k => icoImg(UNITS[k].ico)).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「隊伍」可換</span>`
     : `今晚上場：${L.units.map(k => icoImg(UNITS[k].ico)).join(' ')}${extra > 0 ? `　<span class="new">這一夜只有這 ${L.units.length} 位，後來認識的夥伴要到後面的夜才會同行，不能帶回來</span>` : ''}`;
+  if (L.noShepherd) $('#intro-loadout').innerHTML += `　<span class="new">🌾 開局 ${L.startFood} 糧，今晚不會再來：沒有牧人，糧也不會自己滴</span>`; // 第 25 夜一筆糧
   $('#intro-roster').textContent = lo ? '隊伍' : '圖鑑';
   const cp = loadCheckpoint(L.id), mine = !!cp, hasCp = mine && Engine.checkSnapshot(cp, L.id);
   if (mine && !hasCp) clearCheckpoint(L.id); // 壞掉或舊版的存檔：清掉，並告訴玩家
@@ -703,8 +704,8 @@ function tapCell(r, c) {
   if (selected === 'shovel') { const res = Engine.sell(G, r, c); flushEvents(); if (res.ok) clearSelection(); toast(res.msg || ''); return; }
   if (!selected) { if (tut.on) { toast(tut.waiting ? TUT_STEPS[tut.step].wait : TUT_STEPS[tut.step].say, true); return; } const res = Engine.tapUnit(G, r, c); flushEvents(); if (res.msg) toast(res.msg); return; }
   if (tut.on) { const [tr, tc] = TUT_STEPS[tut.step].cell; if (r !== tr || c !== tc) { toast('放在亮著的那一格', true); return; } }
-  // 格子有人就走「直接換」（同類更貴才會成功，其餘回原因）；沒人才是放下
-  const res = G.units[r + ',' + c] ? Engine.swap(G, r, c, selected) : Engine.place(G, r, c, selected);
+  // 格子有人就走「直接換」（同類更貴才會成功，其餘回原因）；沒人才是放下。一次性的（瓦瓶、水袋）例外：直接倒在那一格，水袋就是要倒在受傷的守望樓上
+  const res = G.units[r + ',' + c] && UNITS[selected].kind !== 'instant' ? Engine.swap(G, r, c, selected) : Engine.place(G, r, c, selected);
   flushEvents();
   if (!res.ok) { toast(res.msg || ''); return; }
   if (UNITS[selected].kind !== 'instant') { Sound.play('place'); Board.placed(r, c, selected); } // 放下壓扁回彈；火盆油燈先點亮。瓦瓶的聲音走 fx blast，也不回彈
@@ -732,8 +733,9 @@ function dawn() {
 // 失守：冷色罩上來（跟天亮同一套格式），結算頁一樣慢 0.9 秒出來
 function nightfall() { Board.lose(); }
 // 引擎事件對應的音效（名稱在 sound.js）；沒列的就沒聲音
-const FX_SFX = { blast: 'blast', ignite: 'ignite', horn: 'horn', emerge: 'emerge', grab: 'grab', splash: 'hit', enrage: 'growl', rest: 'whine', howl: 'howl', roar: 'roar', flee: 'whine', slam: 'boar', crouch: 'growl', home: 'sheep', strike: 'hit' };
-const SPAWN_SFX = { owl: 'owl', leopard: 'growl' }; // 出生就叫的敵人：無月夜看不到，先聽到
+const FX_SFX = { blast: 'blast', ignite: 'ignite', horn: 'horn', emerge: 'emerge', grab: 'grab', splash: 'hit', enrage: 'growl', rest: 'whine', howl: 'howl', roar: 'roar', flee: 'whine', slam: 'boar', crouch: 'growl', home: 'sheep', strike: 'hit',
+  overfly: 'overfly', roll: 'roll', pit: 'pit', water: 'water', throw: 'throw' }; // 第三章：咻、滾石、陷坑、水袋、強盜丟石
+const SPAWN_SFX = { owl: 'owl', leopard: 'growl', eagle: 'eagle', aurochs: 'aurochs' }; // 出生就叫的敵人：無月夜看不到，先聽到；大鷹飛高打不到，尖嘯讓人抬頭找影子
 // 把引擎這一步發生的事畫出來（棋盤上的交給 render.js，這裡放音效、提示、存檔、勝負）
 function flushEvents() {
   const spawned = [];
@@ -862,7 +864,8 @@ function onWin() {
   const next = Engine.nextOf(level.id);
   dawn();
   setTimeout(() => { // 先讓人看到天亮，結算頁慢 0.9 秒出來（減少動態：立刻）
-    endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${sheepSummary()}${level.outroWin}${saved ? '' : ' ' + SAVE_FAILED_NOTE}`);
+    const left = level.noShepherd ? `剩 ${Math.floor(G.food)} 糧。` : ''; // 第 25 夜一筆糧：天亮時剩多少（提案 §4 要記的那一筆，先給玩家看；調 startFood 用）
+    endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${sheepSummary()}${left}${level.outroWin}${saved ? '' : ' ' + SAVE_FAILED_NOTE}`);
     showStars();
     $('#next').hidden = !next; $('#retry').textContent = '再守這一夜';
     if (level.psalm) {
@@ -1039,14 +1042,17 @@ function unitNums(k) {
   const u = UNITS[k], s = [];
   s.push(u.hp > 1 ? `血量 ${u.hp}` : '一次性，放下就用掉，沒有血量');
   if (u.kind === 'producer') s.push(`每 ${u.every} 秒產 ${u.gives} 糧；升級老牧人（${ELDER_COST} 糧）後每 ${(u.every * ELDER_MUL).toFixed(1)} 秒一次`);
-  if (u.kind === 'shooter') s.push(`攻擊間隔 ${u.every} 秒，每次傷害 ${u.dmg}，${u.range ? `射程 ${u.range} 格` : '射程整排'}${u.pierce ? `；穿透整排，每穿一隻傷害剩 ${Math.round(u.falloff * 100)}%` : ''}${u.splash ? `；打同排最遠的敵人，落點 ${u.splash} 格內一起受傷（濺射）` : ''}`);
+  if (u.kind === 'shooter') s.push(`攻擊間隔 ${u.every} 秒，每次傷害 ${u.dmg}，${u.range ? `射程 ${u.range} 格` : '射程整排'}${u.pierce ? `；穿透整排，每穿一隻傷害剩 ${Math.round(u.falloff * 100)}%` : ''}${u.splash ? `；拋到同排${u.lobNear ? '最前面' : '最遠'}的敵人頭上，落點 ${u.splash} 格內一起受傷${u.lobNear ? '（落點小，通常只中一隻）' : '（濺射）'}；拋射飛得過山坡、厚皮也全額，但石頭飛 ${0.8} 秒才落地` : u.shot ? '；直射：從坡上射出去，飛到坡下只打得到飛的，坡下的地面敵人在腳底下打不到' : ''}`);
   if (u.flees) s.push(`敵人進到 ${u.flees} 格內就逃走（單位消失），該排敵人愣住 3 秒`);
-  if (u.kind === 'blocker') s.push(`不攻擊；修補一次 ${REPAIR_COST} 糧回 ${REPAIR_HP} 血量，間隔 ${REPAIR_CD} 秒${u.tall ? '；賊翻不過' : '；賊會翻過去'}`);
-  if (u.kind === 'dog') s.push(`咬一般敵人每秒 ${u.dps}，咬賊、偷羊人、狐狸、野狗每秒 ${u.hunt}；被咬住的敵人停下改咬狗；血量歸零不會死，回窩休息 ${u.rest} 秒回滿`);
-  if (u.slow) s.push(`鋪地不擋路；踩上的敵人速度 ×${STATUS.slow.mul}、每秒傷害 ${u.dps}；被踩時每秒磨損 ${u.wear}`);
+  if (u.kind === 'blocker') s.push(u.norepair ? `不攻擊；不能修補${u.tall ? '；賊翻不過' : '；賊會翻過去'}` : `不攻擊；修補一次 ${REPAIR_COST} 糧回 ${REPAIR_HP} 血量，間隔 ${REPAIR_CD} 秒${u.tall ? '；賊翻不過，大鷹在這排飛不高' : '；賊會翻過去'}`);
+  if (u.hillOnly) s.push('只能堆在坡上那三格');
+  if (u.rolls) s.push(`被咬垮、撞垮，或自己點一下推倒，石頭就滾下坡：這排在它右邊的地面敵人各受傷 ${u.rollDmg}、往後退 ${u.rollPush} 格、暈 ${u.rollStun} 秒（野牛只受傷不退）。推倒不退糧、不算損失；用鏟子拆或原地換守望樓不會滾`);
+  if (u.trap) s.push(`鋪地不擋路；第一隻踩進來的地面敵人困住 ${u.trap} 秒（頭目 ${u.trapBoss} 秒），坑就塌了；迷羊、飛的、翻牆中的不會掉進去。坑塌不算損失`);
+  if (u.kind === 'dog') s.push(`咬一般敵人每秒 ${u.dps}，咬賊、偷羊人、狐狸、野狗、強盜每秒 ${u.hunt}；被咬住的敵人停下改咬狗；血量歸零不會死，回窩休息 ${u.rest} 秒回滿。野牛咬不住，狗不理牠`);
+  if (u.slow) s.push(`鋪地不擋路；踩上的敵人速度 ×${STATUS.slow.mul}（野牛 ×${STATUS.slow.heavyMul}）、每秒傷害 ${u.dps}；被踩時每秒磨損 ${u.wear}`);
   if (u.ignite) s.push(`不攻擊；同排射手的石子與箭矢穿過它就帶火，命中的敵人燃燒 ${STATUS.burn.t} 秒、每秒 ${STATUS.burn.dps}，會傳給貼著的敵人`);
-  if (u.kind === 'instant') s.push(`落點周圍九格每個敵人傷害 ${u.dmg}，並嚇退 ${u.panic} 秒（往回跑）`);
-  if (u.push) s.push(`不攻擊；每 ${u.every} 秒吹一次，同排地面敵人後退 ${u.push} 格並暈眩 ${u.stun} 秒（飛的不受影響）`);
+  if (u.kind === 'instant') s.push(u.healAll ? '倒在哪一格（有人的格子也可以），那一格周圍九格的夥伴血量回滿、不再害怕；休息中的狗不算' : `落點周圍九格每個敵人傷害 ${u.dmg}，並嚇退 ${u.panic} 秒（往回跑）；飛得高的大鷹炸不到，野牛只受傷不嚇跑`);
+  if (u.push) s.push(`不攻擊；每 ${u.every} 秒吹一次，同排地面敵人後退 ${u.push} 格並暈眩 ${u.stun} 秒（飛的不受影響，野牛推不動也不暈）。有坡的夜小心：剛上坡的敵人會被推回坡下，射手又打不到了`);
   if (u.heal) s.push(`不攻擊；周圍${u.range === 2 ? ' 5×5 ' : '八格'}受傷的夥伴每秒回復 ${u.heal} 血量，多位相鄰會疊加${u.brave ? '；獅子咆哮嚇不停它' : ''}`);
   if (u.lanes) s.push(`同時攻擊上下 ${u.lanes} 排，共 ${u.lanes * 2 + 1} 排；飛的也打得到`);
   if (u.deflect) s.push(`不攻擊；地面敵人走到它面前就被趕到隔壁排（最上最下排往中間趕，中間排上下輪流），每趕一隻自己掉 ${u.deflect} 血、同一隻 ${u.deflectCd} 秒內不重複趕；頭目與飛的不受影響`);
@@ -1065,10 +1071,13 @@ function enemyNums(k) {
   if (e.wallMul) s.push(`咬牆傷害 ×${e.wallMul}`);
   if (e.enrage) s.push(`血量低於 ${Math.round(e.enrage * 100)}% 狂暴：速度與傷害 ×2`);
   if (e.vaults) s.push('翻過石牆（守望樓翻不過）');
-  if (e.steals) s.push(`走到最左邊抱走一隻羊，以每秒 ${e.fleeSpeed} 格往回逃，追上就把羊救回`);
+  if (e.steals) s.push(e.flying ? `飛到最左邊抓走一隻羊，以每秒 ${e.fleeSpeed} 格往回飛；這時牠飛低了，直射、拋射都打得到。飛出場前打下來，羊落地自己走回圈（名額一直算著，回圈不加羊、不給糧）；飛出場就少一隻` : `走到最左邊抱走一隻羊，以每秒 ${e.fleeSpeed} 格往回逃，追上就把羊救回`);
   if (e.dodge) s.push(`閃避 ${Math.round(e.dodge * 100)}% 的石子與箭矢；狗、荊棘、火把照常`);
   if (e.digs) s.push(`鑽地繞過前排，從土堆冒出；地下每秒走 ${e.digSpeed} 格`);
-  if (e.flying) s.push('飛越牆、狗、荊棘；只有投射打得到；飛到最左邊就闖進羊圈');
+  if (e.flying && !e.high) s.push('飛越牆、狗、荊棘；只有投射打得到；飛到最左邊就闖進羊圈。坡上的直射打得到坡下上空的牠');
+  if (e.high) s.push('飛得高：飛進來的時候任何投射物、瓦瓶都打不到牠，也不會傳火；守望樓那一排牠飛不高（樓拆了又飛高）。飛越牆、狗、荊棘');
+  if (e.throws) s.push(`走到第 ${e.throws.at + 1} 格（坡下第 2 格）就站住，每 ${e.throws.every} 秒朝這排最前面的夥伴丟一顆石頭（傷害 ${e.throws.dmg}，整排射程；荊棘、陷坑不算靶）；這排沒夥伴了才繼續走。站的地方坡上的直射打不到；狗咬得特別痛、拋石手與投石機砸得到、推倒石堆撞得到`);
+  if (e.heavy) s.push(`推不動：角聲、瓦瓶、滾石、牧人杖都推不動牠也嚇不暈牠（傷害照吃）；狗不理牠；坡下不減速、荊棘只減到 ×${STATUS.slow.heavyMul}。只有陷坑困得住`);
   if (e.detour) s.push(`前面是牆、隔壁排同一格空著就繞過去，${e.detour} 秒內不再繞；狗咬得特別痛`);
   if (e.slam) s.push(`撞上每道牆的第一下傷害 ${e.slam}，撞完自己暈 ${e.slamStun} 秒${e.trample ? '；踏過的荊棘直接壞掉' : ''}`);
   if (e.drift) s.push(`在上下 ${e.drift} 排之間飄（${e.driftT} 秒一圈），單排射手只在牠飄到那排時打得到；投石隊三排都打得到`);
@@ -1095,6 +1104,15 @@ const GLOSSARY = [
   { name: '迷羊', ico: '🐑', text: `不是敵人。從右邊走進來往羊圈走，走到最左邊，或走到本排／上下鄰排抱羊羔牧人所在的欄位，就回圈（羊數 +1、糧 +${STRAY.reward}）；地面敵人碰到就叼走，被叼出場算失落一隻；叼羊的被打倒，羊就從那裡繼續走。牧羊犬沒事時會走在牠旁邊護送` },
   { name: '撞牆', ico: '🐗', text: `野豬撞上每道牆的第一下傷害 ${ENEMIES.boar.slam}，之後正常咬；撞完自己暈 ${ENEMIES.boar.slamStun} 秒。踏過荊棘直接踩爛` },
   { name: '蹲伏', ico: '🐆', text: `豹走到第 ${ENEMIES.leopard.crouchAt} 格先蹲 ${ENEMIES.leopard.crouch} 秒（看得到預兆），然後以 ${STATUS.dash.mul} 倍速衝 ${ENEMIES.leopard.dash} 格` },
+  // ====== 第三章「諸山間」 ======
+  { name: '山坡', ico: '⛰️', text: `第三章右邊三格是下坡：羊圈在山上，敵人從山下爬上來。坡上的直射（石子、箭、機弦）飛到坡緣就從坡下敵人的頭頂飛過去，打不到牠們；上了坡緣（第 4 格）才打得到。拋射（投石機、拋石手）、飛的敵人不受影響；放在坡上三格的單位跟敵人同一個斜面，一切照舊。地面敵人在坡下走得慢（×${HILL_SLOW}），野牛例外。這是規則，不是漏洞：火盆、投石隊、弓箭手在這一章會掉價` },
+  { name: '拋射', ico: '🪃', text: `石頭拋上天再落下，飛得過山坡、厚皮也全額；飛 0.8 秒才落地，跑得快的偶爾會走掉。來源：投石機（拋最遠的、濺射 ${UNITS.catapult.splash} 格）、拋石手（拋最前面的、落點 ${UNITS.lobber.splash} 格）` },
+  { name: '滾石', ico: '🪨', text: `石堆被咬垮、撞垮或自己點一下推倒，石頭滾下坡：這排在它右邊的地面敵人各受傷 ${UNITS.cairn.rollDmg}、退 ${UNITS.cairn.rollPush} 格、暈 ${UNITS.cairn.rollStun} 秒；野牛只受傷。鏟除、換樓不滾` },
+  { name: '困住', ico: '🕳️', text: `陷坑：第一隻踩進來的地面敵人不動也不咬 ${UNITS.pit.trap} 秒（頭目 ${UNITS.pit.trapBoss} 秒），坑就塌了。挖在坡上第一格，困住的敵人卡在坡頂，坡上的射手打得到；是唯一困得住野牛的東西` },
+  { name: '飛高', ico: '🦅', text: '大鷹飛進來時飛得高，任何投射物、瓦瓶都打不到。守望樓那一排牠飛不高，一進場就打得到；抓了羊往回飛也會變低。飛出場前打下來，羊落地自己走回圈' },
+  { name: '推不動', ico: '🐂', text: `野牛：角聲、瓦瓶、滾石推不動也嚇不暈牠，狗不理牠，坡下不減速，荊棘只減到 ×${STATUS.slow.heavyMul}。撞牆第一下 ${ENEMIES.aurochs.slam}、咬牆 ×${ENEMIES.aurochs.wallMul}、厚皮。對策：陷坑困住牠那 ${UNITS.pit.trapBoss} 秒，機弦手、投石機、拋石手一起打` },
+  { name: '丟石頭', ico: '🧔‍♂️', text: `強盜走到坡下第 2 格就站住不走，每 ${ENEMIES.robber.throws.every} 秒朝這排最前面的夥伴丟一顆石頭（${ENEMIES.robber.throws.dmg} 傷害）。坡上的直射打不到牠；狗跑過去咬、拋石手砸、推倒石堆都行。牆前面堆一個石堆，石頭就先丟石堆` },
+  { name: '一筆糧', ico: '🌾', text: '第 25 夜：沒有牧人這張卡，糧也不會自己滴，開局那一筆用完就沒了。鏟子退一半照舊；天亮後剩多少糧，結算會告訴你' },
 ];
 function renderRosterDetail() {
   const box = $('#roster-detail'), k = roster.focus;

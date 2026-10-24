@@ -182,8 +182,8 @@ test('一筆糧的夜：沒牧人也合規、不滴糧、預設隊伍沒牧人�
   const L = E.levelById(25);
   assert.ok(!L.units.includes('shepherd')); const p = E.defaultPick(L); assert.ok(E.validPick(L, p) && !p.includes('shepherd'));
   assert.ok(!E.validPick(L, ['shepherd', 'slinger', 'wall', 'sling']), '帶牧人不合規');
-  const G = E.create(25, 'calm', () => 0.5); assert.strictEqual(G.food, 1000); G.started = true; G.holdWaves = true; G.phase = 'rest'; G.timer = 999;
-  run(G, 20); assert.strictEqual(G.food, 1000, '不滴糧'); assert.ok(G.taughtElder);
+  const G = E.create(25, 'calm', () => 0.5); assert.strictEqual(G.food, L.startFood); G.started = true; G.holdWaves = true; G.phase = 'rest'; G.timer = 999;
+  run(G, 20); assert.strictEqual(G.food, L.startFood, '不滴糧'); assert.ok(G.taughtElder);
   assert.ok(!E.place(G, 2, 0, 'shepherd').ok, '這一夜沒有牧人這張卡');
 });
 

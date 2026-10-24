@@ -7,7 +7,7 @@
   const VOLS = [0.35, 0.6, 1.0];
   let ctx = null, master = null, amb = null, ambWanted = false;
   const lastAt = {};  // 每種音效上次播放的時間，太密就不重播（咬牆、石子每幀都在發生）
-  const GAP = { shot: 0.08, bite: 0.45, die: 0.12, ignite: 0.25, food: 0.05, place: 0.05, hit: 0.1, whine: 0.3, grab: 0.2, sheep: 0.2 };
+  const GAP = { shot: 0.08, bite: 0.45, die: 0.12, ignite: 0.25, food: 0.05, place: 0.05, hit: 0.1, whine: 0.3, grab: 0.2, sheep: 0.2, overfly: 0.5, throw: 0.1, roll: 0.3 }; // 咻：一排五個射手一起射也只響一聲
 
   const prefs = load();
   function load() {
@@ -87,6 +87,14 @@
     grab:   () => tone({ type: 'sawtooth', f0: 760, f1: 620, dur: 0.25, g: 0.14, a: 0.02, lp: 1700, vib: [11, 30] }),  // 羊被抱走：短而急
     whine:  () => tone({ f0: 900, f1: 600, dur: 0.3, g: 0.12, a: 0.03 }),                                           // 狗受傷回窩
     tap:    () => noise({ filt: 'bandpass', f0: 1800, q: 3, dur: 0.02, g: 0.08 }),                                  // 介面輕點
+    // ====== 第三章「諸山間」 ======
+    overfly: () => noise({ filt: 'bandpass', f0: 4200, f1: 2600, q: 3, dur: 0.12, g: 0.12 }),                       // 石子從頭頂飛過：短高頻「咻」
+    roll:    () => { noise({ f0: 220, f1: 90, dur: 0.55, g: 0.45, a: 0.02 }); tone({ f0: 70, f1: 45, dur: 0.5, g: 0.3 }); }, // 滾石：低頻隆隆半秒
+    pit:     () => { tone({ f0: 140, f1: 60, dur: 0.22, g: 0.4 }); noise({ f0: 300, dur: 0.15, g: 0.2, a: 0.01 }); }, // 陷坑：悶的「咚」
+    water:   () => { noise({ filt: 'bandpass', f0: 1400, f1: 600, q: 1.2, dur: 0.35, g: 0.25, a: 0.02 }); tone({ type: 'triangle', f0: 520, f1: 780, dur: 0.18, g: 0.08, at: 0.05 }); }, // 水袋：水花
+    eagle:   () => { tone({ type: 'sawtooth', f0: 1500, f1: 900, dur: 0.28, g: 0.12, a: 0.02, lp: 3200 }); tone({ type: 'sawtooth', f0: 1600, f1: 1000, dur: 0.32, g: 0.12, a: 0.02, lp: 3200, at: 0.3 }); }, // 大鷹：兩聲尖嘯（飛進來時打不到，先聽到）
+    aurochs: () => { tone({ type: 'sawtooth', f0: 110, f1: 60, dur: 0.8, g: 0.28, a: 0.04, lp: 700, vib: [14, 12] }); [0, 0.18, 0.36, 0.54].forEach(t => noise({ f0: 160, dur: 0.08, g: 0.3, at: t })); }, // 野牛：低吼＋四下蹄聲
+    throw:   () => noise({ filt: 'bandpass', f0: 2200, q: 2, dur: 0.04, g: 0.16 }),                                 // 強盜丟石：跟石子射出同款、音高低一點
   };
 
   function play(name) {

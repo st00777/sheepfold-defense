@@ -17,7 +17,9 @@
   // level.hill＝坡從第幾格起（程式欄號，第三章是 4：右邊三格是下坡）。沒設就沒有坡，前兩章完全不受影響
   const hillOf = G => (G.level.hill === undefined || G.level.hill === null ? null : G.level.hill);
   const onHillCell = (G, c) => { const h = hillOf(G); return h !== null && c >= h; }; // 這一格在坡上
-  const downhill = (G, e) => { const h = hillOf(G); return h !== null && e.x >= h; };  // 這隻敵人站在坡下（坡上的格子裡）
+  // 這隻敵人站在坡下：身體已經過了坡頂那條線（HILL_EDGE）。剛掉進坡頂陷坑的（x≈hill）算卡在坡緣，坡上的射手打得到；咬坡上第一格牆的站 x≈hill+0.6，打不到
+  const HILL_EDGE = 0.3;
+  const downhill = (G, e) => { const h = hillOf(G); return h !== null && e.x > h + HILL_EDGE; };
   // 這一排有沒有還站著的守望樓（高的牆）：有的話大鷹在這排飛不高（James 2026-10-24 拍板：守望樓兼職剋大鷹）
   function rowHasTall(G, r) { for (const k in G.units) { const u = G.units[k]; if (u.r === r && u.hp > 0 && UNITS[u.type].tall) return true; } return false; }
   // 升級後的欄位蓋過原本的（投石機→巧匠的機器、荊棘→蠍窩、纏裹的牧人→膏油共用這一條）
@@ -90,7 +92,7 @@
     const G = {
       levelId: level.id, level, diff: diffKey, waves, rng: rng || Math.random,
       rocks: new Set((level.rocks || []).map(([r, c]) => r + ',' + c)),
-      food: level.startFood ?? START_FOOD, trickle: 0, // startFood：關卡可覆寫開局糧（歌珊的夜 100）
+      food: (level.startFood ?? START_FOOD) * (level.noTrickle ? (DIFFS[diffKey].budgetMul ?? 1) : 1), trickle: 0, // startFood：關卡可覆寫開局糧（歌珊的夜 100）；一筆糧的夜依難度乘 budgetMul
       phase: 'prep', wave: 0, timer: level.prep || PREP_TIME,
       queue: [], spawnTimer: 0, spawnedTotal: 0, killed: 0,
       total: waves.reduce((n, w) => n + w.list.reduce((m, [, k]) => m + k, 0), 0),

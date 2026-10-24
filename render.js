@@ -6,13 +6,15 @@
 const Board = (() => {
   // ====== 色票（跟 index.html 的 CSS 變數同值；之後換美術兩邊一起改）======
   const UCOL = { shepherd: 0x3d6ea8, slinger: 0xa8553d, sling: 0x8a3f2e, hireling: 0x7d7a6a, archer: 0x6b4e2e, wall: 0x777777, tower: 0x5c5c66, dog: 0xc9a24a, thorns: 0x4a7a3a,
-    brazier: 0x6e3a1e, jar: 0x8a5a2e, horn: 0x7a6a2a, healer: 0x3d8a7a, catapult: 0x5a4a3a, staff: 0x8a6a3a, lamp: 0xb8862a, patrol: 0x4a5a7a, volley: 0xa8553d, cradle: 0x7a4a6a };
+    brazier: 0x6e3a1e, jar: 0x8a5a2e, horn: 0x7a6a2a, healer: 0x3d8a7a, catapult: 0x5a4a3a, staff: 0x8a6a3a, lamp: 0xb8862a, patrol: 0x4a5a7a, volley: 0xa8553d, cradle: 0x7a4a6a,
+    lobber: 0x9a6a3d, cairn: 0x6e6a60, pit: 0x3a3028, waterskin: 0x3d7aa8 }; // 第三章
   const GOLD = 0xe6b84a, DANGER = 0xd9534f, OK = 0x7bc47f, TEXT = 0xf3ead8, ENEMY_RING = 0x8a2f2c;
   // 敵人身體：底色、大小係數 k、形狀（跟 index.html 的 .enemy.* 規則對齊：圓＝獸、方圓＝人、暗紅細圈＝敵、金粗圈＝頭目）
   const BODY_COL = { big: 0x5a3f2a, human: 0x3a3a30, light: 0xa89a7a, small: 0xb8682a, swarm: 0x4a6a28, dig: 0xa8843a, sly: 0x6b5a3a, boar: 0x4a3426, leopard: 0xa8862a };
-  const KSIZE = { fast: .8, alpha: 1.2, big: 1.3, lion: 1.4, boar: 1.25, leopard: 1.35 };
+  const KSIZE = { fast: .8, alpha: 1.2, big: 1.3, lion: 1.4, boar: 1.25, leopard: 1.35, aurochs: 1.45, eagle: 1.3 }; // 大鷹比鷙鳥大一號、野牛比獅子還大
   const BREATHERS = new Set(['shepherd', 'hireling', 'healer', 'cradle', 'horn']);
-  const FX_TEXT = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤', slam: '💥', trample: '💨', home: '💛', strike: '✦', crouch: '👁' };
+  const FX_TEXT = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤', slam: '💥', trample: '💨', home: '💛', strike: '✦', crouch: '👁', overfly: '咻', pit: '🕳️', water: '💧', roll: '🪨', throw: '🪨' };
+  const HILL_TINT = [0x3a3426, 0x33301f, 0x2d2a1a]; // 坡上三格的底色：越往右（越低）越暗，蓋在草地上做斜面
   const EASE = k => 1 - Math.pow(1 - k, 3); // 跟 CSS 的 cubic-bezier(.23,1,.32,1) 同一種「先快後慢」
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const key = (r, c) => r + ',' + c, unkey = k => k.split(',').map(Number); // 格子鑰匙 'r,c' 與拆回 [r, c]
@@ -165,6 +167,14 @@ const Board = (() => {
       g.rect(c * cw, r * ch, cw, ch).fill(rock ? { color: 0x5a5650, alpha: 1 } : alt ? { color: 0x5f7f46, alpha: .72 } : { color: 0x4f6b3a, alpha: .80 });
       g.rect(c * cw + .5, r * ch + .5, cw - 1, ch - 1).stroke({ width: 1, color: 0xffffff, alpha: .06 });
     }
+    // 第三章山坡：坡上三格蓋一層越往右越暗的土色（斜面），坡緣一條亮線。羊圈在山上、敵人從山下爬上來，所以右邊才是「下坡」
+    const hill = G && G.level.hill !== undefined && G.level.hill !== null ? G.level.hill : null;
+    if (hill !== null) {
+      for (let c = hill; c < COLS; c++) g.rect(c * cw, 0, cw, ROWS * ch).fill({ color: HILL_TINT[Math.min(HILL_TINT.length - 1, c - hill)], alpha: .38 + (c - hill) * .1 });
+      for (let r = 0; r < ROWS; r++) for (let c = hill; c < COLS; c++) { const y0 = r * ch, y1 = (r + 1) * ch; g.moveTo(c * cw, y0 + ch * .5).lineTo((c + 1) * cw, y0 + ch * .5 + ch * .08).stroke({ width: 1, color: 0x000000, alpha: .10 }); void y1; } // 每格一道淺淺的斜紋，看得出是往右下走的面
+      g.moveTo(hill * cw, 0).lineTo(hill * cw, ROWS * ch).stroke({ width: 3, color: GOLD, alpha: .45 });
+      g.moveTo(hill * cw + 2, 0).lineTo(hill * cw + 2, ROWS * ch).stroke({ width: 6, color: 0x000000, alpha: .18 }); // 坡緣下面一道影，像一階
+    }
     // 石頭格畫一顆石頭
     if (state.rocksDirty) { state.rocksDirty = false; for (const sp of L.cells.children.filter(x => x.isRock)) sp.destroy();
     if (G) for (const k of G.rocks) { const [r, c] = unkey(k); const s = makeIcon('🪨', ch * .4); s.alpha = .7; s.x = (c + .5) * cw; s.y = (r + .5) * ch; s.isRock = true; L.cells.addChild(s); } }
@@ -297,7 +307,7 @@ const Board = (() => {
     let k = 1; for (const c of cls) if (KSIZE[c]) k = KSIZE[c];
     const w = G.waves[G.wave - 1]; if (w && w.hpMul > 1.2) k *= 1 + (w.hpMul - 1) * .2; // 後面幾波血厚的狼大一點
     const fly = cls.includes('fly') || cls.includes('owl'), swarm = cls.includes('swarm'), human = cls.includes('human'), small = cls.includes('small'), dig = cls.includes('dig');
-    const boss = cls.includes('alpha') || cls.includes('lion') || cls.includes('leopard');
+    const boss = cls.includes('alpha') || cls.includes('lion') || cls.includes('leopard') || cls.includes('aurochs');
     const bodyCol = cls.map(c => BODY_COL[c]).find(c => c !== undefined) ?? 0x44444f; // 預設狼灰與蝗蟲綠都調暗，跟草地 #4f6b3a 的明度拉開（美術總監 2026-10-23）
     const br = ch * (small ? .25 : swarm ? .22 : .35) * k;
     const body = new PIXI.Container(); cont.addChild(body);
@@ -333,7 +343,10 @@ const Board = (() => {
       if (!paused) { v.shove = v.shove > 0 ? Math.max(0, v.shove - dt) : 0; v.dodge = Math.max(0, v.dodge - dt); v.swing = Math.max(0, v.swing - dt); }
       const shoveX = v.shove > 0 && v.shoveDx ? -v.shoveDx * cw * (1 - EASE(1 - v.shove / .18)) : 0; // 吹角：從原位滑到新位
       const dodgeK = v.dodge > 0 ? Math.sin((1 - v.dodge / .35) * Math.PI) : 0, dodgeX = reduce() ? 0 : cw * .4 * dodgeK; // 閃避：本體側滑＋變淡（血條不跟著跑）；減少動態只變淡
-      v.cont.x = (e.x + .5) * cw + shoveX; v.cont.y = (rv + .5 - (e.lift || 0) * .6) * ch; // lift：賊翻牆的弧線
+      // 第三章山坡：坡下的地面敵人依位置往下偏（最多 .12 格），看得出牠在坡面上；大鷹飛高時整個身體再抬高、放大一點
+      const hill = G.level.hill !== undefined && G.level.hill !== null ? G.level.hill : null;
+      const slope = hill !== null && !v.fly ? clamp((e.x - hill) / (COLS - hill), 0, 1) * ch * .12 : 0;
+      v.cont.x = (e.x + .5) * cw + shoveX; v.cont.y = (rv + .5 - (e.lift || 0) * .6) * ch + slope; // lift：賊翻牆的弧線
       const stunned = e.st.stun || e.st.distract, stillOne = stunned || e.underground || e.crouchT > 0;
       let rot = 0, bob = 0, lunge = 0, bite = 0;
       if (anim && speed <= 1 && !stillOne) { const f = v.fly || v.swarm ? 3 : v.k >= 1.2 ? 4 : e.type === 'fast' ? 8 : 5.7; if (v.fly || v.swarm) bob = Math.sin((time + v.phase) * f) * ch * .06; else { rot = Math.sin((time + v.phase) * f) * .061; bob = -Math.abs(Math.sin((time + v.phase) * f)) * ch * .025; } }
@@ -341,6 +354,11 @@ const Board = (() => {
       if (v.swing > 0) { lunge += cw * .28 * Math.sin((1 - v.swing / .3) * Math.PI); rot += .24 * Math.sin((1 - v.swing / .3) * Math.PI); }
       v.body.rotation = rot; v.body.y = bob; v.body.x = lunge + dodgeX;
       const crouch = e.crouchT > 0; v.body.scale.set(crouch ? .8 : 1 + (reduce() ? 0 : bite * .06)); if (crouch) v.body.y += ch * .12;
+      if (ENEMIES[e.type].high) { // 大鷹：飛高時身體抬高、放大、影子淡；抓了羊或守望樓那排壓低就回到一般飛行高度（這一段滑過去，不跳）
+        v.hiK = clamp((v.hiK ?? (e.high ? 1 : 0)) + (e.high ? 1 : -1) * dt * 2.5, 0, 1);
+        v.body.y -= v.hiK * ch * .22; v.body.scale.set(v.body.scale.x * (1 + v.hiK * .18));
+        const sh = v.cont.children[0]; if (sh && sh !== v.body) sh.alpha = .32 - v.hiK * .2;
+      }
       v.cont.alpha = e.underground ? 0 : stunned ? .6 : 1; v.body.alpha = v.dodge > 0 ? .4 + .6 * (1 - dodgeK) : 1;
       const biteTint = reduce() && e.biting && bite > .5; // 減少動態：咬住時身體一下紅一下白，不位移
       v.spr.tint = e.st.poison ? (v.swarm ? 0xd8b0f0 : 0x9fe07a) : crouch ? 0xb0b0b0 : 0xffffff; v.bg.tint = e.st.poison ? (v.swarm ? 0xc8a0e8 : 0xa8d890) : crouch ? 0xb0b0b0 : biteTint ? 0xffb0a0 : 0xffffff;
@@ -424,7 +442,9 @@ const Board = (() => {
         v = { cont, g, glow, shadow, acc: 0 }; SH.set(s.id, v);
         recoilUnit(s.ur === undefined ? s.r : s.ur, s.uc === undefined ? Math.floor(s.x) : s.uc);
       }
-      const lift = s.kind === 'lob' ? Math.sin(Math.min(1, s.t) * Math.PI) * .6 : 0;
+      let lift = s.kind === 'lob' ? Math.sin(Math.min(1, s.t) * Math.PI) * .6 : 0;
+      // 坡上射出的直射，過了坡緣就「飛在半空」：慢慢抬高、變淡，看得出它從坡下敵人的頭頂飛過去
+      if (s.hill && G.level.hill !== undefined && s.x > G.level.hill) { const k = clamp((s.x - G.level.hill) / 2.5, 0, 1); lift += k * .35; v.cont.alpha = 1 - k * .75; }
       const x = s.x * cw, y = (s.r + .5 - lift) * ch; v.cont.x = x; v.cont.y = y;
       if (v.shadow) { v.shadow.x = x; v.shadow.y = (s.r + .5) * ch + ch * .25; v.shadow.alpha = .35 - lift * .3; }
       if (s.burn) { v.glow.alpha = .8; v.glow.tint = 0xff8a3d; v.g.tint = 0xff8a3d; }
@@ -453,6 +473,15 @@ const Board = (() => {
       case 'dodge': flashDodge(r, x); break;
       case 'crouch': popText(r, x, FX_TEXT.crouch, true); break; // 豹蹲伏：本體縮小變灰之外，頭上飄 👁（跟 DOM 版一樣，蹲著的要讓人注意到）
       case 'bark': case 'hop': break; // 狗咬住、換排：本體動作已看得到，不飄字
+      // ====== 第三章 ======
+      case 'overfly': { popText(r, x, FX_TEXT.overfly, true); if (!reduce()) for (let i = 0; i < 3; i++) spark(px + i * 4, py - ch * .28, 0xf3ead8, .7, .012 * ch, -ch * .2, .3, 1.2); break; } // 石子從頭頂飛過：一團淡白的「咻」
+      case 'pit': { ring(px, py + ch * .1, cw * .45, 0x3a3028, .4); burst(px, py + ch * .1, 8, [0x6a4a2a, 0x3a3028], ch * .45, .4); popText(r, x, `${FX_TEXT.pit}${ev && ev.sec ? ' ' + ev.sec + 's' : ''}`, true); break; } // 坑塌：土色一圈＋幾秒的字
+      case 'water': { ring(px, py, cw * 1.4, 0x7ab8e0, .45); burst(px, py, 14, [0x7ab8e0, 0xcfe8ff, 0xffffff], ch * .7, .45); popText(r, x, FX_TEXT.water, true); break; } // 水袋：藍色水花
+      case 'throw': { if (reduce()) { popText(r, x, FX_TEXT.throw, true); break; } const tx = ((ev && ev.tc !== undefined ? ev.tc : x - 1) + .5) * cw; const g = new PIXI.Graphics().circle(0, 0, 4).fill(0xe9e4d0).stroke({ width: 1, color: 0x000000, alpha: .35 }); L.fx.addChild(g); tween(.32, k => { g.x = px + (tx - px) * k; g.y = py - Math.sin(k * Math.PI) * ch * .5; }, () => { g.destroy(); burst(tx, py, 4, [0xc9bda0], ch * .3, .25); }); break; } // 強盜丟石：一顆小石子從牠手上拋到靶那格
+      case 'roll': { // 滾石：幾顆石頭從石堆那格往右滾下坡，坡下被撞的敵人跟吹角一樣滑開
+        hornShove(ev && ev.moved); if (reduce()) { popText(r, x, FX_TEXT.roll, true); break; }
+        for (let i = 0; i < 4; i++) { const g = new PIXI.Graphics().circle(0, 0, 5 + Math.random() * 3).fill(0x8a8378).stroke({ width: 1, color: 0x000000, alpha: .4 }); L.fx.addChild(g); const d0 = i * .06, far = (COLS - x) * cw; tween(.55 + d0, k => { const kk = clamp((k * (.55 + d0) - d0) / .55, 0, 1), e = EASE(kk); g.x = px + far * e + (i - 1.5) * 4; g.y = py + ch * .25 + Math.sin(kk * Math.PI * 3) * ch * .08 * (1 - kk) + kk * ch * .12; g.rotation = kk * 9; g.alpha = 1 - Math.max(0, kk - .75) * 4; }, () => g.destroy()); }
+        burst(px, py + ch * .2, 8, [0xc9bda0, 0x8a8378], ch * .5, .4); break; }
       default: if (FX_TEXT[kind]) popText(r, x, FX_TEXT[kind], kind === 'grab' || kind === 'home' || kind === 'rest' || kind === 'enrage' || kind === 'sting');
     }
     if (kind === 'emerge') { const g = mounds.get(id); if (g) { g.destroy(); mounds.delete(id); } }
