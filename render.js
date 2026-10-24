@@ -364,7 +364,8 @@ const Board = (() => {
       const dodgeK = v.dodge > 0 ? Math.sin((1 - v.dodge / .35) * Math.PI) : 0, dodgeX = reduce() ? 0 : cw * .4 * dodgeK; // 閃避：本體側滑＋變淡（血條不跟著跑）；減少動態只變淡
       // 第三章山坡：坡下的地面敵人依位置往下偏（最多 .12 格）並縮小一點（假透視，最多 10%），看得出牠在坡面上；大鷹飛高時整個身體再抬高、放大一點
       const sc = scaleAt(e.x + .5); // 坡上越低越小（飛的也一樣：跟同一排的地面對齊）
-      v.cont.x = (e.x + .5) * cw + shoveX; v.cont.y = yAt(rv + .5 - (e.lift || 0) * .6, e.x + .5); // lift：賊翻牆的弧線
+      v.cont.x = (e.x + .5) * cw + shoveX; v.cont.y = v.fly ? (rv + .5) * ch : yAt(rv + .5 - (e.lift || 0) * .6, e.x + .5); // lift：賊翻牆的弧線。飛的維持高地的高度（跟高地的直射同一條線，打得到就看得到打到），只有影子落在斜坡上
+      if (v.fly) { const sh = v.cont.children[0]; if (sh && sh !== v.body) sh.y = ch * .36 + yAt(0, e.x + .5); }
       const stunned = e.st.stun || e.st.distract, stillOne = stunned || e.underground || e.crouchT > 0;
       let rot = 0, bob = 0, lunge = 0, bite = 0;
       if (anim && speed <= 1 && !stillOne) { const f = v.fly || v.swarm ? 3 : v.k >= 1.2 ? 4 : e.type === 'fast' ? 8 : 5.7; if (v.fly || v.swarm) bob = Math.sin((time + v.phase) * f) * ch * .06; else { rot = Math.sin((time + v.phase) * f) * .061; bob = -Math.abs(Math.sin((time + v.phase) * f)) * ch * .025; } }
@@ -464,8 +465,9 @@ const Board = (() => {
       let lift = s.kind === 'lob' ? Math.sin(Math.min(1, s.t) * Math.PI) * .6 : 0;
       // 坡上射出的直射，過了坡頂那條線（跟引擎同一條：hill + HILL_EDGE，投射物 x 是格子 +.5 座標所以再補 .5）就「飛在半空」：慢慢抬高、變淡，看得出它從坡下敵人的頭頂飛過去。最多淡到一半，打坡下空中飛的時還看得見
       const hill = hillOf(G);
-      if (s.fromHill && hill !== null) { const k = clamp((s.x - .5 - hill - HILL_EDGE) / 2, 0, 1); lift += k * .35; v.cont.alpha = 1 - k * .5; }
-      const x = s.x * cw, y = yAt(s.r + .5 - lift, s.x); v.cont.x = x; v.cont.y = y; v.cont.scale.set(scaleAt(s.x)); // 飛進坡上的也跟著地面沉、變小
+      if (s.fromHill && hill !== null) { const k = clamp((s.x - .5 - hill - HILL_EDGE) / 2, 0, 1); v.cont.alpha = 1 - k * .5; } // 過了坡緣慢慢變淡（最多一半）；高度不再另外抬——地面本身往下掉，石子直直飛就看得出是從頭頂過去
+      // 高地射出的直射維持高地的高度直直飛（James 10/24：「彈道跟著往下墜、打不中敵方很奇怪」），斜坡上射的和拋射的才順著地面走
+      const x = s.x * cw, y = s.fromHill ? (s.r + .5 - lift) * ch : yAt(s.r + .5 - lift, s.x); v.cont.x = x; v.cont.y = y; v.cont.scale.set(scaleAt(s.x));
       if (v.shadow) { v.shadow.x = x; v.shadow.y = yAt(s.r + .5, s.x) + ch * .25 * scaleAt(s.x); v.shadow.alpha = .35 - lift * .3; }
       if (s.burn) { v.glow.alpha = .8; v.glow.tint = 0xff8a3d; v.g.tint = 0xff8a3d; }
       if (!paused && speed <= 1 && !reduce()) { v.acc += dt; while (v.acc > .03) { v.acc -= .03; if (s.burn) spark(x - cw * .05, y, Math.random() < .5 ? 0xff8a30 : 0xffd060, .9, .016 * ch, -ch * .3, .3, 1.5); else if (s.kind !== 'arrow') spark(x - cw * .08, y + ch * .02, 0xd8d0c0, .35, .012 * ch, 0, .22, .4); } }
