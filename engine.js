@@ -166,7 +166,7 @@
     return { ok: true, msg: `${def.name}就位` };
   }
 
-  const hillOnlyMsg = G => (hillOf(G) === null ? '這一夜沒有山坡，石堆沒處堆' : `石堆只能堆在坡上那 ${hillCells(G)} 格`);
+  const hillOnlyMsg = G => (hillOf(G) === null ? '這一夜沒有山坡，石堆沒處堆' : `石堆只能堆在斜坡那 ${hillCells(G)} 格`);
   // 真的把單位放上場（place 與檢查點還原共用）
   function makeUnit(G, r, c, k) {
     const def = UNITS[k];
@@ -626,7 +626,7 @@
         if (u.timer <= 0) { u.timer = (u.type === 'shepherd' ? shepherdEvery(G) : def.every) * (u.elder ? ELDER_MUL : 1); G.food += def.gives; ev(G, { t: 'pop', r: u.r, c: u.c, text: `+${def.gives}` }); }
       } else if (def.kind === 'shooter') {
         // 雇工：狼靠近就逃走，該排的狼追牠停三秒
-        if (def.flees && inRow.some(e => !ENEMIES[e.type].flying && e.x - u.c < def.flees && e.x > u.c - 0.5)) {
+        if (def.flees && inRow.some(e => !ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && e.x - u.c < def.flees && e.x > u.c - 0.5)) {
           for (const e of inRow) if (!ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && e.x > u.c - 0.5) { e.st.distract = 3; release(G, e); } // 野牛不會為了追雇工停下來（只有陷坑困得住牠）
           ev(G, { t: 'toast', msg: '雇工看見狼來，撇下羊逃走了' });
           ev(G, { t: 'fx', kind: 'flee', r: u.r, x: u.c });
@@ -858,7 +858,7 @@
         if (Math.abs(e.x + 0.5 - s.x) >= 0.35) continue;
         // 從坡上射的直射，飛到坡下只剩飛的打得到：地面敵人在腳底下，石子從頭頂飛過去（第一次冒「咻」＋提示）
         if (s.fromHill && !ENEMIES[e.type].flying && downhill(G, e)) {
-          if (!s.overflew) { s.overflew = true; ev(G, { t: 'fx', kind: 'overfly', r: s.r, x: e.x, id: s.id }); if (!G.toldOverfly) { G.toldOverfly = true; ev(G, { t: 'toast', msg: `石子從${ENEMIES[e.type].name}的頭頂飛過去了。坡下的敵人在你腳底下，直射打不到` }); } }
+          if (!s.overflew) { s.overflew = true; ev(G, { t: 'fx', kind: 'overfly', r: s.r, x: e.x, id: s.id }); if (!G.toldOverfly) { G.toldOverfly = true; ev(G, { t: 'toast', msg: `石子從${ENEMIES[e.type].name}的頭頂飛過去了。斜坡上的敵人在你腳底下，直射打不到` }); } }
           continue;
         }
         s.hit.add(e.id);
@@ -955,7 +955,7 @@
           if (e.throwT <= 0) {
             e.throwT = def.throws.every; t.hp -= def.throws.dmg;
             ev(G, { t: 'fx', kind: 'throw', r: e.r, x: e.x, id: e.id, tc: t.c }); ev(G, { t: 'unit', r: t.r, c: t.c });
-            if (!G.toldThrow) { G.toldThrow = true; ev(G, { t: 'toast', msg: `${def.name}站在坡下丟石頭，專丟最前面的夥伴。直射打不到牠，派狗咬、拋石手砸` }); }
+            if (!G.toldThrow) { G.toldThrow = true; ev(G, { t: 'toast', msg: `${def.name}站在斜坡上丟石頭，專丟最前面的夥伴。直射打不到牠，派狗咬、拋石手砸` }); }
           }
           continue;
         }

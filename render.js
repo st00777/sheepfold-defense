@@ -21,7 +21,6 @@ const Board = (() => {
   // 相對運動與判定：沉多少只看 x 一個連續函式（yAt），敵人跨過坡緣是順著斜線滑下去、不跳格；格子、單位、狗、投射物、效果、飄字、腳印全走同一條，點擊命中（cellAt）用同一條反算。
   let hillNow = null; // 這一夜的坡（每幀跟 G 對一次；換夜就重畫格子、重算格高）
   const slopeK = x => hillNow === null ? 0 : clamp((x - hillNow) / (COLS - hillNow), 0, 1); // x：格座標（0..COLS），坡緣 0、最右邊 1
-  const scaleAt = () => 1; // 第二版不縮（留著這個接口：之後要做假透視只改這裡）
   const yAt = (ry, x) => ry * ch + slopeK(x) * HILL_DROP * ch; // ry：列座標（含 .5）→ 畫面 y
   const cellPts = (r, c, inset = 0) => { const xa = c + inset / cw, xb = c + 1 - inset / cw; return [xa * cw, yAt(r, xa) + inset, xb * cw, yAt(r, xb) + inset, xb * cw, yAt(r + 1, xb) - inset, xa * cw, yAt(r + 1, xa) - inset]; }; // 一格的四個角（左上→右上→右下→左下），平地就是矩形、坡上是平行四邊形
   const EASE = k => 1 - Math.pow(1 - k, 3); // 跟 CSS 的 cubic-bezier(.23,1,.32,1) 同一種「先快後慢」
@@ -145,7 +144,7 @@ const Board = (() => {
   function frame(g, dt) {
     if (!app) return { biting: false, shots: 0 };
     G = g;
-    const hill = hillOf(G); if (hill !== hillNow) { hillNow = hill; W = 0; } // 換到有坡／沒坡的夜：格高變了，逼 layout 整個重排（格子、單位、腳印都在裡面重建）
+    const hill = hillOf(G); if (hill !== hillNow) { hillNow = hill; if (app.resize) app.resize(); W = 0; } // 換到有坡／沒坡的夜：格高變了，逼 layout 整個重排（格子、單位、腳印都在裡面重建）
     layout();
     if (!paused) time += dt;
     const info = { biting: false, shots: 0 };
@@ -194,7 +193,7 @@ const Board = (() => {
     }
     // 石頭格畫一顆石頭
     if (state.rocksDirty) { state.rocksDirty = false; for (const sp of L.cells.children.filter(x => x.isRock)) sp.destroy();
-    if (G) for (const k of G.rocks) { const [r, c] = unkey(k); const s = makeIcon('🪨', ch * .4); s.alpha = .7; s.x = (c + .5) * cw; s.y = yAt(r + .5, c + .5); s.scale.set(s.scale.x * scaleAt(c + .5)); s.isRock = true; L.cells.addChild(s); } }
+    if (G) for (const k of G.rocks) { const [r, c] = unkey(k); const s = makeIcon('🪨', ch * .4); s.alpha = .7; s.x = (c + .5) * cw; s.y = yAt(r + .5, c + .5); s.isRock = true; L.cells.addChild(s); } }
     const h = L.hintG.clear();
     // 範圍預覽：淡金蓋底色
     for (const k of state.range) { const [r, c] = unkey(k); h.poly(cellPts(r, c)).fill({ color: GOLD, alpha: .23 }); }
@@ -229,7 +228,7 @@ const Board = (() => {
     if (old) { old.cont.destroy({ children: true }); if (old.glow) old.glow.destroy(); if (old.up) old.up.destroy({ children: true }); removeHole(k); UN.delete(k); }
     if (!u) return;
     const def = UNITS[u.type];
-    const cont = new PIXI.Container(); cont.x = (c + .5) * cw; cont.y = yAt(r + .5, c + .5); cont.scale.set(scaleAt(c + .5)); L.units.addChild(cont); // 坡上的格子沉下去、變矮，單位跟著
+    const cont = new PIXI.Container(); cont.x = (c + .5) * cw; cont.y = yAt(r + .5, c + .5); L.units.addChild(cont); // 坡上的格子沉下去、變矮，單位跟著
     const inner = new PIXI.Container(); cont.addChild(inner); // inner：放下壓扁、回彈、跳一下都動這層；cont 只放位置
     const bg = new PIXI.Graphics(); inner.addChild(bg);
     const icoEmoji = def.kind === 'dog' ? '🦴' : def.kind === 'patrol' ? '🪵' : def.ico; // 狗窩、巡夜人的崗位：人在外面走
@@ -328,23 +327,23 @@ const Board = (() => {
     const bodyCol = cls.map(c => BODY_COL[c]).find(c => c !== undefined) ?? 0x44444f; // 預設狼灰與蝗蟲綠都調暗，跟草地 #4f6b3a 的明度拉開（美術總監 2026-10-23）
     const br = ch * (small ? .25 : swarm ? .22 : .35) * k;
     const body = new PIXI.Container(); cont.addChild(body);
-    const bg = new PIXI.Graphics(); body.addChild(bg);
+    const bg = new PIXI.Graphics(); body.addChild(bg); let shadow = null; // 飛的：腳下影子（具名，之後不用猜子節點順序）
     if (!fly) {
       if (human) { bg.roundRect(-br, -br, br * 2, br * 2, br * .6).fill(bodyCol); bg.rotation = -.1; }
       else if (cls.includes('boar')) bg.roundRect(-br, -br, br * 2, br * 2, br * .84).fill(bodyCol);
       else bg.circle(0, 0, br).fill(bodyCol);
       if (boss) bg.stroke({ width: 3, color: GOLD }); else if (!swarm) bg.stroke({ width: 1.5, color: ENEMY_RING }); // 暗紅細圈＝敵人、金粗圈＝頭目（要緊接在身體後面：Pixi 的 stroke 只套用到最後一個形狀）
       if (dig) bg.rect(-br, br * .1, br * 2, br).fill(0x5a4a2a); // 鑽地的：上下分色
-    } else { const sh = new PIXI.Graphics().ellipse(0, ch * .36, cw * .18, 3).fill({ color: 0x000000, alpha: .32 }); cont.addChildAt(sh, 0); } // 飛的：腳下影子
+    } else { shadow = new PIXI.Graphics().ellipse(0, ch * .36, cw * .18, 3).fill({ color: 0x000000, alpha: hillNow !== null ? .5 : .32 }); cont.addChildAt(shadow, 0); } // 飛的：腳下影子
     if (!fly && cls.includes('fast')) { // 快狼的速度線：兩道細殘影，畫在身體外層（cont）不跟著走路搖，否則看起來像尾巴（James 10/24 第 21 夜回饋）
-      const sl = new PIXI.Graphics(); sl.rect(br * .9, -3.5, br * 1.4, 1.6).fill({ color: 0xf3ead8, alpha: .8 }); sl.rect(br * 1.1, 1.5, br * 1.1, 1.6).fill({ color: 0xf3ead8, alpha: .8 }); cont.addChild(sl);
+      const sl = new PIXI.Graphics(); sl.rect(br * .9, -4, br * 1.4, 2.2).fill({ color: 0xf3ead8, alpha: .8 }); sl.rect(br * 1.1, 1.8, br * 1.1, 2.2).fill({ color: 0xf3ead8, alpha: .8 }); cont.addChild(sl);
     }
     const burnGlow = new PIXI.Sprite(radialTex); burnGlow.anchor.set(.5); burnGlow.blendMode = 'add'; burnGlow.tint = 0xff8a3d; burnGlow.width = burnGlow.height = br * 3.2; burnGlow.alpha = 0; body.addChildAt(burnGlow, 0);
     const spr = makeIcon(def.ico, ch * (small ? .34 : swarm ? .3 : .46) * k); spr.y = fly ? -ch * .12 : -ch * .02; body.addChild(spr);
     const flash = makeIcon(def.ico, spr.width || ch * .46 * k); flash.y = spr.y; flash.blendMode = 'add'; flash.alpha = 0; body.addChild(flash);
     const hp = new PIXI.Graphics(); cont.addChild(hp);
     const st = makeText('', Math.max(9, ch * .16), TEXT, false); st.style.stroke = null; st.y = -ch * .42; cont.addChild(st);
-    const v = { cont, body, bg, spr, flash, hp, st, stText: '', hpLast: -1, phase: Math.random() * 6.28, k, fly, swarm, boss, thick: boss || cls.includes('big'), flashT: 0, burnAcc: 0, poisonAcc: 0, shove: 0, dodge: 0, swing: 0, burnGlow, baseW: spr.width, br };
+    const v = { cont, body, bg, spr, flash, hp, st, shadow, stText: '', hpLast: -1, phase: Math.random() * 6.28, k, fly, swarm, boss, thick: boss || cls.includes('big'), flashT: 0, burnAcc: 0, poisonAcc: 0, shove: 0, dodge: 0, swing: 0, burnGlow, baseW: spr.width, br };
     EN.set(e.id, v); return v;
   }
   function statusText(e) { // 頭上最多兩個圖示，依重要性；緩速與嚎叫不顯示
@@ -362,22 +361,21 @@ const Board = (() => {
       if (!paused) { v.shove = v.shove > 0 ? Math.max(0, v.shove - dt) : 0; v.dodge = Math.max(0, v.dodge - dt); v.swing = Math.max(0, v.swing - dt); }
       const shoveX = v.shove > 0 && v.shoveDx ? -v.shoveDx * cw * (1 - EASE(1 - v.shove / .18)) : 0; // 吹角：從原位滑到新位
       const dodgeK = v.dodge > 0 ? Math.sin((1 - v.dodge / .35) * Math.PI) : 0, dodgeX = reduce() ? 0 : cw * .4 * dodgeK; // 閃避：本體側滑＋變淡（血條不跟著跑）；減少動態只變淡
-      // 第三章山坡：坡下的地面敵人依位置往下偏（最多 .12 格）並縮小一點（假透視，最多 10%），看得出牠在坡面上；大鷹飛高時整個身體再抬高、放大一點
-      const sc = scaleAt(e.x + .5); // 坡上越低越小（飛的也一樣：跟同一排的地面對齊）
-      v.cont.x = (e.x + .5) * cw + shoveX; v.cont.y = v.fly ? (rv + .5) * ch : yAt(rv + .5 - (e.lift || 0) * .6, e.x + .5); // lift：賊翻牆的弧線。飛的維持高地的高度（跟高地的直射同一條線，打得到就看得到打到），只有影子落在斜坡上
-      if (v.fly) { const sh = v.cont.children[0]; if (sh && sh !== v.body) sh.y = ch * .36 + yAt(0, e.x + .5); }
+      // 第三章山坡：地面敵人跟著斜坡沉下去（yAt），飛的維持高地高度、只有影子落在斜坡上；大鷹飛高時整個身體再抬高、放大一點
+      v.cont.x = (e.x + .5) * cw + shoveX; v.cont.y = v.fly ? (rv + .5) * ch : yAt(rv + .5 - (e.lift || 0) * .6, v.cont.x / cw); // lift：賊翻牆的弧線。飛的維持高地的高度（跟高地的直射同一條線，打得到就看得到打到），只有影子落在斜坡上
+      if (v.fly && v.shadow) v.shadow.y = yAt(0, v.cont.x / cw); // 高度用畫出來的 x 算（吹角推回去滑移中也貼著地面）
       const stunned = e.st.stun || e.st.distract, stillOne = stunned || e.underground || e.crouchT > 0;
       let rot = 0, bob = 0, lunge = 0, bite = 0;
       if (anim && speed <= 1 && !stillOne) { const f = v.fly || v.swarm ? 3 : v.k >= 1.2 ? 4 : e.type === 'fast' ? 8 : 5.7; if (v.fly || v.swarm) bob = Math.sin((time + v.phase) * f) * ch * .06; else { rot = Math.sin((time + v.phase) * f) * .061; bob = -Math.abs(Math.sin((time + v.phase) * f)) * ch * .025; } }
       if (e.biting && !stillOne && !paused && !still) { bite = Math.abs(Math.sin(time * 7 + v.phase)); if (!reduce()) lunge = -bite * cw * .14; } // 咬東西：每 .45 秒往前撲一下（加速也保留，是資訊；減少動態改身體泛紅）
       if (v.swing > 0) { lunge += cw * .28 * Math.sin((1 - v.swing / .3) * Math.PI); rot += .24 * Math.sin((1 - v.swing / .3) * Math.PI); }
       v.body.rotation = rot; v.body.y = bob; v.body.x = lunge + dodgeX;
-      const crouch = e.crouchT > 0; v.body.scale.set((crouch ? .8 : 1 + (reduce() ? 0 : bite * .06)) * sc); if (crouch) v.body.y += ch * .12;
+      const crouch = e.crouchT > 0; v.body.scale.set((crouch ? .8 : 1 + (reduce() ? 0 : bite * .06))); if (crouch) v.body.y += ch * .12;
       if (ENEMIES[e.type].high) { // 大鷹：飛高時身體抬高、放大、影子變大變淡（抬頭找影子）；抓了羊或守望樓那排壓低就回到一般飛行高度（這一段滑過去，不跳；減少動態直接跳到位、暫停不動）
         const want = e.high ? 1 : 0;
         if (reduce()) v.hiK = want; else if (!paused) v.hiK = clamp((v.hiK ?? want) + (want ? 1 : -1) * dt * 2.5, 0, 1); else v.hiK = v.hiK ?? want;
         v.body.y -= v.hiK * ch * .22; v.body.scale.set(v.body.scale.x * (1 + v.hiK * .18));
-        const sh = v.cont.children[0]; if (sh && sh !== v.body) { sh.scale.set(1 + v.hiK * .5); sh.alpha = 1 - v.hiK * .3; } // 影子本身的填色已是 .32，這裡只在飛高時再淡三成、放大一半
+        const sh = v.shadow; if (sh) { sh.scale.set(1 + v.hiK * .5); sh.alpha = 1 - v.hiK * .3; } // 影子本身的填色已是 .32，這裡只在飛高時再淡三成、放大一半
       }
       v.cont.alpha = e.underground ? 0 : stunned ? .6 : 1; v.body.alpha = v.dodge > 0 ? .4 + .6 * (1 - dodgeK) : 1;
       const biteTint = reduce() && e.biting && bite > .5; // 減少動態：咬住時身體一下紅一下白，不位移
@@ -431,7 +429,7 @@ const Board = (() => {
     const alive = new Set(); const anim = !paused && !still && speed <= 1 && !reduce();
     const put = (id, emoji, kind, x, y, hpv, max, resting) => {
       alive.add(id); const v = MV.get(id) || moverVisual(id, emoji, kind);
-      v.cont.x = x * cw; v.cont.y = yAt(y, x); v.cont.scale.set(scaleAt(x)); // 跑到坡上的狗、巡夜人、迷羊跟著沉下去、變小
+      v.cont.x = x * cw; v.cont.y = yAt(y, x); // 跑到坡上的狗、巡夜人、迷羊跟著沉下去、變小
       if (!paused) { v.swing = Math.max(0, v.swing - dt); v.brightT = Math.max(0, v.brightT - dt); }
       const sw = v.swing > 0 ? Math.sin((1 - v.swing / .3) * Math.PI) : 0;
       v.body.rotation = (anim && !resting ? Math.sin((time + v.phase) * (kind === 'dog' ? 8 : kind === 'patrol' ? 5.3 : 4.5)) * .061 : 0) + sw * .24; v.body.x = sw * cw * .28;
@@ -458,17 +456,17 @@ const Board = (() => {
         if (s.kind === 'arrow') g.roundRect(-9, -1.5, 18, 3, 2).fill(0xd8c8a0);
         else { const R = s.kind === 'lob' || s.kind === 'sling' ? 7 : 5; g.circle(0, 0, R).fill(s.kind === 'lob' ? 0xa9a9a9 : s.kind === 'sling' ? 0xd0d0d0 : 0xe9e4d0).stroke({ width: 1, color: 0x000000, alpha: .35 }); }
         cont.addChild(g);
-        let shadow = null; if (s.kind === 'lob') { shadow = new PIXI.Graphics().ellipse(0, 0, 7, 3).fill({ color: 0x000000, alpha: .35 }); L.shots.addChildAt(shadow, 0); }
+        let shadow = null; if (s.kind === 'lob' || s.fromHill) { shadow = new PIXI.Graphics().ellipse(0, 0, 7, 3).fill({ color: 0x000000, alpha: .35 }); L.shots.addChildAt(shadow, 0); }
         v = { cont, g, glow, shadow, acc: 0 }; SH.set(s.id, v);
         recoilUnit(s.ur === undefined ? s.r : s.ur, s.uc === undefined ? Math.floor(s.x) : s.uc);
       }
       let lift = s.kind === 'lob' ? Math.sin(Math.min(1, s.t) * Math.PI) * .6 : 0;
-      // 坡上射出的直射，過了坡頂那條線（跟引擎同一條：hill + HILL_EDGE，投射物 x 是格子 +.5 座標所以再補 .5）就「飛在半空」：慢慢抬高、變淡，看得出它從坡下敵人的頭頂飛過去。最多淡到一半，打坡下空中飛的時還看得見
+      // 高地射出的直射，過了坡緣那條線（跟引擎同一條：hill + HILL_EDGE，投射物 x 是格子 +.5 座標所以再補 .5）就慢慢變淡（最多一半，打斜坡上空飛的時還看得見）；高度維持高地那一排，地面在它底下掉下去，看得出它從斜坡上敵人的頭頂飛過去
       const hill = hillOf(G);
-      if (s.fromHill && hill !== null) { const k = clamp((s.x - .5 - hill - HILL_EDGE) / 2, 0, 1); v.cont.alpha = 1 - k * .5; } // 過了坡緣慢慢變淡（最多一半）；高度不再另外抬——地面本身往下掉，石子直直飛就看得出是從頭頂過去
+      let over = 0; if (s.fromHill && hill !== null) { over = clamp((s.x - .5 - hill - HILL_EDGE) / 2, 0, 1); v.cont.alpha = 1 - over * .5; } // 過了坡緣慢慢變淡（最多一半）；高度不再另外抬——地面本身往下掉，石子直直飛就看得出是從頭頂過去
       // 高地射出的直射維持高地的高度直直飛（James 10/24：「彈道跟著往下墜、打不中敵方很奇怪」），斜坡上射的和拋射的才順著地面走
-      const x = s.x * cw, y = s.fromHill ? (s.r + .5 - lift) * ch : yAt(s.r + .5 - lift, s.x); v.cont.x = x; v.cont.y = y; v.cont.scale.set(scaleAt(s.x));
-      if (v.shadow) { v.shadow.x = x; v.shadow.y = yAt(s.r + .5, s.x) + ch * .25 * scaleAt(s.x); v.shadow.alpha = .35 - lift * .3; }
+      const x = s.x * cw, y = s.fromHill ? (s.r + .5 - lift) * ch : yAt(s.r + .5 - lift, s.x); v.cont.x = x; v.cont.y = y;
+      if (v.shadow) { v.shadow.x = x; v.shadow.y = yAt(s.r + .5, s.x) + ch * .25; v.shadow.alpha = s.fromHill ? .3 * over : .35 - lift * .3; } // 高地的直射過了坡緣才長出地面影子：看得出它飛在斜坡上方，不是穿過上一排的敵人
       if (s.burn) { v.glow.alpha = .8; v.glow.tint = 0xff8a3d; v.g.tint = 0xff8a3d; }
       if (!paused && speed <= 1 && !reduce()) { v.acc += dt; while (v.acc > .03) { v.acc -= .03; if (s.burn) spark(x - cw * .05, y, Math.random() < .5 ? 0xff8a30 : 0xffd060, .9, .016 * ch, -ch * .3, .3, 1.5); else if (s.kind !== 'arrow') spark(x - cw * .08, y + ch * .02, 0xd8d0c0, .35, .012 * ch, 0, .22, .4); } }
     }
@@ -535,7 +533,7 @@ const Board = (() => {
     const trail = new PIXI.Graphics().rect(-cw * 2.6, -ch * .12, cw * 2.6, ch * .24).fill({ color: GOLD, alpha: .45 }); cont.addChild(trail);
     const man = makeIcon('🧍', ch * .5); cont.addChild(man); cont.y = (r + .5) * ch;
     const rd = reduce(); cont.x = rd ? W * .5 : -cw * .3;
-    tween(.9, k => { if (!rd) { cont.x = -cw * .3 + k * (W + cw); cont.y = yAt(r + .5, cont.x / cw); } cont.alpha = k < (rd ? .6 : .8) ? 1 : 1 - (k - (rd ? .6 : .8)) / (rd ? .4 : .2); }, () => cont.destroy({ children: true }));
+    tween(.9, k => { if (!rd) cont.x = -cw * .3 + k * (W + cw); cont.y = yAt(r + .5, cont.x / cw); cont.alpha = k < (rd ? .6 : .8) ? 1 : 1 - (k - (rd ? .6 : .8)) / (rd ? .4 : .2); }, () => cont.destroy({ children: true }));
   }
 
   // ====== 腳印預告：敵人的在右緣閃爍，special 加紅圈、頭目加金圈；迷羊的錯開一格 ======
