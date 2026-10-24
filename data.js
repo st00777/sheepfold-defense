@@ -167,6 +167,7 @@ const FORESHADOW_LEAD = 3; // 倒數剩幾秒先印腳印
 const START_FOOD = 150;
 const TRICKLE = { every: 5, gives: 5 }; // 沒放牧人也會慢慢有糧
 const HILL_SLOW = 0.85;    // 第三章：地面敵人在坡下走得慢的倍數（模擬無差就改 1）
+const HILL_DROP = 1;       // 第三章畫面：坡上的排整排往下沉幾排（有坡的夜棋盤多這麼多排高；引擎不用，index.html 排版與 render.js 共用，兩邊才對得齊）
 const HILL_EDGE = 0.3;     // 第三章：敵人 x 超過 hill + 這個值才算「在坡下」（剛掉進坡頂陷坑的 x≈hill 算卡在坡緣、打得到；咬坡上第一格牆的 x≈hill+0.6 打不到）
 
 // ====== 關卡 ======
@@ -688,5 +689,5 @@ const LEVELS = [
   },
 ];
 
-const DATA = { THICK_MUL, REPAIR_HINT, SPEED_FAST, SPEED_SLOW, HILL_SLOW, HILL_EDGE, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
+const DATA = { THICK_MUL, REPAIR_HINT, SPEED_FAST, SPEED_SLOW, HILL_SLOW, HILL_EDGE, HILL_DROP, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
 if (typeof module !== 'undefined') module.exports = DATA; else window.DATA = DATA;

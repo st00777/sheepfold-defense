@@ -16,14 +16,14 @@ const Board = (() => {
   const FX_TEXT = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤', slam: '💥', trample: '💨', home: '💛', strike: '✦', crouch: '👁', overfly: '咻', pit: '🕳️', water: '💧', roll: '🪨', throw: '🪨' };
   const HILL_TINT = [0x3a3426, 0x33301f, 0x2d2a1a]; // 坡上三格的底色：越往右（越低）越暗，蓋在草地上做斜面
   const hillOf = g => (g && g.level.hill !== undefined && g.level.hill !== null ? g.level.hill : null); // 這一夜坡從第幾格起；沒有坡＝null（跟 engine.js 同一條）
-  // 坡的畫法（2026-10-24 James：「只是後半段用黃色框圍住，看不出是斜坡」）：過了坡緣，地面往右下斜、越低越矮——每一排的頂緣往右沉下去、底緣貼著棋盤下緣，
-  // 最右邊一格只剩平地的 HILL_SQUASH 高，右三格變成一塊斜著的梯形，上面露出來的是對面的遠山與夜空。格子、單位、敵人、投射物、效果、飄字、腳印全走 yAt／scaleAt 這一條。
-  const HILL_SQUASH = .76;
-  let hillNow = null; // 這一夜的坡（每幀跟 G 對一次；換夜就重畫格子）
+  // 坡的畫法（2026-10-24 James：「只是後半段用黃色框圍住，看不出是斜坡」→ 第二版 James 定案「整排往下移」）：過了坡緣，五排一起順著斜線往下沉，到最右邊剛好沉 HILL_DROP 排，
+  // 格子大小不變（手機上點得準）。有坡的夜棋盤多 HILL_DROP 排高（index.html 排版照同一個數），左下多出來的是坡下的土地、右上露出來的是對面的遠山與夜空。
+  // 相對運動與判定：沉多少只看 x 一個連續函式（yAt），敵人跨過坡緣是順著斜線滑下去、不跳格；格子、單位、狗、投射物、效果、飄字、腳印全走同一條，點擊命中（cellAt）用同一條反算。
+  let hillNow = null; // 這一夜的坡（每幀跟 G 對一次；換夜就重畫格子、重算格高）
   const slopeK = x => hillNow === null ? 0 : clamp((x - hillNow) / (COLS - hillNow), 0, 1); // x：格座標（0..COLS），坡緣 0、最右邊 1
-  const scaleAt = x => 1 - (1 - HILL_SQUASH) * slopeK(x); // 這個 x 的一格有多高（比例），坡上的東西也照這個縮
-  const yAt = (ry, x) => { const s = scaleAt(x); return (1 - s) * H + ry * ch * s; }; // ry：列座標（含 .5）→ 畫面 y；底緣永遠在 H
-  const cellPts = (r, c, inset = 0) => { const xa = c + inset / cw, xb = c + 1 - inset / cw; return [xa * cw, yAt(r, xa) + inset * scaleAt(xa), xb * cw, yAt(r, xb) + inset * scaleAt(xb), xb * cw, yAt(r + 1, xb) - inset * scaleAt(xb), xa * cw, yAt(r + 1, xa) - inset * scaleAt(xa)]; }; // 一格的四個角（左上→右上→右下→左下），平地就是矩形
+  const scaleAt = () => 1; // 第二版不縮（留著這個接口：之後要做假透視只改這裡）
+  const yAt = (ry, x) => ry * ch + slopeK(x) * HILL_DROP * ch; // ry：列座標（含 .5）→ 畫面 y
+  const cellPts = (r, c, inset = 0) => { const xa = c + inset / cw, xb = c + 1 - inset / cw; return [xa * cw, yAt(r, xa) + inset, xb * cw, yAt(r, xb) + inset, xb * cw, yAt(r + 1, xb) - inset, xa * cw, yAt(r + 1, xa) - inset]; }; // 一格的四個角（左上→右上→右下→左下），平地就是矩形、坡上是平行四邊形
   const EASE = k => 1 - Math.pow(1 - k, 3); // 跟 CSS 的 cubic-bezier(.23,1,.32,1) 同一種「先快後慢」
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const key = (r, c) => r + ',' + c, unkey = k => k.split(',').map(Number); // 格子鑰匙 'r,c' 與拆回 [r, c]
@@ -108,7 +108,7 @@ const Board = (() => {
   function layout() {
     const w = app.screen.width, h = app.screen.height;
     if (!w || !h || (w === W && h === H)) return;
-    W = w; H = h; cw = W / COLS; ch = H / ROWS; layoutN++;
+    W = w; H = h; cw = W / COLS; ch = H / (ROWS + (hillNow !== null ? HILL_DROP : 0)); layoutN++; // 有坡的夜多 HILL_DROP 排高（index.html 把棋盤拉高，這裡照同一個數切格子）
     if (tex.ground) { const gs = L.groundSpr, s = Math.max(W / gs.texture.width, H / gs.texture.height); gs.scale.set(s); gs.x = (W - gs.texture.width * s) / 2; gs.y = (H - gs.texture.height * s) / 2; }
     else L.groundSpr.clear().rect(0, 0, W, H).fill(0x243a2a);
     L.vig.width = W; L.vig.height = H;
@@ -132,7 +132,7 @@ const Board = (() => {
   // 點棋盤：算出是哪一格交給 index.html；滑過／按住則用來預覽範圍
   function bindPointer() {
     app.stage.eventMode = 'static'; app.stage.hitArea = app.screen;
-    const cellAt = p => { const c = Math.floor(p.x / cw); if (c < 0 || c >= COLS) return null; const x = p.x / cw, s = scaleAt(x), r = Math.floor((p.y - (1 - s) * H) / (ch * s)); return (r >= 0 && r < ROWS) ? [r, c] : null; }; // 坡上的格子沉下去也變矮，點到頂緣以上的夜空不算格子
+    const cellAt = p => { const c = Math.floor(p.x / cw); if (c < 0 || c >= COLS) return null; const x = p.x / cw, r = Math.floor((p.y - yAt(0, x)) / ch); return (r >= 0 && r < ROWS) ? [r, c] : null; }; // 坡上的格子沉下去：用畫的那條線反算；點到頂緣以上的夜空、左下坡下的土地都不算格子
     let hoverKey = '';
     app.stage.on('pointertap', e => { const rc = cellAt(e.global); if (rc) onTap(rc[0], rc[1]); });
     const hover = e => { const rc = cellAt(e.global); const k = rc ? key(rc[0], rc[1]) : ''; if (k === hoverKey) return; hoverKey = k; onHover(rc ? rc[0] : null, rc ? rc[1] : null); };
@@ -145,7 +145,7 @@ const Board = (() => {
   function frame(g, dt) {
     if (!app) return { biting: false, shots: 0 };
     G = g;
-    const hill = hillOf(G); if (hill !== hillNow) { hillNow = hill; state.cellsDirty = state.rocksDirty = true; if (marker) setMarker(marker.r, marker.type); if (strayMark) setStrayMark(strayMark.r); } // 換到有坡／沒坡的夜：格子重畫、腳印重擺（單位由 drawUnits 自己重建）
+    const hill = hillOf(G); if (hill !== hillNow) { hillNow = hill; W = 0; } // 換到有坡／沒坡的夜：格高變了，逼 layout 整個重排（格子、單位、腳印都在裡面重建）
     layout();
     if (!paused) time += dt;
     const info = { biting: false, shots: 0 };
@@ -181,14 +181,16 @@ const Board = (() => {
     // 第三章山坡：右三格的地面往右下斜（格子本身已照 cellPts 沉下去、變矮），這裡補：頂緣以上的遠山夜空、越低越暗的土色、坡緣的崖面與稜線。羊圈在山上、敵人從山下爬上來，所以右邊才是「下坡」
     const hill = hillOf(G);
     if (hill !== null) {
-      const x0 = hill * cw, yTop = yAt(0, COLS);
+      const x0 = hill * cw, yTop = yAt(0, COLS), yBot = ROWS * ch, yBotR = yAt(ROWS, COLS);
       g.poly([x0, 0, W, 0, W, yTop]).fill(0x121824); // 頂緣以上：夜空
       g.poly([x0, 0, W, yTop * .5, W, yTop]).fill({ color: 0x2c3038, alpha: .9 }); // 對面的遠山，一道淡淡的山影貼著稜線
-      for (let c = hill; c < COLS; c++) g.poly([c * cw, yAt(0, c), (c + 1) * cw, yAt(0, c + 1), (c + 1) * cw, H, c * cw, H]).fill({ color: HILL_TINT[Math.min(HILL_TINT.length - 1, c - hill)], alpha: .38 + (c - hill) * .1 }); // 坡面：越往右越暗的土色
+      g.poly([0, yBot, x0, yBot, W, yBotR, W, H, 0, H]).fill(0x1c1810); // 底緣以下：坡下的土地（平地那段多出來的一排，不是格子）
+      g.poly([0, yBot, x0, yBot, W, yBotR, W, yBotR + ch * .18, x0, yBot + ch * .18, 0, yBot + ch * .18]).fill({ color: 0x000000, alpha: .25 }); // 底緣下一道影，平地像一塊台地
+      for (let c = hill; c < COLS; c++) g.poly([c * cw, yAt(0, c), (c + 1) * cw, yAt(0, c + 1), (c + 1) * cw, yAt(ROWS, c + 1), c * cw, yAt(ROWS, c)]).fill({ color: HILL_TINT[Math.min(HILL_TINT.length - 1, c - hill)], alpha: .38 + (c - hill) * .1 }); // 坡面：越往右越暗的土色
       for (let r = 0; r < ROWS; r++) for (let c = hill; c < COLS; c++) { g.moveTo(c * cw, yAt(r + .5, c)).lineTo((c + 1) * cw, yAt(r + .5, c + 1) + ch * .05).stroke({ width: 1, color: 0x000000, alpha: .10 }); } // 每格一道淺淺的斜紋，順著坡再多斜一點
       g.moveTo(x0, 0).lineTo(W, yTop).stroke({ width: 2, color: 0xd8c8a0, alpha: .4 }); // 稜線：坡頂對著天空那條亮邊
-      g.poly([x0, 0, x0 + cw * .22, yAt(0, hill + .22), x0 + cw * .22, H, x0, H]).fill({ color: 0x000000, alpha: .22 }); // 坡緣下面一道崖影，像一階
-      g.moveTo(x0, 0).lineTo(x0, H).stroke({ width: 3, color: GOLD, alpha: .45 }); // 坡緣線（跟引擎的 hill 同一條）
+      g.poly([x0, 0, x0 + cw * .22, yAt(0, hill + .22), x0 + cw * .22, yAt(ROWS, hill + .22), x0, yBot]).fill({ color: 0x000000, alpha: .22 }); // 坡緣下面一道崖影，像一階
+      g.moveTo(x0, 0).lineTo(x0, yBot).stroke({ width: 3, color: GOLD, alpha: .45 }); // 坡緣線（跟引擎的 hill 同一條）
     }
     // 石頭格畫一顆石頭
     if (state.rocksDirty) { state.rocksDirty = false; for (const sp of L.cells.children.filter(x => x.isRock)) sp.destroy();
