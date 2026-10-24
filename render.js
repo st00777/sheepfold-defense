@@ -16,6 +16,14 @@ const Board = (() => {
   const FX_TEXT = { blast: '💥', ignite: '🔥', sting: '☠️', flee: '💨', horn: '📯', emerge: '💨', grab: '🐑', splash: '💥', enrage: '😡', rest: '💤', slam: '💥', trample: '💨', home: '💛', strike: '✦', crouch: '👁', overfly: '咻', pit: '🕳️', water: '💧', roll: '🪨', throw: '🪨' };
   const HILL_TINT = [0x3a3426, 0x33301f, 0x2d2a1a]; // 坡上三格的底色：越往右（越低）越暗，蓋在草地上做斜面
   const hillOf = g => (g && g.level.hill !== undefined && g.level.hill !== null ? g.level.hill : null); // 這一夜坡從第幾格起；沒有坡＝null（跟 engine.js 同一條）
+  // 坡的畫法（2026-10-24 James：「只是後半段用黃色框圍住，看不出是斜坡」）：過了坡緣，地面往右下斜、越低越矮——每一排的頂緣往右沉下去、底緣貼著棋盤下緣，
+  // 最右邊一格只剩平地的 HILL_SQUASH 高，右三格變成一塊斜著的梯形，上面露出來的是對面的遠山與夜空。格子、單位、敵人、投射物、效果、飄字、腳印全走 yAt／scaleAt 這一條。
+  const HILL_SQUASH = .76;
+  let hillNow = null; // 這一夜的坡（每幀跟 G 對一次；換夜就重畫格子）
+  const slopeK = x => hillNow === null ? 0 : clamp((x - hillNow) / (COLS - hillNow), 0, 1); // x：格座標（0..COLS），坡緣 0、最右邊 1
+  const scaleAt = x => 1 - (1 - HILL_SQUASH) * slopeK(x); // 這個 x 的一格有多高（比例），坡上的東西也照這個縮
+  const yAt = (ry, x) => { const s = scaleAt(x); return (1 - s) * H + ry * ch * s; }; // ry：列座標（含 .5）→ 畫面 y；底緣永遠在 H
+  const cellPts = (r, c, inset = 0) => { const xa = c + inset / cw, xb = c + 1 - inset / cw; return [xa * cw, yAt(r, xa) + inset * scaleAt(xa), xb * cw, yAt(r, xb) + inset * scaleAt(xb), xb * cw, yAt(r + 1, xb) - inset * scaleAt(xb), xa * cw, yAt(r + 1, xa) - inset * scaleAt(xa)]; }; // 一格的四個角（左上→右上→右下→左下），平地就是矩形
   const EASE = k => 1 - Math.pow(1 - k, 3); // 跟 CSS 的 cubic-bezier(.23,1,.32,1) 同一種「先快後慢」
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const key = (r, c) => r + ',' + c, unkey = k => k.split(',').map(Number); // 格子鑰匙 'r,c' 與拆回 [r, c]
@@ -124,7 +132,7 @@ const Board = (() => {
   // 點棋盤：算出是哪一格交給 index.html；滑過／按住則用來預覽範圍
   function bindPointer() {
     app.stage.eventMode = 'static'; app.stage.hitArea = app.screen;
-    const cellAt = p => { const c = Math.floor(p.x / cw), r = Math.floor(p.y / ch); return (c >= 0 && c < COLS && r >= 0 && r < ROWS) ? [r, c] : null; };
+    const cellAt = p => { const c = Math.floor(p.x / cw); if (c < 0 || c >= COLS) return null; const x = p.x / cw, s = scaleAt(x), r = Math.floor((p.y - (1 - s) * H) / (ch * s)); return (r >= 0 && r < ROWS) ? [r, c] : null; }; // 坡上的格子沉下去也變矮，點到頂緣以上的夜空不算格子
     let hoverKey = '';
     app.stage.on('pointertap', e => { const rc = cellAt(e.global); if (rc) onTap(rc[0], rc[1]); });
     const hover = e => { const rc = cellAt(e.global); const k = rc ? key(rc[0], rc[1]) : ''; if (k === hoverKey) return; hoverKey = k; onHover(rc ? rc[0] : null, rc ? rc[1] : null); };
@@ -136,7 +144,9 @@ const Board = (() => {
   // ====== 每一幀：index.html 的 tick 呼叫；回報「有人在咬」與新出手數給它放音效 ======
   function frame(g, dt) {
     if (!app) return { biting: false, shots: 0 };
-    G = g; layout();
+    G = g;
+    const hill = hillOf(G); if (hill !== hillNow) { hillNow = hill; state.cellsDirty = state.rocksDirty = true; if (marker) setMarker(marker.r, marker.type); if (strayMark) setStrayMark(strayMark.r); } // 換到有坡／沒坡的夜：格子重畫、腳印重擺（單位由 drawUnits 自己重建）
+    layout();
     if (!paused) time += dt;
     const info = { biting: false, shots: 0 };
     if (!G) { app.render(); return info; }
@@ -160,35 +170,39 @@ const Board = (() => {
     // 教學金框每幀呼吸，畫在自己那層；底色、石頭、提示框只在變了的時候重畫
     const t = L.teachG.clear();
     if (state.teach) { const [r, c] = state.teach; const pulse = reduce() ? .8 : .5 + .5 * Math.abs(Math.sin(time * 1.75)); // 一呼吸 1.8 秒（跟 DOM 版 glowFade .9s alternate 同）
-      t.rect(c * cw + 5, r * ch + 5, cw - 10, ch - 10).stroke({ width: 3, color: GOLD }); t.rect(c * cw + 2, r * ch + 2, cw - 4, ch - 4).stroke({ width: 8, color: GOLD, alpha: .35 * pulse }); }
+      t.poly(cellPts(r, c, 5)).stroke({ width: 3, color: GOLD }); t.poly(cellPts(r, c, 2)).stroke({ width: 8, color: GOLD, alpha: .35 * pulse }); }
     if (!state.cellsDirty) return; state.cellsDirty = false;
     const g = L.cellG.clear();
     for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
       const rock = G && G.rocks.has(key(r, c)), alt = (r + c) % 2;
-      g.rect(c * cw, r * ch, cw, ch).fill(rock ? { color: 0x5a5650, alpha: 1 } : alt ? { color: 0x5f7f46, alpha: .72 } : { color: 0x4f6b3a, alpha: .80 });
-      g.rect(c * cw + .5, r * ch + .5, cw - 1, ch - 1).stroke({ width: 1, color: 0xffffff, alpha: .06 });
+      g.poly(cellPts(r, c)).fill(rock ? { color: 0x5a5650, alpha: 1 } : alt ? { color: 0x5f7f46, alpha: .72 } : { color: 0x4f6b3a, alpha: .80 });
+      g.poly(cellPts(r, c, .5)).stroke({ width: 1, color: 0xffffff, alpha: .06 });
     }
-    // 第三章山坡：坡上三格蓋一層越往右越暗的土色（斜面），坡緣一條亮線。羊圈在山上、敵人從山下爬上來，所以右邊才是「下坡」
+    // 第三章山坡：右三格的地面往右下斜（格子本身已照 cellPts 沉下去、變矮），這裡補：頂緣以上的遠山夜空、越低越暗的土色、坡緣的崖面與稜線。羊圈在山上、敵人從山下爬上來，所以右邊才是「下坡」
     const hill = hillOf(G);
     if (hill !== null) {
-      for (let c = hill; c < COLS; c++) g.rect(c * cw, 0, cw, ROWS * ch).fill({ color: HILL_TINT[Math.min(HILL_TINT.length - 1, c - hill)], alpha: .38 + (c - hill) * .1 });
-      for (let r = 0; r < ROWS; r++) for (let c = hill; c < COLS; c++) { const y0 = r * ch + ch * .5; g.moveTo(c * cw, y0).lineTo((c + 1) * cw, y0 + ch * .08).stroke({ width: 1, color: 0x000000, alpha: .10 }); } // 每格一道淺淺的斜紋，看得出是往右下走的面
-      g.moveTo(hill * cw, 0).lineTo(hill * cw, ROWS * ch).stroke({ width: 3, color: GOLD, alpha: .45 });
-      g.moveTo(hill * cw + 2, 0).lineTo(hill * cw + 2, ROWS * ch).stroke({ width: 6, color: 0x000000, alpha: .18 }); // 坡緣下面一道影，像一階
+      const x0 = hill * cw, yTop = yAt(0, COLS);
+      g.poly([x0, 0, W, 0, W, yTop]).fill(0x121824); // 頂緣以上：夜空
+      g.poly([x0, 0, W, yTop * .5, W, yTop]).fill({ color: 0x2c3038, alpha: .9 }); // 對面的遠山，一道淡淡的山影貼著稜線
+      for (let c = hill; c < COLS; c++) g.poly([c * cw, yAt(0, c), (c + 1) * cw, yAt(0, c + 1), (c + 1) * cw, H, c * cw, H]).fill({ color: HILL_TINT[Math.min(HILL_TINT.length - 1, c - hill)], alpha: .38 + (c - hill) * .1 }); // 坡面：越往右越暗的土色
+      for (let r = 0; r < ROWS; r++) for (let c = hill; c < COLS; c++) { g.moveTo(c * cw, yAt(r + .5, c)).lineTo((c + 1) * cw, yAt(r + .5, c + 1) + ch * .05).stroke({ width: 1, color: 0x000000, alpha: .10 }); } // 每格一道淺淺的斜紋，順著坡再多斜一點
+      g.moveTo(x0, 0).lineTo(W, yTop).stroke({ width: 2, color: 0xd8c8a0, alpha: .4 }); // 稜線：坡頂對著天空那條亮邊
+      g.poly([x0, 0, x0 + cw * .22, yAt(0, hill + .22), x0 + cw * .22, H, x0, H]).fill({ color: 0x000000, alpha: .22 }); // 坡緣下面一道崖影，像一階
+      g.moveTo(x0, 0).lineTo(x0, H).stroke({ width: 3, color: GOLD, alpha: .45 }); // 坡緣線（跟引擎的 hill 同一條）
     }
     // 石頭格畫一顆石頭
     if (state.rocksDirty) { state.rocksDirty = false; for (const sp of L.cells.children.filter(x => x.isRock)) sp.destroy();
-    if (G) for (const k of G.rocks) { const [r, c] = unkey(k); const s = makeIcon('🪨', ch * .4); s.alpha = .7; s.x = (c + .5) * cw; s.y = (r + .5) * ch; s.isRock = true; L.cells.addChild(s); } }
+    if (G) for (const k of G.rocks) { const [r, c] = unkey(k); const s = makeIcon('🪨', ch * .4); s.alpha = .7; s.x = (c + .5) * cw; s.y = yAt(r + .5, c + .5); s.scale.set(s.scale.x * scaleAt(c + .5)); s.isRock = true; L.cells.addChild(s); } }
     const h = L.hintG.clear();
     // 範圍預覽：淡金蓋底色
-    for (const k of state.range) { const [r, c] = unkey(k); h.rect(c * cw, r * ch, cw, ch).fill({ color: GOLD, alpha: .23 }); }
+    for (const k of state.range) { const [r, c] = unkey(k); h.poly(cellPts(r, c)).fill({ color: GOLD, alpha: .23 }); }
     // 提示框：空地虛線金框、可直接換的金實線、鏟子時紅虛線
-    for (const [k, kind] of state.hints) { const [r, c] = unkey(k); const x = c * cw + 4, y = r * ch + 4, w = cw - 8, hh = ch - 8;
-      if (kind === 'swap') h.rect(x, y, w, hh).stroke({ width: 2, color: GOLD }); else dashRect(h, x, y, w, hh, kind === 'sell' ? DANGER : GOLD); }
+    for (const [k, kind] of state.hints) { const [r, c] = unkey(k); const pts = cellPts(r, c, 4);
+      if (kind === 'swap') h.poly(pts).stroke({ width: 2, color: GOLD }); else dashPoly(h, pts, kind === 'sell' ? DANGER : GOLD); }
   }
-  function dashRect(g, x, y, w, h, color) { // Pixi 沒有虛線：自己一段一段畫
+  function dashPoly(g, p, color) { // Pixi 沒有虛線：自己一段一段畫（四個角的多邊形，坡上是斜的）
     const seg = 6, gap = 4; const edge = (x0, y0, x1, y1) => { const len = Math.hypot(x1 - x0, y1 - y0), n = Math.floor(len / (seg + gap)); for (let i = 0; i <= n; i++) { const a = i * (seg + gap) / len, b = Math.min(1, (i * (seg + gap) + seg) / len); if (a >= 1) break; g.moveTo(x0 + (x1 - x0) * a, y0 + (y1 - y0) * a).lineTo(x0 + (x1 - x0) * b, y0 + (y1 - y0) * b); } };
-    edge(x, y, x + w, y); edge(x + w, y, x + w, y + h); edge(x + w, y + h, x, y + h); edge(x, y + h, x, y); g.stroke({ width: 2, color });
+    for (let i = 0; i < 4; i++) edge(p[i * 2], p[i * 2 + 1], p[(i * 2 + 2) % 8], p[(i * 2 + 3) % 8]); g.stroke({ width: 2, color });
   }
   function setHints(map) { state.hints = map || new Map(); state.cellsDirty = true; }
   function setRange(list) { state.range = new Set((list || []).map(([r, c]) => key(r, c))); state.cellsDirty = true; }
@@ -213,7 +227,7 @@ const Board = (() => {
     if (old) { old.cont.destroy({ children: true }); if (old.glow) old.glow.destroy(); if (old.up) old.up.destroy({ children: true }); removeHole(k); UN.delete(k); }
     if (!u) return;
     const def = UNITS[u.type];
-    const cont = new PIXI.Container(); cont.x = (c + .5) * cw; cont.y = (r + .5) * ch; L.units.addChild(cont);
+    const cont = new PIXI.Container(); cont.x = (c + .5) * cw; cont.y = yAt(r + .5, c + .5); cont.scale.set(scaleAt(c + .5)); L.units.addChild(cont); // 坡上的格子沉下去、變矮，單位跟著
     const inner = new PIXI.Container(); cont.addChild(inner); // inner：放下壓扁、回彈、跳一下都動這層；cont 只放位置
     const bg = new PIXI.Graphics(); inner.addChild(bg);
     const icoEmoji = def.kind === 'dog' ? '🦴' : def.kind === 'patrol' ? '🪵' : def.ico; // 狗窩、巡夜人的崗位：人在外面走
@@ -296,7 +310,7 @@ const Board = (() => {
     // 照亮的排：黑霧散掉（.6 秒淡）、草地轉暖亮（跟引擎 rowLit 同一套判定）。天亮後黑暗在退的那一兩秒，亮排跟著一起淡掉，不會先全黑再亮
     let changed = false;
     for (let r = 0; r < ROWS; r++) { const lit = keepDark() && !!Engine.rowLit(G, r); if (lit !== state.litRows[r]) { state.litRows[r] = lit; changed = true; } const f = L.fogs[r]; if (!paused) f.alpha += ((lit ? 0 : 1) - f.alpha) * Math.min(1, dt * 5); f.visible = f.alpha > .01; }
-    if (changed) { const g = L.litG.clear(); for (let r = 0; r < ROWS; r++) if (state.litRows[r]) for (let c = 0; c < COLS; c++) g.rect(c * cw, r * ch, cw, ch).fill({ color: (r + c) % 2 ? 0x8a9847 : 0x7d8a3f, alpha: .7 }); }
+    if (changed) { const g = L.litG.clear(); for (let r = 0; r < ROWS; r++) if (state.litRows[r]) for (let c = 0; c < COLS; c++) g.poly(cellPts(r, c)).fill({ color: (r + c) % 2 ? 0x8a9847 : 0x7d8a3f, alpha: .7 }); }
     L.litG.alpha = state.darkA;
     app.renderer.render({ container: L.darkScene, target: L.darkRT, clear: true });
   }
@@ -347,16 +361,15 @@ const Board = (() => {
       const shoveX = v.shove > 0 && v.shoveDx ? -v.shoveDx * cw * (1 - EASE(1 - v.shove / .18)) : 0; // 吹角：從原位滑到新位
       const dodgeK = v.dodge > 0 ? Math.sin((1 - v.dodge / .35) * Math.PI) : 0, dodgeX = reduce() ? 0 : cw * .4 * dodgeK; // 閃避：本體側滑＋變淡（血條不跟著跑）；減少動態只變淡
       // 第三章山坡：坡下的地面敵人依位置往下偏（最多 .12 格）並縮小一點（假透視，最多 10%），看得出牠在坡面上；大鷹飛高時整個身體再抬高、放大一點
-      const hill = hillOf(G);
-      const slopeK = hill !== null && !v.fly ? clamp((e.x - hill) / (COLS - hill), 0, 1) : 0, slope = slopeK * ch * .12;
-      v.cont.x = (e.x + .5) * cw + shoveX; v.cont.y = (rv + .5 - (e.lift || 0) * .6) * ch + slope; // lift：賊翻牆的弧線
+      const sc = scaleAt(e.x + .5); // 坡上越低越小（飛的也一樣：跟同一排的地面對齊）
+      v.cont.x = (e.x + .5) * cw + shoveX; v.cont.y = yAt(rv + .5 - (e.lift || 0) * .6, e.x + .5); // lift：賊翻牆的弧線
       const stunned = e.st.stun || e.st.distract, stillOne = stunned || e.underground || e.crouchT > 0;
       let rot = 0, bob = 0, lunge = 0, bite = 0;
       if (anim && speed <= 1 && !stillOne) { const f = v.fly || v.swarm ? 3 : v.k >= 1.2 ? 4 : e.type === 'fast' ? 8 : 5.7; if (v.fly || v.swarm) bob = Math.sin((time + v.phase) * f) * ch * .06; else { rot = Math.sin((time + v.phase) * f) * .061; bob = -Math.abs(Math.sin((time + v.phase) * f)) * ch * .025; } }
       if (e.biting && !stillOne && !paused && !still) { bite = Math.abs(Math.sin(time * 7 + v.phase)); if (!reduce()) lunge = -bite * cw * .14; } // 咬東西：每 .45 秒往前撲一下（加速也保留，是資訊；減少動態改身體泛紅）
       if (v.swing > 0) { lunge += cw * .28 * Math.sin((1 - v.swing / .3) * Math.PI); rot += .24 * Math.sin((1 - v.swing / .3) * Math.PI); }
       v.body.rotation = rot; v.body.y = bob; v.body.x = lunge + dodgeX;
-      const crouch = e.crouchT > 0; v.body.scale.set((crouch ? .8 : 1 + (reduce() ? 0 : bite * .06)) * (1 - slopeK * .1)); if (crouch) v.body.y += ch * .12;
+      const crouch = e.crouchT > 0; v.body.scale.set((crouch ? .8 : 1 + (reduce() ? 0 : bite * .06)) * sc); if (crouch) v.body.y += ch * .12;
       if (ENEMIES[e.type].high) { // 大鷹：飛高時身體抬高、放大、影子變大變淡（抬頭找影子）；抓了羊或守望樓那排壓低就回到一般飛行高度（這一段滑過去，不跳；減少動態直接跳到位、暫停不動）
         const want = e.high ? 1 : 0;
         if (reduce()) v.hiK = want; else if (!paused) v.hiK = clamp((v.hiK ?? want) + (want ? 1 : -1) * dt * 2.5, 0, 1); else v.hiK = v.hiK ?? want;
@@ -415,7 +428,7 @@ const Board = (() => {
     const alive = new Set(); const anim = !paused && !still && speed <= 1 && !reduce();
     const put = (id, emoji, kind, x, y, hpv, max, resting) => {
       alive.add(id); const v = MV.get(id) || moverVisual(id, emoji, kind);
-      v.cont.x = x * cw; v.cont.y = y * ch;
+      v.cont.x = x * cw; v.cont.y = yAt(y, x); v.cont.scale.set(scaleAt(x)); // 跑到坡上的狗、巡夜人、迷羊跟著沉下去、變小
       if (!paused) { v.swing = Math.max(0, v.swing - dt); v.brightT = Math.max(0, v.brightT - dt); }
       const sw = v.swing > 0 ? Math.sin((1 - v.swing / .3) * Math.PI) : 0;
       v.body.rotation = (anim && !resting ? Math.sin((time + v.phase) * (kind === 'dog' ? 8 : kind === 'patrol' ? 5.3 : 4.5)) * .061 : 0) + sw * .24; v.body.x = sw * cw * .28;
@@ -450,8 +463,8 @@ const Board = (() => {
       // 坡上射出的直射，過了坡頂那條線（跟引擎同一條：hill + HILL_EDGE，投射物 x 是格子 +.5 座標所以再補 .5）就「飛在半空」：慢慢抬高、變淡，看得出它從坡下敵人的頭頂飛過去。最多淡到一半，打坡下空中飛的時還看得見
       const hill = hillOf(G);
       if (s.fromHill && hill !== null) { const k = clamp((s.x - .5 - hill - HILL_EDGE) / 2, 0, 1); lift += k * .35; v.cont.alpha = 1 - k * .5; }
-      const x = s.x * cw, y = (s.r + .5 - lift) * ch; v.cont.x = x; v.cont.y = y;
-      if (v.shadow) { v.shadow.x = x; v.shadow.y = (s.r + .5) * ch + ch * .25; v.shadow.alpha = .35 - lift * .3; }
+      const x = s.x * cw, y = yAt(s.r + .5 - lift, s.x); v.cont.x = x; v.cont.y = y; v.cont.scale.set(scaleAt(s.x)); // 飛進坡上的也跟著地面沉、變小
+      if (v.shadow) { v.shadow.x = x; v.shadow.y = yAt(s.r + .5, s.x) + ch * .25 * scaleAt(s.x); v.shadow.alpha = .35 - lift * .3; }
       if (s.burn) { v.glow.alpha = .8; v.glow.tint = 0xff8a3d; v.g.tint = 0xff8a3d; }
       if (!paused && speed <= 1 && !reduce()) { v.acc += dt; while (v.acc > .03) { v.acc -= .03; if (s.burn) spark(x - cw * .05, y, Math.random() < .5 ? 0xff8a30 : 0xffd060, .9, .016 * ch, -ch * .3, .3, 1.5); else if (s.kind !== 'arrow') spark(x - cw * .08, y + ch * .02, 0xd8d0c0, .35, .012 * ch, 0, .22, .4); } }
     }
@@ -461,7 +474,7 @@ const Board = (() => {
 
   // ====== 一次性效果 ======
   function fx(kind, r, x, id, ev) {
-    const px = (x + .5) * cw, py = (r + .5) * ch;
+    const px = (x + .5) * cw, py = yAt(r + .5, x + .5);
     if (reduce() && ['blast', 'splash', 'slam', 'ignite', 'trample', 'emerge'].includes(kind)) popText(r, x, FX_TEXT[kind]); // 減少動態：粒子不出，改飄一個字讓人知道發生了什麼
     switch (kind) {
       case 'blast': ring(px, py, cw * 1.6, 0xffb060, .45); burst(px, py, 18, [0xff8a30, 0xffd060, 0x777777], ch * .9, .5); break;
@@ -470,7 +483,7 @@ const Board = (() => {
       case 'ignite': burst(px, py, 10, [0xff8a30, 0xffd060], ch * .6, .5); break;
       case 'howl': ripple(px, py, 0xc9a0dc); break;
       case 'roar': ripple(px, py, GOLD); break;
-      case 'horn': { if (speed <= 1) squashUnit(r, x); popText(r, x, FX_TEXT.horn); if (reduce()) break; const g = new PIXI.Graphics(); L.fx.addChild(g); tween(.45, k => { const e = EASE(k); g.clear().ellipse(px + e * W * .9, py, cw * .25, ch * .45).stroke({ width: 3, color: 0xffe28a, alpha: 1 - k }); }, () => g.destroy()); hornShove(ev && ev.moved); break; } // 吹的人回彈＋衝擊波＋被推的滑移
+      case 'horn': { if (speed <= 1) squashUnit(r, x); popText(r, x, FX_TEXT.horn); if (reduce()) break; const g = new PIXI.Graphics(); L.fx.addChild(g); tween(.45, k => { const e = EASE(k); g.clear().ellipse(px + e * W * .9, yAt(r + .5, (px + e * W * .9) / cw), cw * .25, ch * .45).stroke({ width: 3, color: 0xffe28a, alpha: 1 - k }); }, () => g.destroy()); hornShove(ev && ev.moved); break; } // 吹的人回彈＋衝擊波＋被推的滑移
       case 'trample': case 'emerge': case 'flee': burst(px, py + ch * .2, 6, [0xc9bda0], ch * .4, .3); if (kind === 'flee') popText(r, x, FX_TEXT.flee); break;
       case 'gate': gateSweep(r); break;
       case 'strike': { burst(px, py, 6, [0xffe28a, 0xffffff], ch * .4, .25); const t = makeText('✦', Math.max(16, ch * .5), GOLD, true); t.x = px; t.y = py; L.text.addChild(t); tween(.45, k => { t.scale.set(1 + k * .4); t.alpha = 1 - k; }, () => t.destroy()); swingPatrol(id); break; }
@@ -483,24 +496,24 @@ const Board = (() => {
       case 'overfly': { if (speed > 1) break; popText(r, x, FX_TEXT.overfly, true); if (!reduce()) for (let i = 0; i < 3; i++) spark(px + i * 4, py - ch * .28, 0xf3ead8, .7, .012 * ch, -ch * .2, .3, 1.2); break; } // 石子從頭頂飛過：一團淡白的「咻」（加速時省略：五排同時射會冒一堆字）
       case 'pit': { ring(px, py + ch * .1, cw * .45, 0x3a3028, .4); burst(px, py + ch * .1, 8, [0x6a4a2a, 0x3a3028], ch * .45, .4); popText(r, x, `${FX_TEXT.pit}${ev && ev.sec ? ' ' + ev.sec + 's' : ''}`, true); break; } // 坑塌：土色一圈＋幾秒的字
       case 'water': { ring(px, py, cw * 1.4, 0x7ab8e0, .45); burst(px, py, 14, [0x7ab8e0, 0xcfe8ff, 0xffffff], ch * .7, .45); popText(r, x, FX_TEXT.water, true); break; } // 水袋：藍色水花
-      case 'throw': { const tx = ((ev && ev.tc !== undefined ? ev.tc : x - 1) + .5) * cw; if (reduce() || speed > 1) { if (reduce()) popText(r, x, FX_TEXT.throw, true); else burst(tx, py, 4, [0xc9bda0], ch * .3, .25); break; } const g = new PIXI.Graphics().circle(0, 0, 4).fill(0xe9e4d0).stroke({ width: 1, color: 0x000000, alpha: .35 }); L.fx.addChild(g); tween(.32, k => { g.x = px + (tx - px) * k; g.y = py - Math.sin(k * Math.PI) * ch * .5; }, () => { g.destroy(); burst(tx, py, 4, [0xc9bda0], ch * .3, .25); }); break; } // 強盜丟石：一顆小石子從牠手上拋到靶那格；加速只留落點的灰塵
+      case 'throw': { const tx = ((ev && ev.tc !== undefined ? ev.tc : x - 1) + .5) * cw, ty = yAt(r + .5, tx / cw); if (reduce() || speed > 1) { if (reduce()) popText(r, x, FX_TEXT.throw, true); else burst(tx, ty, 4, [0xc9bda0], ch * .3, .25); break; } const g = new PIXI.Graphics().circle(0, 0, 4).fill(0xe9e4d0).stroke({ width: 1, color: 0x000000, alpha: .35 }); L.fx.addChild(g); tween(.32, k => { g.x = px + (tx - px) * k; g.y = py + (ty - py) * k - Math.sin(k * Math.PI) * ch * .5; }, () => { g.destroy(); burst(tx, ty, 4, [0xc9bda0], ch * .3, .25); }); break; } // 強盜丟石：一顆小石子從牠手上拋到靶那格；加速只留落點的灰塵
       case 'roll': { // 滾石：幾顆石頭從石堆那格往右滾下坡（加速時兩顆），坡下被撞的敵人跟吹角一樣滑開
         hornShove(ev && ev.moved); if (reduce()) { popText(r, x, FX_TEXT.roll, true); break; }
-        for (let i = 0; i < (speed > 1 ? 2 : 4); i++) { const g = new PIXI.Graphics().circle(0, 0, 5 + Math.random() * 3).fill(0x8a8378).stroke({ width: 1, color: 0x000000, alpha: .4 }); g.alpha = 0; L.fx.addChild(g); const d0 = i * .06, far = (COLS - x) * cw; tween(.55 + d0, k => { const kk = clamp((k * (.55 + d0) - d0) / .55, 0, 1), e = EASE(kk); g.x = px + far * e + (i - 1.5) * 4; g.y = py + ch * .25 + Math.sin(kk * Math.PI * 3) * ch * .08 * (1 - kk) + kk * ch * .12; g.alpha = kk <= 0 ? 0 : 1 - Math.max(0, kk - .75) * 4; }, () => g.destroy()); } // 還沒輪到的那幾顆先隱形，不會疊在石堆格上閃一下
+        for (let i = 0; i < (speed > 1 ? 2 : 4); i++) { const g = new PIXI.Graphics().circle(0, 0, 5 + Math.random() * 3).fill(0x8a8378).stroke({ width: 1, color: 0x000000, alpha: .4 }); g.alpha = 0; L.fx.addChild(g); const d0 = i * .06, far = (COLS - x) * cw; tween(.55 + d0, k => { const kk = clamp((k * (.55 + d0) - d0) / .55, 0, 1), e = EASE(kk); g.x = px + far * e + (i - 1.5) * 4; g.y = yAt(r + .5, (px + far * e) / cw) + ch * .25 + Math.sin(kk * Math.PI * 3) * ch * .08 * (1 - kk) + kk * ch * .12; g.alpha = kk <= 0 ? 0 : 1 - Math.max(0, kk - .75) * 4; }, () => g.destroy()); } // 還沒輪到的那幾顆先隱形，不會疊在石堆格上閃一下
         burst(px, py + ch * .2, 8, [0xc9bda0, 0x8a8378], ch * .5, .4); break; }
       default: if (FX_TEXT[kind]) popText(r, x, FX_TEXT[kind], kind === 'grab' || kind === 'home' || kind === 'rest' || kind === 'enrage' || kind === 'sting');
     }
     if (kind === 'emerge') { const g = mounds.get(id); if (g) { g.destroy(); mounds.delete(id); } }
   }
   function ring(x, y, R, color, dur) { const g = new PIXI.Graphics(); L.fx.addChild(g); const rd = reduce(); tween(dur, k => { const e = rd ? .7 : EASE(k); g.clear().circle(x, y, R * e).stroke({ width: 3 * (1 - k) + 1, color, alpha: 1 - k }); }, () => g.destroy()); } // 減少動態：圓環不擴張只淡出
-  function drawMound(g) { g.clear().ellipse(0, 0, cw * .3, ch * .14).fill(0x6a4a2a).stroke({ width: 1, color: 0x000000, alpha: .3 }); g.x = (g.mx + .5) * cw; g.y = (g.mr + .5) * ch + ch * .25; }
+  function drawMound(g) { g.clear().ellipse(0, 0, cw * .3, ch * .14).fill(0x6a4a2a).stroke({ width: 1, color: 0x000000, alpha: .3 }); g.x = (g.mx + .5) * cw; g.y = yAt(g.mr + .5, g.mx + .5) + ch * .25; }
   function ripple(x, y, color) { const rd = reduce(); const one = (delay) => { const g = new PIXI.Graphics(); L.fx.addChild(g); tweens.push({ t: 0, dur: 1 + delay, fn: k => { const kk = clamp((k * (1 + delay) - delay) / 1, 0, 1); g.clear().circle(x, y, cw * .35 * (1 + 1.6 * (rd ? .5 : kk))).stroke({ width: 2, color, alpha: 1 - kk }); }, done: () => g.destroy() }); }; one(0); if (!rd) one(.25); }
   function burst(x, y, n, cols, v, life) { if (reduce()) return; if (speed > 1) n = Math.ceil(n / 3); for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, s = v * (.4 + Math.random() * .8); spawnParticle(x, y, Math.cos(a) * s, Math.sin(a) * s - v * .3, life * (.6 + Math.random() * .6), cols[Math.floor(Math.random() * cols.length)], .04 * ch * (.6 + Math.random()), ch * 1.6, .8); } } // 粒子直徑約 4px，手機上才看得到
   // 飄字：+25 金色往上飄 1 秒；效果 emoji 0.8 秒；減少動態只淡出
   function popText(r, c, text, light) {
     const gold = String(text)[0] === '+';
     const t = makeText(text, gold ? Math.max(13, ch * .22) : Math.max(16, ch * .42), gold ? GOLD : TEXT, gold); if (!gold) t.style.stroke = { color: 0x000000, width: 2 };
-    t.x = (c + (gold ? .3 : .5)) * cw; t.y = (r + (gold ? .25 : .5)) * ch; L.text.addChild(t);
+    t.x = (c + (gold ? .3 : .5)) * cw; t.y = yAt(r + (gold ? .25 : .5), c + .5); L.text.addChild(t);
     const y0 = t.y, rd = reduce(), dur = rd ? .5 : gold ? 1 : .8, dy = gold ? 24 : 12;
     tween(dur, k => { const e = EASE(k); if (!rd) t.y = y0 - dy * e; t.alpha = 1 - e; }, () => t.destroy());
   }
@@ -508,7 +521,7 @@ const Board = (() => {
   function catchFx(r, c) {
     const t = makeText('接回 🐑', Math.max(11, ch * .18), 0x2a2418, true); t.style.stroke = null;
     const b = new PIXI.Container(); b.addChild(new PIXI.Graphics().roundRect(-t.width / 2 - 8, -t.height / 2 - 2, t.width + 16, t.height + 4, 999).fill(GOLD)); b.addChild(t);
-    b.x = (c + .5) * cw; b.y = (r + .2) * ch; L.text.addChild(b); const y0 = b.y, rd = reduce();
+    b.x = (c + .5) * cw; b.y = yAt(r + .2, c + .5); L.text.addChild(b); const y0 = b.y, rd = reduce();
     tween(rd ? 1.2 : 1.3, k => { if (!rd) b.y = y0 - 12 * EASE(k); b.alpha = 1 - k * k; }, () => b.destroy({ children: true }));
     const v = UN.get(key(r, c)); if (v && speed <= 1 && !rd) tween(.32, k => { const s = Math.sin(k * Math.PI); v.inner.y = -ch * .12 * s; v.inner.scale.set(1 + .08 * s); }, () => { v.inner.y = 0; v.inner.scale.set(1); });
   }
@@ -518,7 +531,7 @@ const Board = (() => {
     const trail = new PIXI.Graphics().rect(-cw * 2.6, -ch * .12, cw * 2.6, ch * .24).fill({ color: GOLD, alpha: .45 }); cont.addChild(trail);
     const man = makeIcon('🧍', ch * .5); cont.addChild(man); cont.y = (r + .5) * ch;
     const rd = reduce(); cont.x = rd ? W * .5 : -cw * .3;
-    tween(.9, k => { if (!rd) cont.x = -cw * .3 + k * (W + cw); cont.alpha = k < (rd ? .6 : .8) ? 1 : 1 - (k - (rd ? .6 : .8)) / (rd ? .4 : .2); }, () => cont.destroy({ children: true }));
+    tween(.9, k => { if (!rd) { cont.x = -cw * .3 + k * (W + cw); cont.y = yAt(r + .5, cont.x / cw); } cont.alpha = k < (rd ? .6 : .8) ? 1 : 1 - (k - (rd ? .6 : .8)) / (rd ? .4 : .2); }, () => cont.destroy({ children: true }));
   }
 
   // ====== 腳印預告：敵人的在右緣閃爍，special 加紅圈、頭目加金圈；迷羊的錯開一格 ======
@@ -529,12 +542,12 @@ const Board = (() => {
     const special = type && type !== 'wolf' && type !== 'fast';
     if (special) { const boss = !!ENEMIES[type].boss; cont.addChild(new PIXI.Graphics().circle(0, 0, ch * .3).fill({ color: 0x000000, alpha: .3 }).stroke({ width: boss ? 3 : 2, color: boss ? GOLD : ENEMY_RING })); }
     cont.addChild(makeIcon(special ? ENEMIES[type].ico : '🐾', ch * .38));
-    cont.x = W - cw * .5; cont.y = (r + .5) * ch; marker = { cont, r, type };
+    cont.x = W - cw * .5; cont.y = yAt(r + .5, COLS - .5); marker = { cont, r, type }; // 坡的夜：腳印跟著最右邊那格沉下去
   }
   function setStrayMark(r) {
     if (strayMark) { strayMark.cont.destroy({ children: true }); strayMark = null; }
     if (r === null || r === undefined) return;
-    const cont = makeIcon('🐑', ch * .38); cont.x = W - cw * 1.5; cont.y = (r + .5) * ch; L.marks.addChild(cont); strayMark = { cont, r };
+    const cont = makeIcon('🐑', ch * .38); cont.x = W - cw * 1.5; cont.y = yAt(r + .5, COLS - 1.5); L.marks.addChild(cont); strayMark = { cont, r };
   }
   function drawMarks() { const a = reduce() ? .85 : .35 + .6 * Math.abs(Math.sin(time * 1.96)); if (marker) marker.cont.alpha = a; if (strayMark) strayMark.cont.alpha = reduce() ? .95 : a; for (const [, g] of mounds) g.alpha = reduce() ? .9 : .55 + .45 * Math.abs(Math.sin(time * 2.6)); } // 腳印一閃 1.6 秒（跟 DOM 版 blink .8s alternate 同）
 
