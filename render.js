@@ -374,7 +374,7 @@ const Board = (() => {
     }
     const burnGlow = new PIXI.Sprite(radialTex); burnGlow.anchor.set(.5); burnGlow.blendMode = 'add'; burnGlow.tint = 0xff8a3d; burnGlow.width = burnGlow.height = br * 3.2; burnGlow.alpha = 0; body.addChildAt(burnGlow, 0);
     const spr = makeIcon(def.ico, ch * (small ? .34 : swarm ? .3 : .46) * k); spr.y = fly ? -ch * .12 : -ch * .02; body.addChild(spr);
-    const flash = makeIcon(def.ico, spr.width || ch * .46 * k); flash.y = spr.y; flash.blendMode = 'add'; flash.alpha = 0; body.addChild(flash);
+    const flash = makeIcon(def.ico, ch * .46 * k); if (spr.width) { flash.width = spr.width; flash.height = spr.height; } flash.y = spr.y; // 亮影要跟本體一樣大：把 spr.width 丟回 makeIcon 會再放大 1.35 一次（10/27 審查） flash.blendMode = 'add'; flash.alpha = 0; body.addChild(flash);
     const hp = new PIXI.Graphics(); cont.addChild(hp);
     const st = makeText('', Math.max(9, ch * .16), TEXT, false); st.style.stroke = null; st.y = -ch * .42; cont.addChild(st);
     const v = { cont, body, bg, spr, flash, hp, st, shadow, stText: '', hpLast: -1, phase: Math.random() * 6.28, k, fly, swarm, boss, thick: boss || cls.includes('big'), flashT: 0, burnAcc: 0, poisonAcc: 0, shove: 0, dodge: 0, swing: 0, burnGlow, baseW: spr.width, br };
@@ -456,7 +456,7 @@ const Board = (() => {
     else g.circle(0, 0, ch * .28).fill(0xf3ead8).stroke({ width: 2, color: GOLD });
     body.addChild(g);
     const spr = makeIcon(emoji, ch * (kind === 'stray' ? .38 : .44)); spr.y = -ch * .02; body.addChild(spr);
-    const bright = makeIcon(emoji, spr.width || ch * .44); bright.y = spr.y; bright.blendMode = 'add'; bright.alpha = 0; body.addChild(bright);
+    const bright = makeIcon(emoji, ch * (kind === 'stray' ? .38 : .44)); if (spr.width) { bright.width = spr.width; bright.height = spr.height; } bright.y = spr.y; bright.blendMode = 'add'; bright.alpha = 0; body.addChild(bright);
     const hp = new PIXI.Graphics(); cont.addChild(hp);
     const v = { cont, body, spr, bright, brightT: 0, hp, hpLast: -1, phase: Math.random() * 6, kind, swing: 0, zz: null }; MV.set(id, v); return v; // brightT：減少動態時巡夜人出手改用「亮一下」的剩餘秒數（跟 bright 精靈分開存，2026-10-23 混用過一次整局停掉）
   }
@@ -464,7 +464,7 @@ const Board = (() => {
     const alive = new Set(); const anim = !paused && !still && speed <= 1 && !reduce();
     const put = (id, emoji, kind, x, y, hpv, max, resting) => {
       alive.add(id); const v = MV.get(id) || moverVisual(id, emoji, kind);
-      if (kind !== 'patrol') { const dx = x * cw - v.cont.x; if (Math.abs(dx) > .3) v.faceRight = dx > 0; const sx = Math.abs(v.spr.scale.x) * (v.faceRight === false ? -1 : 1); v.spr.scale.x = sx; v.bright.scale.x = sx; } // 狗、迷羊的圖預設朝右（10/26 全部我方圖翻成面向敵人）；往左跑就左右鏡像，停下來維持最後的方向（James 10/26）
+      if (kind !== 'patrol') { if (v.anchorX === undefined) v.anchorX = x; const dx = x - v.anchorX; if (Math.abs(dx) > .006) { v.faceRight = dx > 0; v.anchorX = x; } const sx = Math.abs(v.spr.scale.x) * (v.faceRight === false ? -1 : 1); v.spr.scale.x = sx; v.bright.scale.x = sx; } // 狗、迷羊的圖預設朝右（10/26 全部我方圖翻成面向敵人）；往左跑就左右鏡像，停下來維持最後的方向（James 10/26）。用格座標跟「上次轉向的位置」比、位移累積到 0.006 格才判，不然迷羊每幀只走 0.1px 永遠轉不了頭，轉手機改 cw 也不會誤翻（10/27 審查）
       v.cont.x = x * cw; v.cont.y = yAt(y, x); // 跑到坡上的狗、巡夜人、迷羊跟著沉下去、變小
       if (!paused) { v.swing = Math.max(0, v.swing - dt); v.brightT = Math.max(0, v.brightT - dt); }
       const sw = v.swing > 0 ? Math.sin((1 - v.swing / .3) * Math.PI) : 0;
