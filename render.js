@@ -182,24 +182,24 @@ const Board = (() => {
     if (hill !== null) {
       const x0 = hill * cw, yTop = yAt(0, COLS), yBot = ROWS * ch, yBotR = yAt(ROWS, COLS);
       // 底圖是程式畫的（Recraft 那條路這一階段沒接，先用零點數的畫法；之後要換成一張圖，只動這一段）。碎石、草叢、山稜的位置用固定種子的亂數，每次重畫都長一樣，不會換夜就跳
-      let sd = 7919 + hill * 97; const rnd = () => (sd = (Math.imul(sd, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff;
+      let sd = 0; const seed = n => { sd = 7919 + hill * 97 + n * 1013; }, rnd = () => (sd = (Math.imul(sd, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff; // 每一層（星、山、土層、碎石、草、坡下）各自一個種子：之後改某一層的數量，別層不會跟著搬家
       const ridge = x => yTop * (x - x0) / (W - x0); // 稜線：坡頂對著天空那條線在 x 的高度
       g.poly([x0, 0, W, 0, W, yTop]).fill(0x121824); // 頂緣以上：夜空
       g.poly([x0, 0, W, yTop * .45, W, yTop]).fill({ color: 0x1b2236, alpha: .9 }); // 貼著山的那層天比較亮（夜裡的地平線總是比頭頂亮）
-      for (let i = 0; i < 16; i++) { const sx = x0 + cw * .15 + rnd() * (W - x0 - cw * .3); const sy = rnd() * ridge(sx) * .45; if (sy > 1) g.circle(sx, sy, .8 + rnd() * .9).fill({ color: 0xfff6d8, alpha: .3 + rnd() * .45 }); } // 星星：只撒在遠山上面那片天
-      for (const [k0, amp, col, al] of [[.42, .16, 0x1f2434, .95], [.66, .13, 0x2a2e3a, .95]]) { // 對面的遠山兩層：遠的淡、近的深，稜線用亂數起伏，夾在天空三角形裡
+      seed(1); for (let i = 0; i < 16; i++) { const sx = x0 + cw * .15 + rnd() * (W - x0 - cw * .3); const sy = rnd() * ridge(sx) * .45; if (sy > 1) g.circle(sx, sy, .8 + rnd() * .9).fill({ color: 0xfff6d8, alpha: .3 + rnd() * .45 }); } // 星星：只撒在遠山上面那片天
+      seed(2); for (const [k0, amp, col, al] of [[.42, .16, 0x1f2434, .95], [.66, .13, 0x2a2e3a, .95]]) { // 對面的遠山兩層：遠的淡、近的深，稜線用亂數起伏，夾在天空三角形裡
         const pts = [x0, 0]; const n = 7; for (let i = 1; i <= n; i++) { const sx = x0 + (W - x0) * i / n; pts.push(sx, ridge(sx) * (k0 + (rnd() - .5) * amp * 2)); } pts.push(W, yTop); g.poly(pts).fill({ color: col, alpha: al });
       }
       g.poly([0, yBot, x0, yBot, W, yBotR, W, H, 0, H]).fill(0x1c1810); // 底緣以下：坡下的土地（平地那段多出來的一排，不是格子）
       g.poly([0, yBot, x0, yBot, W, yBotR, W, yBotR + ch * .18, x0, yBot + ch * .18, 0, yBot + ch * .18]).fill({ color: 0x000000, alpha: .25 }); // 底緣下一道影，平地像一塊台地
       for (let c = hill; c < COLS; c++) g.poly([c * cw, yAt(0, c), (c + 1) * cw, yAt(0, c + 1), (c + 1) * cw, yAt(ROWS, c + 1), c * cw, yAt(ROWS, c)]).fill({ color: HILL_TINT[Math.min(HILL_TINT.length - 1, c - hill)], alpha: .38 + (c - hill) * .1 }); // 坡面：越往右越暗的土色
-      for (const ry of [.55, 1.35, 2.2, 3.05, 3.85, 4.7]) { // 土層：六道順著坡的等高線，微微起伏，上緣一條淡亮邊像被月光照到的階
+      seed(3); for (const ry of [.55, 1.4, 2.3, 3.35, 4.4]) { // 土層：五道順著坡的等高線，微微起伏，上緣一條淡亮邊像被月光照到的階；全部離整數至少 .35，不會剛好壓在排與排的交界上被看成格線（審查 2026-10-26）
         const n = 8, dk = [], lt = []; for (let i = 0; i <= n; i++) { const sx = x0 + (W - x0) * i / n, w = (rnd() - .5) * ch * .1; dk.push(sx, yAt(ry, sx / cw) + w); lt.push(sx, yAt(ry, sx / cw) + w - 2); }
         g.poly(lt, false).stroke({ width: 1.5, color: 0xd8c8a0, alpha: .07 }); g.poly(dk, false).stroke({ width: 1.5, color: 0x000000, alpha: .14 });
       }
-      for (let i = 0; i < 28; i++) { const sx = x0 + cw * .08 + rnd() * (W - x0 - cw * .16), ry = .08 + rnd() * (ROWS - .16), sy = yAt(ry, sx / cw), big = rnd() < .25; g.ellipse(sx, sy, big ? 3.5 + rnd() * 2 : 1.8 + rnd() * 1.4, big ? 2 + rnd() : 1.2 + rnd() * .8).fill({ color: big ? 0x8a8378 : 0x7a7368, alpha: .35 }).stroke({ width: 1, color: 0x000000, alpha: .18 }); } // 碎石：散在坡面上，四分之一是大顆的
-      for (let i = 0; i < 18; i++) { const sx = x0 + cw * .1 + rnd() * (W - x0 - cw * .2), sy = yAt(.1 + rnd() * (ROWS - .2), sx / cw); for (let j = -1; j <= 1; j++) g.moveTo(sx, sy).lineTo(sx + j * 2.5 + (rnd() - .5) * 2, sy - 4 - rnd() * 3); g.stroke({ width: 1, color: 0x7a9450, alpha: .35 }); } // 草叢：三根細草一撮，坡上還是有草的
-      for (let i = 0; i < 10; i++) { const sx = cw * .1 + rnd() * (W - cw * .2), sy = (sx < x0 ? yBot : yBotR + (yBot - yBotR) * (W - sx) / (W - x0)) + ch * .3 + rnd() * ch * .55; g.ellipse(sx, Math.min(H - 3, sy), 2 + rnd() * 2, 1.2 + rnd()).fill({ color: 0x5a4a30, alpha: .5 }); } // 坡下的土地也撒幾顆
+      seed(4); for (let i = 0; i < 28; i++) { const sx = x0 + cw * .08 + rnd() * (W - x0 - cw * .16), ry = .08 + rnd() * (ROWS - .16), sy = yAt(ry, sx / cw), big = rnd() < .25; g.ellipse(sx, sy, big ? 3.5 + rnd() * 2 : 1.8 + rnd() * 1.4, big ? 2 + rnd() : 1.2 + rnd() * .8).fill({ color: big ? 0x8a8378 : 0x7a7368, alpha: .35 }).stroke({ width: 1, color: 0x000000, alpha: .18 }); } // 碎石：散在坡面上，四分之一是大顆的
+      seed(5); for (let i = 0; i < 18; i++) { const sx = x0 + cw * .1 + rnd() * (W - x0 - cw * .2), sy = yAt(.1 + rnd() * (ROWS - .2), sx / cw); for (let j = -1; j <= 1; j++) g.moveTo(sx, sy).lineTo(sx + j * 2.5 + (rnd() - .5) * 2, sy - 4 - rnd() * 3); g.stroke({ width: 1, color: 0x7a9450, alpha: .35 }); } // 草叢：三根細草一撮，坡上還是有草的
+      seed(6); for (let i = 0; i < 10; i++) { const sx = cw * .1 + rnd() * (W - cw * .2), sy = (sx < x0 ? yBot : yBotR + (yBot - yBotR) * (W - sx) / (W - x0)) + ch * .3 + rnd() * ch * .55; g.ellipse(sx, Math.min(H - 3, sy), 2 + rnd() * 2, 1.2 + rnd()).fill({ color: 0x5a4a30, alpha: .5 }); } // 坡下的土地也撒幾顆
       for (let r = 0; r < ROWS; r++) for (let c = hill; c < COLS; c++) { g.moveTo(c * cw, yAt(r + .5, c)).lineTo((c + 1) * cw, yAt(r + .5, c + 1) + ch * .05).stroke({ width: 1, color: 0x000000, alpha: .07 }); } // 每格一道淺淺的斜紋，順著坡再多斜一點（有了土層之後再淡一點）
       g.moveTo(x0, 0).lineTo(W, yTop).stroke({ width: 2, color: 0xd8c8a0, alpha: .4 }); // 稜線：坡頂對著天空那條亮邊
       g.poly([x0, 0, x0 + cw * .22, yAt(0, hill + .22), x0 + cw * .22, yAt(ROWS, hill + .22), x0, yBot]).fill({ color: 0x000000, alpha: .22 }); // 坡緣下面一道崖影，像一階
@@ -350,7 +350,7 @@ const Board = (() => {
       if (dig) bg.rect(-br, br * .1, br * 2, br).fill(0x5a4a2a); // 鑽地的：上下分色
     } else { // 飛的：腳下影子。大鷹的影子是鷹形的（同一張圖塗黑、壓扁），飛高時放大變淡、往右偏一點（月光從左上來）；其他飛的還是一粒橢圓
       shadow = new PIXI.Container();
-      if (cls.includes('eagle')) { const sil = makeIcon(def.ico, ch * .46 * k); sil.tint = 0x000000; sil.alpha = .5; sil.scale.y *= .45; sil.y = ch * .36; sil.bx = sil.scale.x; shadow.sil = sil; shadow.addChild(sil); }
+      if (cls.includes('eagle') && tex[ICONS[def.ico]]) { const sil = makeIcon(def.ico, ch * .46 * k); sil.tint = 0x000000; sil.alpha = .5; sil.scale.y *= .45; sil.y = ch * .36; sil.bx = sil.scale.x; shadow.sil = sil; shadow.addChild(sil); } // 圖載不到就不做鷹形（文字 emoji 塗黑不會是實心剪影），退回下面的橢圓
       else shadow.addChild(new PIXI.Graphics().ellipse(0, ch * .36, cw * .18, 3).fill({ color: 0x000000, alpha: hillNow !== null ? .5 : .32 }));
       cont.addChildAt(shadow, 0);
     }
@@ -395,7 +395,7 @@ const Board = (() => {
         const want = e.high ? 1 : 0;
         if (reduce()) v.hiK = want; else if (!paused) v.hiK = clamp((v.hiK ?? want) + (want ? 1 : -1) * dt * 2.5, 0, 1); else v.hiK = v.hiK ?? want;
         v.body.y -= v.hiK * ch * .22; v.body.scale.set(v.body.scale.x * (1 + v.hiK * .18));
-        const sh = v.shadow; if (sh) { sh.scale.set(1 + v.hiK * .5); sh.alpha = 1 - v.hiK * .3; } // 影子本身的填色已是 .32，這裡只在飛高時再淡三成、放大一半
+        const sh = v.shadow; if (sh) { sh.scale.set(1 + v.hiK * .35); sh.alpha = 1 - v.hiK * .3; sh.y -= v.hiK * ch * .12; } // 飛高時影子淡三成、放大 .35、往上收 .12 格：放大會把影子中心往下推，最右下排（已沉一排）再放大一半會被畫布切掉一半（審查 2026-10-26 算出 6.04 格 > 6 格）
       }
       v.cont.alpha = e.underground ? 0 : stunned ? .6 : 1; v.body.alpha = v.dodge > 0 ? .4 + .6 * (1 - dodgeK) : 1;
       const biteTint = reduce() && e.biting && bite > .5; // 減少動態：咬住時身體一下紅一下白，不位移
