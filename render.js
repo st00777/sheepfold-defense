@@ -79,6 +79,7 @@ const Board = (() => {
     gradTex.dawn = grad([[0, '#fff3c0'], [.5, '#ffd98a'], [1, '#ffb45a']]);
     gradTex.lose = grad([[0, '#0b1020'], [.6, '#1a1030'], [1, '#06080f']]);
     gradTex.fog = cv(256, 8, (g, w, h) => { const r = g.createLinearGradient(0, 0, w, 0); r.addColorStop(0, 'rgba(10,12,20,0)'); r.addColorStop(1, 'rgba(10,12,20,.8)'); g.fillStyle = r; g.fillRect(0, 0, w, h); });
+    gradTex.night = cv(256, 8, (g, w, h) => { const r = g.createLinearGradient(0, 0, w, 0); r.addColorStop(0, '#ddd3c3'); r.addColorStop(.4, '#b9bfd6'); r.addColorStop(1, '#93a4d8'); g.fillStyle = r; g.fillRect(0, 0, w, h); }); // 夜色光照圖的底：左邊羊圈那頭微暖、右邊敵人來的那頭月光冷藍（照封面）；相乘上去，白＝不變、越藍越冷越暗
     makeDotTextures();
   }
   function makeDotTextures() { // 這兩張是用 renderer 畫出來的，WebGL context 掉了內容就沒了，恢復時要重做
@@ -87,7 +88,10 @@ const Board = (() => {
   }
   function buildLayers() {
     // 由下往上：草地 → 格子底色與提示 → 圍欄 → 腳印與土堆 → 單位 → 火光（相加）→ 會動的（敵人、狗、投射物）→ 效果 → 黑暗 → 天氣 → 天色 → 飄字 → 暗角
-    for (const n of ['ground', 'cells', 'marks', 'units', 'glow', 'movers', 'shots', 'fx', 'hints', 'dark', 'weather', 'sky', 'text', 'top']) { L[n] = new PIXI.Container(); app.stage.addChild(L[n]); }
+    for (const n of ['ground', 'cells', 'marks', 'units', 'glow', 'movers', 'shots', 'fx', 'light', 'hints', 'dark', 'weather', 'sky', 'text', 'top']) { L[n] = new PIXI.Container(); app.stage.addChild(L[n]); }
+    // 光照圖（相乘）：整張棋盤罩一層夜色（左暖右冷），火盆與油燈周圍用相加的暖圓把夜色「洗掉」，火邊暖亮、遠處冷藍（封面的光線）。先畫進一張貼圖再相乘，暖圓之間才不會互相疊黑；提示與飄字在它上面不受影響
+    L.lightRT = null; L.lightSpr = new PIXI.Sprite(); L.lightSpr.blendMode = 'multiply'; L.light.addChild(L.lightSpr);
+    L.lightScene = new PIXI.Container(); L.lightBase = new PIXI.Sprite(gradTex.night); L.lightScene.addChild(L.lightBase); L.lightPools = new PIXI.Container(); L.lightScene.addChild(L.lightPools);
     L.groundSpr = tex.ground ? new PIXI.Sprite(tex.ground) : new PIXI.Graphics(); L.ground.addChild(L.groundSpr);
     L.cellG = new PIXI.Graphics(); L.cells.addChild(L.cellG);
     L.hintG = new PIXI.Graphics(); L.cells.addChild(L.hintG);
@@ -116,6 +120,8 @@ const Board = (() => {
     L.fence.clear().rect(0, 0, 9, H).fill({ color: 0x8a6a3e, alpha: .92 }); for (let y = 10; y < H; y += 13) L.fence.rect(0, y, 9, 3).fill({ color: 0x000000, alpha: .33 }); L.fence.rect(9, 0, 3, H).fill({ color: 0x000000, alpha: .25 });
     if (L.darkRT) L.darkRT.destroy(true);
     L.darkRT = PIXI.RenderTexture.create({ width: W, height: H, resolution: app.renderer.resolution }); L.darkSpr.texture = L.darkRT;
+    if (L.lightRT) L.lightRT.destroy(true);
+    L.lightRT = PIXI.RenderTexture.create({ width: W, height: H, resolution: app.renderer.resolution }); L.lightSpr.texture = L.lightRT; L.lightBase.width = W; L.lightBase.height = H;
     L.darkFill.clear().rect(0, 0, W, H).fill({ color: 0x060a16, alpha: .22 }); // .22＝舊 DOM 版 brightness(.78) 的暗度；原本 .32 James 真機說太暗（2026-10-23）
     L.fogs.forEach((f, r) => { f.x = W * .78; f.y = r * ch; f.width = W * .22; f.height = ch; });
     state.cellsDirty = state.rocksDirty = true; state.litRows.fill(null); // 照亮的排用舊格子尺寸畫的，填 null 讓 drawDark 下一幀重畫
@@ -152,7 +158,7 @@ const Board = (() => {
     try {
       drawCells(); drawUnits(dt); info.biting = drawEnemies(dt); drawMovers(dt); info.shots = drawShots(dt); drawMarks();
       if (!paused) { updateParticles(dt); updateTweens(dt); drawSky(dt); drawWeather(dt); }
-      drawDark(dt);
+      drawDark(dt); drawLight(dt);
     } catch (err) { report(err); }
     app.render();
     return info;
@@ -239,7 +245,7 @@ const Board = (() => {
   function renderUnit(r, c) {
     const k = key(r, c), u = G && G.units[k];
     const old = UN.get(k);
-    if (old) { old.cont.destroy({ children: true }); if (old.glow) old.glow.destroy(); if (old.up) old.up.destroy({ children: true }); removeHole(k); UN.delete(k); }
+    if (old) { old.cont.destroy({ children: true }); if (old.glow) old.glow.destroy(); if (old.pool) old.pool.destroy(); if (old.up) old.up.destroy({ children: true }); removeHole(k); UN.delete(k); }
     if (!u) return;
     const def = UNITS[u.type];
     const cont = new PIXI.Container(); cont.x = (c + .5) * cw; cont.y = yAt(r + .5, c + .5); L.units.addChild(cont); // 坡上的格子沉下去、變矮，單位跟著
@@ -254,7 +260,8 @@ const Board = (() => {
     if (u.upgraded && def.upgrade && def.upgrade.ico) { const b = new PIXI.Container(); b.addChild(new PIXI.Graphics().roundRect(-ch * .17, -ch * .14, ch * .34, ch * .28, 6).fill({ color: 0x000000, alpha: .65 })); const bi = makeIcon(def.upgrade.ico, ch * .26); b.addChild(bi); b.x = cw * .32; b.y = -ch * .32; inner.addChild(b); }
     if (def.push) { v.cd = new PIXI.Graphics(); inner.addChild(v.cd); }
     if (u.maxHp > 1 && def.kind !== 'dog') { v.hp = new PIXI.Graphics(); inner.addChild(v.hp); }
-    if (u.type === 'brazier' || u.type === 'lamp') { const gl = new PIXI.Sprite(radialTex); gl.anchor.set(.5); gl.blendMode = 'add'; gl.tint = u.type === 'lamp' ? 0xffc46a : 0xff8a3a; gl.x = cont.x; gl.y = cont.y; L.glow.addChild(gl); v.glow = gl; }
+    if (u.type === 'brazier' || u.type === 'lamp') { const gl = new PIXI.Sprite(radialTex); gl.anchor.set(.5); gl.blendMode = 'add'; gl.tint = u.type === 'lamp' ? 0xffc46a : 0xff8a3a; gl.x = cont.x; gl.y = cont.y; L.glow.addChild(gl); v.glow = gl;
+      const lp = new PIXI.Sprite(radialTex); lp.anchor.set(.5); lp.blendMode = 'add'; lp.tint = u.type === 'lamp' ? 0xffd9a0 : 0xffb870; lp.x = cont.x; lp.y = cont.y; L.lightPools.addChild(lp); v.pool = lp; } // 光照圖上的暖圓：比光暈大一圈，把這一帶的夜色洗掉（火邊的草地、單位、敵人都回到暖色）
     UN.set(k, v); drawUnitBg(v);
   }
   function drawUnitBg(v) {
@@ -281,8 +288,9 @@ const Board = (() => {
       if (anim) {
         if (BREATHERS.has(u.type)) { const b = Math.sin((time + v.phase) * 1.3); v.spr.scale.y = v.spr.scale.x * (1 + b * .02); v.spr.y = -ch * .04 - (b + 1) / 2; } // 一次呼吸 4.8 秒（跟 DOM 版 2.4s alternate 同）
         if (v.glow) { const f = .9 + Math.sin(time * 13 + v.phase) * .06 + Math.sin(time * 31) * .04; v.glow.width = v.glow.height = (u.type === 'lamp' ? 2.6 : 1.9) * ch * f; v.glow.alpha = .5; v.spr.rotation = Math.sin(time * 9 + v.phase) * .03; v.spr.alpha = .9 + Math.sin(time * 11 + v.phase) * .1; // 火光晃：光暈大小、圖示微轉＋明暗
+          if (v.pool) v.pool.width = v.pool.height = (u.type === 'lamp' ? 4.4 : 3.6) * ch * f;
           if (Math.random() < dt * (u.type === 'brazier' ? 14 : 5)) spark(v.cont.x, v.cont.y - ch * .1, u.type === 'brazier' ? 0xffa040 : 0xffd080, 1, .03 * ch, -ch * .5, .7, 2.2); }
-      } else if (v.glow) { v.glow.width = v.glow.height = (u.type === 'lamp' ? 2.6 : 1.9) * ch; v.glow.alpha = .5; v.spr.alpha = 1; } // 暫停／加速：停在平均大小，不要突然縮放
+      } else if (v.glow) { v.glow.width = v.glow.height = (u.type === 'lamp' ? 2.6 : 1.9) * ch; v.glow.alpha = .5; v.spr.alpha = 1; if (v.pool) v.pool.width = v.pool.height = (u.type === 'lamp' ? 4.4 : 3.6) * ch; } // 暫停／加速：停在平均大小，不要突然縮放
       if (v.hp && v.hpLast !== u.hp) { v.hpLast = u.hp; hpBar(v.hp, cw * .8, ch * .32, clamp(u.hp / u.maxHp, 0, 1), OK); }
       if (v.cd) { const ready = u.timer <= 0, len = u.cdLen || v.def.every, f = ready ? 1 : clamp(1 - u.timer / len, 0, 1); if (f !== v.cdLast || ready !== v.ready) { v.cdLast = f; v.ready = ready; const w = cw * .8, y = ch * .32 - 5; v.cd.clear().rect(-w / 2, y, w, 3).fill({ color: 0x000000, alpha: .4 }).rect(-w / 2, y, w * f, 3).fill({ color: GOLD, alpha: ready ? 1 : .85 }); if (ready) v.cd.rect(-w / 2 - 1, y - 1, w + 2, 5).stroke({ width: 1, color: GOLD, alpha: .6 }); } }
       // 可升級／修補角標：規則在引擎，這裡只畫；糧夠才出現，出現時跳 4 下
@@ -314,6 +322,14 @@ const Board = (() => {
   }
   function removeHole(k) { const h = holes.get(k); if (h) { h.band.destroy(); h.near.destroy(); holes.delete(k); } }
   const keepDark = () => state.dark || (state.darkA || 0) > .02; // 「還算暗」：黑暗正在退的那一兩秒也算，亮帶與亮排跟著一起淡
+  // 光照圖：每幀把「夜色底＋暖圓」畫進貼圖（只有一張底和幾個火的圓，很便宜），天亮後夜色退掉、失守時留著
+  function drawLight(dt) {
+    if (!L.lightRT) return;
+    const want = dawned && state.lose <= 0 ? 0 : 1;
+    L.lightSpr.alpha = paused ? L.lightSpr.alpha : L.lightSpr.alpha + (want - L.lightSpr.alpha) * Math.min(1, dt * 1.5);
+    L.light.visible = L.lightSpr.alpha > .01; if (!L.light.visible) return;
+    app.renderer.render({ container: L.lightScene, target: L.lightRT, clear: true });
+  }
   function drawDark(dt) {
     // 腳印消失的那一波起棋盤變暗（跟引擎 markerVisible 同一個時間點）；天亮後不再罩回去
     const dark = !!G && !dawned && !!G.level.moonless && G.wave + (G.phase === 'wave' ? 0 : 1) >= G.level.moonless;
@@ -643,7 +659,7 @@ const Board = (() => {
 
   // ====== 開局、清場 ======
   function newGame(g, opts) {
-    G = g; diff = opts.diff; speed = opts.speed || 1; dawned = false; still = false; paused = false; time = 0; errCount = 0;
+    G = g; diff = opts.diff; speed = opts.speed || 1; dawned = false; if (L.lightSpr) L.lightSpr.alpha = 1; still = false; paused = false; time = 0; errCount = 0;
     if (!app) return; // 棋盤開不起來：index.html 會擋住開始，這裡再守一道
     clear(false);
     state.cellsDirty = state.rocksDirty = true; state.dark = false; state.darkA = 0; L.fogs.forEach(f => { f.alpha = 1; }); state.litRows.fill(false); L.litG.clear();
@@ -652,7 +668,7 @@ const Board = (() => {
   }
   function clear(all = true) {
     if (!app) return;
-    for (const [, v] of UN) { v.cont.destroy({ children: true }); if (v.glow) v.glow.destroy(); if (v.up) v.up.destroy({ children: true }); } UN.clear();
+    for (const [, v] of UN) { v.cont.destroy({ children: true }); if (v.glow) v.glow.destroy(); if (v.pool) v.pool.destroy(); if (v.up) v.up.destroy({ children: true }); } UN.clear();
     for (const [, v] of EN) v.cont.destroy({ children: true }); EN.clear();
     for (const [, v] of MV) v.cont.destroy({ children: true }); MV.clear();
     for (const [, v] of SH) { v.cont.destroy({ children: true }); if (v.shadow) v.shadow.destroy(); } SH.clear();
