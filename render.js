@@ -530,10 +530,11 @@ const Board = (() => {
   // 看門的掃排：人影從左邊門口衝到右邊，後面拖一道金光（減少動態：不位移，只淡出）
   function gateSweep(r) {
     const cont = new PIXI.Container(); L.fx.addChild(cont);
-    const trail = new PIXI.Graphics().rect(-cw * 2.6, -ch * .12, cw * 2.6, ch * .24).fill({ color: GOLD, alpha: .45 }); cont.addChild(trail);
+    const trail = new PIXI.Graphics(); cont.addChild(trail); // 尾帶每幀照 yAt 重畫成一條順著地面的帶子，到坡緣就跟著折下去（James 10/26 真機：直的尾帶插進斜坡地板）
+    const drawTrail = x => { const n = 8, len = cw * 2.6, top = [], bot = []; for (let i = 0; i <= n; i++) { const px = x - len + len * i / n, dy = yAt(r + .5, px / cw) - yAt(r + .5, x / cw); top.push(px - x, dy - ch * .12); bot.unshift(px - x, dy + ch * .12); } trail.clear().poly(top.concat(bot)).fill({ color: GOLD, alpha: .45 }); };
     const man = makeIcon('🧍', ch * .5); cont.addChild(man); cont.y = (r + .5) * ch;
-    const rd = reduce(); cont.x = rd ? W * .5 : -cw * .3;
-    tween(.9, k => { if (!rd) cont.x = -cw * .3 + k * (W + cw); cont.y = yAt(r + .5, cont.x / cw); cont.alpha = k < (rd ? .6 : .8) ? 1 : 1 - (k - (rd ? .6 : .8)) / (rd ? .4 : .2); }, () => cont.destroy({ children: true }));
+    const rd = reduce(); cont.x = rd ? W * .5 : -cw * .3; drawTrail(cont.x);
+    tween(.9, k => { if (!rd) { cont.x = -cw * .3 + k * (W + cw); drawTrail(cont.x); } cont.y = yAt(r + .5, cont.x / cw); cont.alpha = k < (rd ? .6 : .8) ? 1 : 1 - (k - (rd ? .6 : .8)) / (rd ? .4 : .2); }, () => cont.destroy({ children: true }));
   }
 
   // ====== 腳印預告：敵人的在右緣閃爍，special 加紅圈、頭目加金圈；迷羊的錯開一格 ======
