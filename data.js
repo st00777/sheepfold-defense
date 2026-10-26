@@ -12,7 +12,7 @@ const ROWS = 5, COLS = 7;
 const UNITS = {
   shepherd: { name: '牧人',     ico: '🧑‍🌾', cost: 50,  hp: 60,  kind: 'producer', every: 7,   gives: 25,
               desc: '定時產糧。再點一下升級成老牧人，產糧更快', ref: '創 31:40' },
-  slinger:  { name: '投石手',   ico: '🪨',   cost: 100, hp: 60,  kind: 'shooter', every: 1.3, dmg: 20, shot: 'stone',
+  slinger:  { name: '投石手',   ico: '🙋',   cost: 100, hp: 60,  kind: 'shooter', every: 1.3, dmg: 20, shot: 'stone',
               desc: '投石攻擊同一排的敵人', ref: '士 20:16' },
   wall:     { name: '石牆',     ico: '🧱',   cost: 50,  hp: 300, kind: 'blocker',
               desc: '高血量擋路。再點一下花 25 糧修補', ref: '民 32:16' },

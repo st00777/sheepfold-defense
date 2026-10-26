@@ -402,7 +402,7 @@
   </div>
 </div>
 
-<script src="data.js?v=13"></script>
+<script src="data.js?v=14"></script>
 <script src="engine.js?v=18"></script>
 <script src="sound.js?v=7"></script>
 <script src="lib/pixi.min.js"></script>
@@ -488,13 +488,13 @@ const HOME_UPDATE = '最近更新 10/26：第三章「諸山間」第 21-30 夜�
 // ====== 圖示：Microsoft Fluent Emoji 3D（MIT；圖在 img/ico/，128px WebP；授權全文 img/ico/LICENSE-fluentui-emoji.txt）======
 // 同一個 emoji 字元對到一張圖，各家手機看起來一樣；沒對到的（效果名詞、UI 符號、提示列文字）照舊用系統 emoji。圖載不到就退回 emoji，不會留空
 const ICON_IMG = {
-  '🧑‍🌾': 'c-farmer', '🪨': 'rock', '🧱': 'brick', '🎯': 'bullseye', '🐕': 'c-dog', '🤾': 'person_playing_handball', '🗼': 'tokyo_tower', '🏹': 'bow_and_arrow',
-  '🌿': 'herb', '🦂': 'scorpion', '🔥': 'fire', '🏺': 'amphora', '📯': 'postal_horn', '🎺': 'trumpet', '🩹': 'adhesive_bandage', '🫗': 'pouring_liquid',
-  '🛞': 'wheel', '🦯': 'white_cane', '🪔': 'diya_lamp', '🚶': 'person_walking', '🥌': 'curling_stone', '🫂': 'people_hugging',
+  '🧑‍🌾': 'c-farmer', '🙋': 'c-slinger', '🪨': 'c-rock', '🧱': 'c-wall', '🎯': 'c-sling', '🐕': 'c-dog', '🤾': 'c-hireling', '🗼': 'c-tower', '🏹': 'c-archer',
+  '🌿': 'c-thorns', '🦂': 'scorpion', '🔥': 'c-brazier', '🏺': 'c-jar', '📯': 'c-horn', '🎺': 'trumpet', '🩹': 'c-healer', '🫗': 'pouring_liquid',
+  '🛞': 'c-catapult', '🦯': 'c-staff', '🪔': 'c-lamp', '🚶': 'c-patrol', '🥌': 'c-volley', '🫂': 'c-cradle',
   '🐺': 'c-wolf', '🐻': 'bear', '🦁': 'c-lion', '🥷': 'ninja', '🧔': 'person_beard', '🦊': 'fox', '🦗': 'cricket', '🐕‍🦺': 'service_dog', '🦅': 'eagle',
   '🐗': 'boar', '🦉': 'owl', '🐆': 'leopard', '🐑': 'c-ewe',
-  '🪃': 'boomerang', '🕳️': 'hole', '🥛': 'glass_of_milk', '⛰️': 'mountain', '🧔‍♂️': 'man_beard', '🐂': 'ox', // 第三章：拋石手、陷坑、水袋、石堆（圖鑑的「山坡」也用它）、強盜、野牛；大鷹跟鷙鳥同一張 eagle，靠放大與鷹形影子分
-  '🦴': 'bone', '🪵': 'wood', '🧍': 'person_standing', '⛏️': 'pick', '🐾': 'paw_prints', '🧑': 'person', '🐩': 'poodle', // 狗窩、崗位、看門的、鏟子、腳印、組合字備援
+  '🪃': 'c-thrower', '🕳️': 'c-pit', '🥛': 'c-waterskin', '⛰️': 'c-stonepile', '🧔‍♂️': 'man_beard', '🐂': 'ox', // 第三章：拋石手、陷坑、水袋、石堆（圖鑑的「山坡」也用它）、強盜、野牛；大鷹跟鷙鳥同一張 eagle，靠放大與鷹形影子分
+  '🦴': 'bone', '🪵': 'wood', '🧍': 'c-gatekeeper', '⛏️': 'pick', '🐾': 'paw_prints', '🧑': 'person', '🐩': 'poodle', // 狗窩、崗位、看門的、鏟子、腳印、組合字備援
 };
 function icoImg(e) { const f = ICON_IMG[e]; return f ? `<img class="ei" src="img/ico/${f}.webp" alt="${e}" onerror="icoFail(this)">` : e; }
 function icoFail(img) { img.replaceWith(document.createTextNode(img.alt)); }
