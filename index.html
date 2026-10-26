@@ -259,7 +259,9 @@
   #roster-count { font-size: 13px; color: var(--muted); margin-top: 8px; min-height: 16px; }
   #roster-detail { text-align: left; background: #0004; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.6; height: 150px; overflow-y: auto; display: flex; gap: 10px; }
   /* 圖鑑角色頁：左邊立繪（點一下開燈箱看大圖）、右邊名字＋稱號＋數值（2026-10-26 James：遊戲內的圖太小，圖鑑要看得清楚） */
-  #roster-detail .big { width: 96px; height: 96px; flex: none; object-fit: contain; cursor: zoom-in; border-radius: 8px; background: #0003; align-self: flex-start; position: sticky; top: 0; -webkit-user-drag: none; -webkit-touch-callout: none; } /* sticky：右邊文字捲動時立繪留在原地 */
+  #roster-detail .bigw { position: relative; flex: none; align-self: flex-start; position: sticky; top: 0; width: 96px; height: 96px; } /* sticky：右邊文字捲動時立繪留在原地 */
+  #roster-detail .big { display: block; width: 96px; height: 96px; object-fit: contain; cursor: zoom-in; border-radius: 8px; background: #0003; -webkit-user-drag: none; -webkit-touch-callout: none; }
+  #roster-detail .zoom { position: absolute; right: 0; bottom: 0; font-size: 10px; line-height: 1.4; color: var(--text); background: #000b; border-radius: 8px 0 8px 0; padding: 1px 6px; pointer-events: none; white-space: nowrap; } /* 沒說沒人知道立繪可以點（James 10/27） */
   html.big #roster-detail { height: 190px; } /* 大字模式行高變大，150px 只看得到四行半 */
   #roster-detail .dt { flex: 1; min-width: 0; }
   #roster-detail .sub { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; margin: -2px 0 4px; }
@@ -511,6 +513,7 @@ const ICON_IMG = {
   '🐗': 'c-boar', '🦉': 'c-owl', '🐆': 'c-leopard', '🐑': 'c-ewe',
   '🪃': 'c-thrower', '🕳️': 'c-pit', '🥛': 'c-waterskin', '⛰️': 'c-stonepile', '🧔‍♂️': 'c-bandit', '🐂': 'c-ox', // 第三章：拋石手、陷坑、水袋、石堆（圖鑑的「山坡」也用它）、強盜、野牛；大鷹跟鷙鳥同一張 eagle，靠放大與鷹形影子分
   '🦴': 'c-kennel', '🪵': 'c-post', '🧍': 'c-gatekeeper', '⛏️': 'c-shovel', '🐾': 'c-paws', '🧑': 'person', '🐩': 'poodle', // 狗窩、崗位、看門的、鏟子、腳印、組合字備援
+  '🛡': 'c-hide', '↕️': 'c-swap', '🌑': 'c-moonless', '🌾': 'c-ration', // 效果頁專用：厚皮、換排、無月夜、一筆糧（10/27 James：效果頁還有四格是系統 emoji；小居生圖）。費用列的「🌾 50」是純文字，不經 icoImg，不受影響
 };
 // 角色（人與動物）各有三套圖：棋盤 q-*（Q 版小人，縮到一格還認得出）、卡片與行內 h-*（頭像）、圖鑑角色頁 l-*（512px 立繪，48 張都有）。道具與標記棋盤和卡片都用原本的 c-*（2026-10-26 仿主流手遊的分工）
 const CHAR_KEYS = new Set(['farmer', 'slinger', 'sling', 'dog', 'hireling', 'archer', 'horn', 'healer', 'patrol', 'volley', 'cradle', 'thrower', 'gatekeeper', 'ewe', 'wolf', 'bear', 'lion', 'thief', 'stealer', 'fox', 'locust', 'wilddog', 'eagle', 'boar', 'owl', 'leopard', 'bandit', 'ox']);
@@ -1195,8 +1198,8 @@ function renderRosterDetail() {
   }
 }
 // 圖鑑角色頁的立繪：有 l-* 大圖就放，點一下開燈箱；大圖載不到就換成頭像（再載不到才拿掉，文字照排）
-function bigImg(d, tab, k) { const f = icoFile(d.ico, 'big'), h = icoFile(d.ico, 'head'); return f ? `<img class="big" src="img/ico/${f}.webp" alt="" data-tab="${tab}" data-key="${k}" data-fb="${h || ''}" onerror="bigFail(this)">` : ''; }
-function bigFail(img) { const fb = img.dataset.fb; if (fb && !img.dataset.tried) { img.dataset.tried = '1'; img.src = `img/ico/${fb}.webp`; } else img.remove(); }
+function bigImg(d, tab, k) { const f = icoFile(d.ico, 'big'), h = icoFile(d.ico, 'head'); return f ? `<span class="bigw"><img class="big" src="img/ico/${f}.webp" alt="" data-tab="${tab}" data-key="${k}" data-fb="${h || ''}" onerror="bigFail(this)"><span class="zoom">🔍 點圖放大</span></span>` : ''; }
+function bigFail(img) { const fb = img.dataset.fb; if (fb && !img.dataset.tried) { img.dataset.tried = '1'; img.src = `img/ico/${fb}.webp`; } else img.parentElement.remove(); } // 連頭像都載不到：整個圖框（含角標）拿掉，文字照排
 // 敵人出處行：經文＋第幾夜初登場（從關卡波次算，不靠本機紀錄）
 const FIRST_NIGHT = {}; LEVELS.forEach((l, i) => (l.waves || []).forEach(w => (w.list || []).forEach(([t]) => { if (FIRST_NIGHT[t] === undefined) FIRST_NIGHT[t] = i + 1; })));
 function enemyRef(k) { const e = ENEMIES[k], parts = []; if (e.ref) parts.push(fullRef(e.ref)); if (FIRST_NIGHT[k]) parts.push(`第 ${FIRST_NIGHT[k]} 夜初登場`); return parts.join('・'); }
