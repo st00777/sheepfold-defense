@@ -91,7 +91,7 @@
   .card .tag { position: absolute; right: 4px; top: 3px; font-size: 10px; color: #2b2a26; background: var(--new); border-radius: 6px; padding: 0 4px; }
   #cards-wrap { background: var(--panel); }
   .card .ico { font-size: 24px; line-height: 1; }
-  /* Fluent 3D 圖示（img/ico/*.webp）：包在原本的 .ico 裡，大小跟著字級走，emoji 的呼吸／走路動畫規則照用 */
+  /* 圖示（img/ico/*.webp，10/26 起全是 ChatGPT 生的圖）：包在原本的 .ico 裡，大小跟著字級走，emoji 的呼吸／走路動畫規則照用 */
   img.ei { width: 1.15em; height: 1.15em; vertical-align: -.2em; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
   .card .name { font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card .cost { font-size: 13px; color: var(--gold); white-space: nowrap; }
@@ -333,7 +333,7 @@
     <div class="ref ch-sub" id="ch-sub"></div>
     <div id="lv-list"></div>
     <div class="upd" id="home-upd"></div>
-    <div class="ref credit">圖示取自 Microsoft Fluent Emoji（MIT 授權）</div>
+    <div class="ref credit">人物、道具與場景圖由 ChatGPT 生成（2026 年 10 月）</div>
   </div>
 </div>
 
@@ -503,8 +503,9 @@ const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來', 3: '羊圈在山上，斜坡上的敵人直射打不到：要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛' };
 const HOME_UPDATE = '最近更新 10/26：第三章「諸山間」第 21-30 夜上線——羊圈在山上、敵人從斜坡爬上來，直射打不到坡上；新夥伴拋石手、石堆、陷坑、水袋，新敵人強盜、大鷹、野牛；第 30 夜天亮念詩篇 121';
 
-// ====== 圖示：Microsoft Fluent Emoji 3D（MIT；圖在 img/ico/，128px WebP；授權全文 img/ico/LICENSE-fluentui-emoji.txt）======
-// 同一個 emoji 字元對到一張圖，各家手機看起來一樣；沒對到的（效果名詞、UI 符號、提示列文字）照舊用系統 emoji。圖載不到就退回 emoji，不會留空
+// ====== 圖示：ChatGPT 生的 3D 黏土風圖（圖在 img/ico/，256px WebP；原圖 img/char/*-src.png；做法見 docs/art-asset-plan-2026-10-26.md）======
+// 2026-10-27 起舊的 Microsoft Fluent Emoji 圖全部刪掉，授權文件一併移除。
+// 同一個 emoji 字元對到一張圖，各家手機看起來一樣；沒對到的（UI 符號、提示列文字）照舊用系統 emoji。圖載不到就退回 emoji，不會留空
 const ICON_IMG = {
   '🧑‍🌾': 'c-farmer', '🙋': 'c-slinger', '🪨': 'c-rock', '🧱': 'c-wall', '🎯': 'c-sling', '🐕': 'c-dog', '🤾': 'c-hireling', '🗼': 'c-tower', '🏹': 'c-archer',
   '🌿': 'c-thorns', '🦂': 'c-scorpion', '🔥': 'c-brazier', '🏺': 'c-jar', '📯': 'c-horn', '🎺': 'c-trumpet', '🩹': 'c-healer', '🫗': 'c-oil', '⚙️': 'c-gear',
@@ -512,7 +513,7 @@ const ICON_IMG = {
   '🐺': 'c-wolf', '🐻': 'c-bear', '🦁': 'c-lion', '🥷': 'c-thief', '🧔': 'c-stealer', '🦊': 'c-fox', '🦗': 'c-locust', '🐕‍🦺': 'c-wilddog', '🦅': 'c-eagle',
   '🐗': 'c-boar', '🦉': 'c-owl', '🐆': 'c-leopard', '🐑': 'c-ewe',
   '🪃': 'c-thrower', '🕳️': 'c-pit', '🥛': 'c-waterskin', '⛰️': 'c-stonepile', '🧔‍♂️': 'c-bandit', '🐂': 'c-ox', // 第三章：拋石手、陷坑、水袋、石堆（圖鑑的「山坡」也用它）、強盜、野牛；大鷹跟鷙鳥同一張 eagle，靠放大與鷹形影子分
-  '🦴': 'c-kennel', '🪵': 'c-post', '🧍': 'c-gatekeeper', '⛏️': 'c-shovel', '🐾': 'c-paws', '🧑': 'person', '🐩': 'poodle', // 狗窩、崗位、看門的、鏟子、腳印、組合字備援
+  '🦴': 'c-kennel', '🪵': 'c-post', '🧍': 'c-gatekeeper', '⛏️': 'c-shovel', '🐾': 'c-paws', '🧑': 'c-farmer', '🐩': 'c-wilddog', // 狗窩、崗位、看門的、鏟子、腳印、組合字備援（拼不出 🧑‍🌾／🐕‍🦺 的手機會把 ico 換成 🧑／🐩，一樣指到牧人與野狗的新圖；10/27 舊 Fluent 圖全刪）
   '🛡': 'c-hide', '↕️': 'c-swap', '🌑': 'c-moonless', '🌾': 'c-ration', // 效果頁專用：厚皮、換排、無月夜、一筆糧（10/27 James：效果頁還有四格是系統 emoji；小居生圖）。費用列的「🌾 50」是純文字，不經 icoImg，不受影響
 };
 // 角色（人與動物）各有三套圖：棋盤 q-*（Q 版小人，縮到一格還認得出）、卡片與行內 h-*（頭像）、圖鑑角色頁 l-*（512px 立繪，48 張都有）。道具與標記棋盤和卡片都用原本的 c-*（2026-10-26 仿主流手遊的分工）
