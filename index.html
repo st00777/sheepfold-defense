@@ -257,7 +257,18 @@
   .rc.focus { outline: 2px solid var(--text); outline-offset: 1px; }
   .rc.on::after { content: '✓'; position: absolute; right: 4px; bottom: 2px; font-size: 11px; color: var(--gold); }
   #roster-count { font-size: 13px; color: var(--muted); margin-top: 8px; min-height: 16px; }
-  #roster-detail { text-align: left; background: #0004; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.6; height: 122px; overflow-y: auto; }
+  #roster-detail { text-align: left; background: #0004; border-radius: 8px; padding: 10px 12px; margin-top: 8px; font-size: 14px; line-height: 1.6; height: 150px; overflow-y: auto; display: flex; gap: 10px; }
+  /* 圖鑑角色頁：左邊立繪（點一下開燈箱看大圖）、右邊名字＋稱號＋數值（2026-10-26 James：遊戲內的圖太小，圖鑑要看得清楚） */
+  #roster-detail .big { width: 96px; height: 96px; flex: none; object-fit: contain; cursor: zoom-in; border-radius: 8px; background: #0003; align-self: flex-start; -webkit-user-drag: none; }
+  #roster-detail .dt { flex: 1; min-width: 0; }
+  #roster-detail .sub { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; margin: -2px 0 4px; }
+  #lightbox { z-index: 20; background: #000d; cursor: zoom-out; }
+  .lb { text-align: center; max-width: 92vw; }
+  .lb img { width: min(80vw, 360px); aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 10px 18px #000a); -webkit-user-drag: none; }
+  .lb .n { font-size: 24px; color: var(--gold); font-weight: bold; margin-top: 6px; }
+  .lb .t { font-size: 16px; margin-top: 4px; }
+  .lb .r { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .lb .h { font-size: 12px; color: var(--muted); margin-top: 14px; }
   #roster-detail b { color: var(--gold); }
   #roster-detail .ref { margin: 0; }
   #roster-detail .num { color: var(--muted); font-size: 13px; }
@@ -370,6 +381,10 @@
     <button class="btn alt" id="roster-back">回上一頁</button>
   </div>
 </div>
+<!-- 圖鑑燈箱：點立繪看大圖，點任何地方關 -->
+<div class="overlay" id="lightbox" hidden>
+  <div class="lb"><img id="lb-img" alt=""><div class="n" id="lb-name"></div><div class="t" id="lb-title"></div><div class="r" id="lb-ref"></div><div class="h">點一下關閉</div></div>
+</div>
 
 <!-- 暫停 -->
 <div class="overlay" id="pause" hidden>
@@ -402,11 +417,11 @@
   </div>
 </div>
 
-<script src="data.js?v=14"></script>
+<script src="data.js?v=15"></script>
 <script src="engine.js?v=18"></script>
 <script src="sound.js?v=7"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=17"></script>
+<script src="render.js?v=18"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS 由 data.js 直接提供
@@ -496,16 +511,19 @@ const ICON_IMG = {
   '🪃': 'c-thrower', '🕳️': 'c-pit', '🥛': 'c-waterskin', '⛰️': 'c-stonepile', '🧔‍♂️': 'c-bandit', '🐂': 'c-ox', // 第三章：拋石手、陷坑、水袋、石堆（圖鑑的「山坡」也用它）、強盜、野牛；大鷹跟鷙鳥同一張 eagle，靠放大與鷹形影子分
   '🦴': 'c-kennel', '🪵': 'c-post', '🧍': 'c-gatekeeper', '⛏️': 'c-shovel', '🐾': 'c-paws', '🧑': 'person', '🐩': 'poodle', // 狗窩、崗位、看門的、鏟子、腳印、組合字備援
 };
-function icoImg(e) { const f = ICON_IMG[e]; return f ? `<img class="ei" src="img/ico/${f}.webp" alt="${e}" onerror="icoFail(this)">` : e; }
+// 角色（人與動物）各有三套圖：棋盤 q-*（Q 版小人，縮到一格還認得出）、卡片與行內 h-*（頭像）、圖鑑角色頁 l-*（512px 立繪，48 張都有）。道具與標記棋盤和卡片都用原本的 c-*（2026-10-26 仿主流手遊的分工）
+const CHAR_KEYS = new Set(['farmer', 'slinger', 'sling', 'dog', 'hireling', 'archer', 'horn', 'healer', 'patrol', 'volley', 'cradle', 'thrower', 'gatekeeper', 'ewe', 'wolf', 'bear', 'lion', 'thief', 'stealer', 'fox', 'locust', 'wilddog', 'eagle', 'boar', 'owl', 'leopard', 'bandit', 'ox']);
+function icoFile(e, use) { const f = ICON_IMG[e]; if (!f) return null; const k = f.replace(/^c-/, ''); if (use === 'big') return f.startsWith('c-') ? 'l-' + k : f; if (!CHAR_KEYS.has(k)) return f; return use === 'board' ? 'q-' + k : 'h-' + k; }
+function icoImg(e) { const f = icoFile(e, 'head'); return f ? `<img class="ei" src="img/ico/${f}.webp" alt="${e}" onerror="icoFail(this)">` : e; }
 function icoFail(img) { img.replaceWith(document.createTextNode(img.alt)); }
 // 開局就把圖先載進快取：狼第一次出現、第一次開圖鑑都不會閃一下空白
-(window.requestIdleCallback || setTimeout)(() => { for (const f of new Set(Object.values(ICON_IMG))) { const i = new Image(); i.src = `img/ico/${f}.webp`; } });
+(window.requestIdleCallback || setTimeout)(() => { for (const f of new Set(Object.keys(ICON_IMG).map(e => icoFile(e, 'head')))) { const i = new Image(); i.src = `img/ico/${f}.webp`; } });
 
 // ====== 畫面建立 ======
 // 棋盤是 canvas（render.js）：點格子交給 tapCell；拿著卡滑過（桌機）或按住（手機）可放的格子，先亮出這張卡管得到的格子，放下後再亮 1.3 秒（tapCell）
 let boardReady = false;
 async function buildBoard() {
-  boardReady = await Board.init({ el: $('#board'), icons: ICON_IMG, onTap: tapCell,
+  boardReady = await Board.init({ el: $('#board'), icons: Object.fromEntries(Object.keys(ICON_IMG).map(e => [e, icoFile(e, 'board')])), onTap: tapCell,
     onHover: (r, c) => { if (r === null) { if (!rangeTimer) clearRange(); return; } if (selected && selected !== 'shovel' && hintMap.has(r + ',' + c)) showRange(rangeCells(selected, r, c)); },
     // 畫面層出錯：引擎沒事，遊戲照走；說一聲並記在 localStorage（sheepfold-lasterr，給除錯用），不像引擎出錯那樣回關卡
     onError: msg => { toast('畫面出了點狀況，已記下來；遊戲照常繼續', true); try { localStorage.setItem('sheepfold-lasterr', `${new Date().toISOString()} ${msg}`.slice(0, 2000)); } catch (e) {} } });
@@ -1165,12 +1183,21 @@ function renderRosterDetail() {
     const away = roster.mode !== 'pick' && roster.from === 'intro' && !level.units.includes(k);
     const learns = roster.from === 'intro' && u.upgrade && u.upgrade.from === Engine.posOf(level.id);
     const note = away ? '<br><span class="new">這一夜還沒遇見，要到後面的夜才會同行</span>' : fresh ? `<br><span class="new">這一夜新開的卡${roster.mode === 'pick' ? '，建議帶上' : ''}</span>` : learns ? `<br><span class="new">這一夜起學會「${u.upgrade.name}」：放下後再點一下</span>` : roster.mode === 'pick' && k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : '';
-    box.innerHTML = `<b>${icoImg(u.ico)} ${u.name}</b>　<span class="num">🌾 ${u.cost}</span><br>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${fullRef(u.ref)}${u.upgrade ? '・升級 ' + fullRef(u.upgrade.ref) : ''}</div>`;
+    box.innerHTML = `${bigImg(u, 'units', k)}<div class="dt"><b>${u.name}</b>　<span class="num">🌾 ${u.cost}</span><span class="sub">${u.title || ''}</span>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${fullRef(u.ref)}${u.upgrade ? '・升級 ' + fullRef(u.upgrade.ref) : ''}</div></div>`;
   } else {
     const e = ENEMIES[k];
-    box.innerHTML = `<b>${icoImg(e.ico)} ${e.name}</b><br>${e.tip || '最普通的一隻，走到最左邊就闖進羊圈'}<br><span class="num">${enemyNums(k)}</span>${e.ref ? `<div class="ref">${fullRef(e.ref)}</div>` : ''}`;
+    box.innerHTML = `${bigImg(e, 'enemies', k)}<div class="dt"><b>${e.name}</b><span class="sub">${e.title || ''}</span>${e.tip || '最普通的一隻，走到最左邊就闖進羊圈'}<br><span class="num">${enemyNums(k)}</span>${e.ref ? `<div class="ref">${fullRef(e.ref)}</div>` : ''}</div>`;
   }
 }
+// 圖鑑角色頁的立繪：有 l-* 大圖就放，點一下開燈箱；沒圖（載不到）就退回頭像
+function bigImg(d, tab, k) { const f = icoFile(d.ico, 'big'); return f ? `<img class="big" src="img/ico/${f}.webp" alt="${d.name}" data-tab="${tab}" data-key="${k}" onerror="this.remove()">` : ''; }
+$('#roster-detail').addEventListener('click', ev => {
+  const img = ev.target.closest('img.big'); if (!img) return;
+  const d = (img.dataset.tab === 'units' ? UNITS : ENEMIES)[img.dataset.key]; if (!d) return;
+  $('#lb-img').src = img.src; $('#lb-img').alt = d.name; $('#lb-name').textContent = d.name; $('#lb-title').textContent = d.title || ''; $('#lb-ref').textContent = fullRef(d.ref);
+  $('#lightbox').hidden = false;
+});
+$('#lightbox').addEventListener('click', () => { $('#lightbox').hidden = true; });
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { roster.tab = b.dataset.tab; roster.focus = null; renderRoster(); }));
 $('#roster-go').addEventListener('click', () => { if (roster.picked.size < MIN_CARDS) return; saveLoadout(level.id, sortUnits([...roster.picked])); $('#roster').hidden = true; const cp = pendingCp; pendingCp = null; startGame(cp); });
 $('#roster-back').addEventListener('click', () => { $('#roster').hidden = true; if (roster.from === 'intro') { showIntroNew(level); $('#intro').hidden = false; } else if (roster.from === 'pause') $('#pause').hidden = false; else $('#levels').hidden = false; });

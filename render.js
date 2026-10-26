@@ -57,7 +57,9 @@ const Board = (() => {
       el.appendChild(app.canvas);
       // 圖一張一張載：哪張載不到就那張退回系統 emoji 文字，不會整批空白
       const files = new Set(Object.values(ICONS));
-      await Promise.all([...files].map(f => PIXI.Assets.load({ alias: f, src: `img/ico/${f}.webp` }).then(t => { tex[f] = t; }, () => { tex[f] = null; })));
+      // q-*（Q 版小人）載不到就退回同名的 c-* 全身圖，再不行才退文字
+      const load = f => PIXI.Assets.load({ alias: f, src: `img/ico/${f}.webp` }).then(t => { tex[f] = t; }, () => (f.startsWith('q-') ? PIXI.Assets.load({ alias: 'c-' + f.slice(2), src: `img/ico/c-${f.slice(2)}.webp` }).then(t => { tex[f] = t; }, () => { tex[f] = null; }) : (tex[f] = null)));
+      await Promise.all([...files].map(load));
       makeTextures(); buildLayers(); bindPointer();
       // 盒子大小變了就重排並立刻畫一幀（暫停中沒有 tick，不畫會留白）；延到下一幀做，不然在回呼裡改 canvas 尺寸會被瀏覽器記一筆「ResizeObserver loop」警告
       if (typeof ResizeObserver !== 'undefined') { let queued = false; new ResizeObserver(() => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; if (app) { app.resize(); frame(G, 0); } }); }).observe(el); }
@@ -229,7 +231,7 @@ const Board = (() => {
   // 圖示：有圖用圖，沒圖（載不到）退回系統 emoji 文字
   function makeIcon(emoji, size) {
     const f = ICONS[emoji], t = f && tex[f];
-    if (t) { const s = new PIXI.Sprite(t); s.anchor.set(.5); s.width = s.height = size * (f.startsWith('c-') ? 1.35 : 1); return s; } // c-*：全身角色圖已裁到角色邊框，比原本填滿方格的圖示瘦長，放大 1.35 倍在手機上才看得到（James 10/26）
+    if (t) { const s = new PIXI.Sprite(t); s.anchor.set(.5); s.width = s.height = size * (f.startsWith('c-') || f.startsWith('q-') ? 1.35 : 1); return s; } // c-*／q-*：角色圖已裁到角色邊框，比原本填滿方格的圖示瘦長，放大 1.35 倍在手機上才看得到（James 10/26）
     const txt = new PIXI.Text({ text: emoji, style: { fontSize: size * .85, fontFamily: '-apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif' } }); txt.anchor.set(.5); return txt;
   }
   function makeText(text, size, fill, bold) {

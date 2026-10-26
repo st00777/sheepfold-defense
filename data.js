@@ -1,5 +1,5 @@
 // 羊圈守夜 · 資料表。加單位、加敵人、加關卡都只改這裡。
-// 數值說明：cost 要花的糧；hp 能被咬幾下；every 幾秒做一次事；dmg 一下打多少；speed 每秒走幾格；bite 每秒咬掉多少血。
+// title：圖鑑角色頁的一句稱號（取自出處經文或角色定位，不進規則）。數值說明：cost 要花的糧；hp 能被咬幾下；every 幾秒做一次事；dmg 一下打多少；speed 每秒走幾格；bite 每秒咬掉多少血。
 'use strict';
 
 const ROWS = 5, COLS = 7;
@@ -10,63 +10,63 @@ const ROWS = 5, COLS = 7;
 // upgrade：放下後「再點一下」花糧升級，欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）；fromId＝在哪一夜（id）學會，engine.js 載入時換算成 from＝那一夜的位置（顯示編號），desc 裡的 {from} 一併填入
 // heal 每秒回血／range 回血範圍幾格（1＝周圍八格、2＝5×5）／brave 獅子咆哮嚇不停
 const UNITS = {
-  shepherd: { name: '牧人',     ico: '🧑‍🌾', cost: 50,  hp: 60,  kind: 'producer', every: 7,   gives: 25,
+  shepherd: { name: '牧人', title: '羊圈的根基，糧從他手裡來',     ico: '🧑‍🌾', cost: 50,  hp: 60,  kind: 'producer', every: 7,   gives: 25,
               desc: '定時產糧。再點一下升級成老牧人，產糧更快', ref: '創 31:40' },
-  slinger:  { name: '投石手',   ico: '🙋',   cost: 100, hp: 60,  kind: 'shooter', every: 1.3, dmg: 20, shot: 'stone',
+  slinger:  { name: '投石手', title: '甩石不差毫髮的便雅憫人',   ico: '🙋',   cost: 100, hp: 60,  kind: 'shooter', every: 1.3, dmg: 20, shot: 'stone',
               desc: '投石攻擊同一排的敵人', ref: '士 20:16' },
-  wall:     { name: '石牆',     ico: '🧱',   cost: 50,  hp: 300, kind: 'blocker',
+  wall:     { name: '石牆', title: '為羊群築的牆',     ico: '🧱',   cost: 50,  hp: 300, kind: 'blocker',
               desc: '高血量擋路。再點一下花 25 糧修補', ref: '民 32:16' },
-  sling:    { name: '機弦手',   ico: '🎯',   cost: 150, hp: 60,  kind: 'shooter', every: 3.2, dmg: 90, shot: 'sling',
+  sling:    { name: '機弦手', title: '一顆石子，撂倒巨人',   ico: '🎯',   cost: 150, hp: 60,  kind: 'shooter', every: 3.2, dmg: 90, shot: 'sling',
               desc: '單發傷害高、攻擊間隔長，專打獅子和熊', ref: '撒上 17:40' },
-  dog:      { name: '牧羊犬',   ico: '🐕',   cost: 75,  hp: 220, kind: 'dog', dps: 10, hunt: 30, run: 1.6, rest: 10,
+  dog:      { name: '牧羊犬', title: '追賊的，不要命的',   ico: '🐕',   cost: 75,  hp: 220, kind: 'dog', dps: 10, hunt: 30, run: 1.6, rest: 10,
               desc: '抓賊的。追咬賊、偷羊人、狐狸、野狗；大傢伙也能拖幾秒。受傷回窩休息，不會死', ref: '伯 30:1' },
-  hireling: { name: '雇工',     ico: '🤾',   cost: 25,  hp: 40,  kind: 'shooter', every: 0.9, dmg: 10, shot: 'stone', range: 2.5, flees: 1.0,
+  hireling: { name: '雇工', title: '見狼來就撇下羊逃走',     ico: '🤾',   cost: 25,  hp: 40,  kind: 'shooter', every: 0.9, dmg: 10, shot: 'stone', range: 2.5, flees: 1.0,
               desc: '低費短射程投石手，敵人一靠近就逃跑', ref: '約 10:12' },
-  tower:    { name: '守望樓',   ico: '🗼',   cost: 125, hp: 600, kind: 'blocker', tall: true,
+  tower:    { name: '守望樓', title: '葡萄園中的樓，賊也翻不過',   ico: '🗼',   cost: 125, hp: 600, kind: 'blocker', tall: true,
               desc: '高血量防線，賊也翻不過', ref: '賽 5:2' },
-  archer:   { name: '弓箭手',   ico: '🏹',   cost: 125, hp: 60,  kind: 'shooter', every: 1.8, dmg: 26, shot: 'arrow', pierce: true, falloff: 0.8,
+  archer:   { name: '弓箭手', title: '在曠野長大的弓箭手',   ico: '🏹',   cost: 125, hp: 60,  kind: 'shooter', every: 1.8, dmg: 26, shot: 'arrow', pierce: true, falloff: 0.8,
               desc: '箭矢穿透整排，每穿一隻傷害降低', ref: '創 21:20' },
-  thorns:   { name: '荊棘',     ico: '🌿',   cost: 75,  hp: 150, kind: 'floor', slow: 0.5, dps: 6, wear: 3,
+  thorns:   { name: '荊棘', title: '用荊棘堵住她的道',     ico: '🌿',   cost: 75,  hp: 150, kind: 'floor', slow: 0.5, dps: 6, wear: 3,
               desc: '鋪地減速並持續傷害，踩久會損壞。放在射手前面最划算；第 {from} 夜起再點一下撒蠍子', ref: '何 2:6',
               // 升級：再點一下花糧撒蠍子進去，踩入的敵人中毒（from＝第幾夜起學會）；持續有效，每隻敵人同一片荊棘只叮一次
               upgrade: { name: '荊棘蠍窩', ico: '🦂', cost: 50, fromId: 5, poison: 8, desc: '撒蠍子進荊棘，踩入的敵人中毒，持續有效', ref: '申 8:15' } },
-  brazier:  { name: '火盆',     ico: '🔥',   cost: 75,  hp: 100, kind: 'support', ignite: true,
+  brazier:  { name: '火盆', title: '夜間按著更次看守羊群',     ico: '🔥',   cost: 75,  hp: 100, kind: 'support', ignite: true,
               desc: '點燃穿過的石子與箭矢，燃燒會傳給隔壁敵人', ref: '路 2:8' },
-  jar:      { name: '瓦瓶火把', ico: '🏺',   cost: 100, hp: 0,   kind: 'instant', dmg: 30, panic: 2.5,
+  jar:      { name: '瓦瓶火把', title: '打破瓦瓶，火把一亮', ico: '🏺',   cost: 100, hp: 0,   kind: 'instant', dmg: 30, panic: 2.5,
               desc: '一次性。九格範圍傷害，並嚇退敵人', ref: '士 7:19' },
-  horn:     { name: '吹角手',   ico: '📯',   cost: 100, hp: 60,  kind: 'support', every: 20, push: 1, stun: 2,
+  horn:     { name: '吹角手', title: '吹角，你們就蒙記念',   ico: '📯',   cost: 100, hp: 60,  kind: 'support', every: 20, push: 1, stun: 2,
               desc: '每 20 秒吹角，同排敵人後退一格並暈眩。第 {from} 夜起再點一下換銀號，五排一起退', ref: '民 10:9',
               // 升級：銀號，吹一次五排地面敵人全部後退並暈眩（all＝全場）
               upgrade: { name: '銀號', ico: '🎺', cost: 75, fromId: 14, all: true, desc: '換成銀號，吹一次五排的地面敵人全部後退一格並暈眩', ref: '民 10:2' } },
-  healer:   { name: '纏裹的牧人', ico: '🩹', cost: 100, hp: 60,  kind: 'support', every: 1, heal: 8, range: 1, brave: true,
+  healer:   { name: '纏裹的牧人', title: '受傷的，我必纏裹', ico: '🩹', cost: 100, hp: 60,  kind: 'support', every: 1, heal: 8, range: 1, brave: true,
               desc: '不攻擊，持續回復周圍八格夥伴的血量，不怕獅子咆哮。第 {from} 夜起再點一下膏油，範圍擴大到 5×5、回復更多血量', ref: '結 34:16',
               // 升級：再點一下花糧膏油，範圍 1 格→2 格（5×5 共 24 格）、回血 8→12；brave＝獅子咆哮嚇不停它
               upgrade: { name: '膏油', ico: '🫗', cost: 50, fromId: 7, heal: 12, range: 2, desc: '膏油後周圍 5×5 共 24 格的夥伴每秒回復 12 血量，一位顧整條防線', ref: '詩 23:5' } },
-  catapult: { name: '投石機',   ico: '🛞',   cost: 200, hp: 80,  kind: 'shooter', every: 4, dmg: 45, shot: 'lob', splash: 1.2,
+  catapult: { name: '投石機', title: '巧匠所設計的機器',   ico: '🛞',   cost: 200, hp: 80,  kind: 'shooter', every: 4, dmg: 45, shot: 'lob', splash: 1.2,
               desc: '攻擊同排最遠的敵人，濺射傷害波及落點周圍。拋射飛得過山坡。第 {from} 夜起再點一下換巧匠的機器，裝填快一半、濺射更大', ref: '代下 26:15',
               // 升級（第三章）：巧匠的機器，裝填 4 秒→2.6 秒、濺射 1.2→1.5 格；every／splash 蓋過原本的
               upgrade: { name: '巧匠的機器', ico: '⚙️', cost: 100, fromId: 28, every: 2.6, splash: 1.5, desc: '裝填 4 秒變 2.6 秒、濺射 1.2 格變 1.5 格，斜坡上擠成串的狼一砸一片', ref: '代下 26:15' } },
   // ====== 第二章「另外的羊」 ======
-  staff:    { name: '牧人杖',   ico: '🦯',   cost: 50,  hp: 150, kind: 'deflector', deflect: 10, deflectCd: 4,
+  staff:    { name: '牧人杖', title: '你的杖、你的竿，都安慰我',   ico: '🦯',   cost: 50,  hp: 150, kind: 'deflector', deflect: 10, deflectCd: 4,
               desc: '不攻擊。地面敵人走到它面前就被趕到隔壁排，放在沒有射手的排，把敵人趕進有射手的那排。頭目趕不動', ref: '詩 23:4' },
-  lamp:     { name: '油燈',     ico: '🪔',   cost: 50,  hp: 60,  kind: 'support', light: 1,
+  lamp:     { name: '油燈', title: '她的燈終夜不滅',     ico: '🪔',   cost: 50,  hp: 60,  kind: 'support', light: 1,
               desc: '不攻擊。照亮自己這排和上下兩排：光裡的敵人不換排（豺狼不繞路、豹不跳排、夜鴞不飄），無月夜裡那三排的腳印預告也會回來。放中間那排最划算', ref: '箴 31:18' },
-  patrol:   { name: '巡夜人',   ico: '🚶',   cost: 125, hp: 140, kind: 'patrol', every: 0.8, dmg: 18, walk: 1.2, reach: 1.3,
+  patrol:   { name: '巡夜人', title: '晝夜作我們的保障',   ico: '🚶',   cost: 125, hp: 140, kind: 'patrol', every: 0.8, dmg: 18, walk: 1.2, reach: 1.3,
               desc: '在本排與上下鄰排巡邏，空閒時優先趕往近戰範圍內受威脅的排；接敵後留在那排攻擊。站在哪排就擋哪排的狼；鄰排那格有東西就走不進去', ref: '撒上 25:16' },
-  volley:   { name: '投石隊',   ico: '🥌',   cost: 175, hp: 60,  kind: 'shooter', every: 1.6, dmg: 14, shot: 'stone', lanes: 1,
+  volley:   { name: '投石隊', title: '左右兩手都能甩石',   ico: '🥌',   cost: 175, hp: 60,  kind: 'shooter', every: 1.6, dmg: 14, shot: 'stone', lanes: 1,
               desc: '同時投石攻擊自己這排和上下兩排。放中間一次顧三排，夜鴞飄到哪排都打得到', ref: '代上 12:2' },
-  cradle:   { name: '抱羊羔的牧人', ico: '🫂', cost: 75, hp: 100, kind: 'support', cradle: true,
+  cradle:   { name: '抱羊羔的牧人', title: '用膀臂聚集羊羔，抱在懷中', ico: '🫂', cost: 75, hp: 100, kind: 'support', cradle: true,
               desc: '不攻擊。本排與上下鄰排的迷羊走到他所在的那一欄，就立刻安全。放前面接得早，但仍需保護他', ref: '賽 40:11' },
   // ====== 第三章「諸山間」 ======
   // lobNear 拋最前面那隻（投石機是拋最遠的）；hillOnly 只能放坡上；rolls 被咬垮或點一下推倒會滾石（rollDmg 傷害、rollPush 退幾格、rollStun 暈幾秒）；norepair 不能修補
   // trap 困住第一隻踩進來的地面敵人幾秒、trapBoss 頭目幾秒（一次性）；healAll 倒在哪格，九格內的夥伴回滿血
-  lobber:    { name: '拋石手',  ico: '🪃',  cost: 125, hp: 60,  kind: 'shooter', every: 2.0, dmg: 28, shot: 'lob', lobNear: true, splash: 0.45,
+  lobber:    { name: '拋石手', title: '拋擲石頭有時',  ico: '🪃',  cost: 125, hp: 60,  kind: 'shooter', every: 2.0, dmg: 28, shot: 'lob', lobNear: true, splash: 0.45,
                desc: '把石頭拋到同排最前面那隻敵人頭上。拋得過山坡，厚皮也全額；落點小，通常只中一隻', ref: '傳 3:5' },
-  cairn:     { name: '石堆',    ico: '⛰️',  cost: 50,  hp: 200, kind: 'blocker', hillOnly: true, rolls: true, norepair: true, rollDmg: 80, rollPush: 1, rollStun: 1,
+  cairn:     { name: '石堆', title: '堆聚石頭有時',    ico: '⛰️',  cost: 50,  hp: 200, kind: 'blocker', hillOnly: true, rolls: true, norepair: true, rollDmg: 80, rollPush: 1, rollStun: 1,
                desc: '只能堆在斜坡那三格，是一道便宜的牆。被咬垮或自己點一下推倒，石頭就滾下坡：右邊的地面敵人受傷、退一格、暈一下。不能修補、推倒不退糧', ref: '傳 3:5' },
-  pit:       { name: '陷坑',    ico: '🕳️',  cost: 75,  hp: 1,   kind: 'floor', trap: 4, trapBoss: 2.5,
+  pit:       { name: '陷坑', title: '他就被陷在坑裡',    ico: '🕳️',  cost: 75,  hp: 1,   kind: 'floor', trap: 4, trapBoss: 2.5,
                desc: '一次性。第一隻踩進來的地面敵人困住 4 秒（頭目 2.5 秒），坑就塌了。挖在斜坡第一格（第 5 格、牆前面），困住的敵人卡在坡緣，射手打得到', ref: '結 19:8' },
-  waterskin: { name: '水袋',    ico: '🥛',  cost: 75,  hp: 0,   kind: 'instant', healAll: true,
+  waterskin: { name: '水袋', title: '一皮袋水，給夏甲',    ico: '🥛',  cost: 75,  hp: 0,   kind: 'instant', healAll: true,
                desc: '一次性。倒在哪一格，九格內的夥伴血量回滿、不再害怕。守望樓被撞到剩一口氣時用', ref: '創 21:14' },
 };
 const ELDER_MUL = 0.6;    // 老牧人送糧間隔倍數
@@ -89,46 +89,46 @@ const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'lobber', 'ca
 // thick 厚皮：石子和箭只打 THICK_MUL（35%），機弦、投石機、火、毒全額（所以「石子打不痛牠」）；prio 狗優先咬誰（越大越先）
 const ENEMIES = {
   // ref：經文出處（圖鑑敵方頁顯示；正本對照表在 docs/roster.md）
-  wolf:    { name: '狼',     ico: '🐺', hp: 60,  speed: 0.22, bite: 12, ref: '創 31:39' },
-  fast:    { name: '快狼',   ico: '🐺', hp: 40,  speed: 0.40, bite: 10, cls: 'fast', ref: '哈 1:8' },
-  alpha:   { name: '領頭狼', ico: '🐺', hp: 200, speed: 0.20, bite: 15, cls: 'alpha', howl: 8, prio: 4, boss: true, ref: '哈 1:8',
+  wolf:    { name: '狼', title: '夜裡來撕裂的',     ico: '🐺', hp: 60,  speed: 0.22, bite: 12, ref: '創 31:39' },
+  fast:    { name: '快狼', title: '比晚上的豺狼更猛',   ico: '🐺', hp: 40,  speed: 0.40, bite: 10, cls: 'fast', ref: '哈 1:8' },
+  alpha:   { name: '領頭狼', title: '一聲長嚎，狼群齊奔', ico: '🐺', hp: 200, speed: 0.20, bite: 15, cls: 'alpha', howl: 8, prio: 4, boss: true, ref: '哈 1:8',
              tip: '嚎叫讓附近狼群加速。派牧羊犬咬住牠' },
-  bear:    { name: '母熊',   ico: '🐻', hp: 420, speed: 0.15, bite: 25, cls: 'big', enrage: 0.5, thick: true, prio: 2, boss: true, ref: '撒下 17:8',
+  bear:    { name: '母熊', title: '田野裡丟崽子的母熊',   ico: '🐻', hp: 420, speed: 0.15, bite: 25, cls: 'big', enrage: 0.5, thick: true, prio: 2, boss: true, ref: '撒下 17:8',
              tip: '血量高，半血狂暴。石子傷害低，改用機弦手' },
-  lion:    { name: '獅子',   ico: '🦁', hp: 600, speed: 0.15, bite: 30, cls: 'big lion', roar: 12, wallMul: 4, thick: true, prio: 2, boss: true, ref: '摩 3:8',
+  lion:    { name: '獅子', title: '獅子吼叫，誰不懼怕',   ico: '🦁', hp: 600, speed: 0.15, bite: 30, cls: 'big lion', roar: 12, wallMul: 4, thick: true, prio: 2, boss: true, ref: '摩 3:8',
              tip: '咆哮讓附近夥伴停手，拆牆很快。狗拖住，機弦手集中攻擊' },
-  thief:   { name: '賊',     ico: '🥷', hp: 70,  speed: 0.25, bite: 10, cls: 'human', vaults: true, prio: 3, ref: '約 10:1',
+  thief:   { name: '賊', title: '從別處爬進去的',     ico: '🥷', hp: 70,  speed: 0.25, bite: 10, cls: 'human', vaults: true, prio: 3, ref: '約 10:1',
              tip: '會翻過石牆，改用守望樓攔截' },
-  rustler: { name: '偷羊人', ico: '🧔', hp: 90,  speed: 0.30, bite: 4,  cls: 'human light', steals: true, fleeSpeed: 0.45, prio: 5, ref: '創 31:39',
+  rustler: { name: '偷羊人', title: '抱了羊就跑', ico: '🧔', hp: 90,  speed: 0.30, bite: 4,  cls: 'human light', steals: true, fleeSpeed: 0.45, prio: 5, ref: '創 31:39',
              tip: '不攻擊，走到底就抱羊逃跑。派牧羊犬追捕救羊' },
-  fox:     { name: '小狐狸', ico: '🦊', hp: 30,  speed: 0.35, bite: 6,  cls: 'small', dodge: 0.7, prio: 3, ref: '歌 2:15',
+  fox:     { name: '小狐狸', title: '毀壞葡萄園的小狐狸', ico: '🦊', hp: 30,  speed: 0.35, bite: 6,  cls: 'small', dodge: 0.7, prio: 3, ref: '歌 2:15',
              tip: '十顆石子閃掉七顆。改用牧羊犬或荊棘' },
-  locust:  { name: '蝗群',   ico: '🦗', hp: 8,   speed: 0.30, bite: 2,  cls: 'swarm', ref: '箴 30:27',
+  locust:  { name: '蝗群', title: '沒有君王，卻分隊而出',   ico: '🦗', hp: 8,   speed: 0.30, bite: 2,  cls: 'swarm', ref: '箴 30:27',
              tip: '成群出現，用弓箭手穿透，一箭打多隻' },
-  digger:  { name: '野狗',   ico: '🐕‍🦺', hp: 80, speed: 0.22, bite: 12, cls: 'dig', digs: true, digSpeed: 0.35, ref: '瑪 1:3',
+  digger:  { name: '野狗', title: '曠野的野狗',   ico: '🐕‍🦺', hp: 80, speed: 0.22, bite: 12, cls: 'dig', digs: true, digSpeed: 0.35, ref: '瑪 1:3',
              tip: '鑽地繞過前排。土堆是牠冒出來的地方，在土堆左邊放牆或狗' },
-  bird:    { name: '鷙鳥',   ico: '🦅', hp: 50,  speed: 0.20, bite: 0,  cls: 'fly', flying: true, ref: '創 15:11',
+  bird:    { name: '鷙鳥', title: '鷙鳥下來落在祭物上',   ico: '🦅', hp: 50,  speed: 0.20, bite: 0,  cls: 'fly', flying: true, ref: '創 15:11',
              tip: '飛越牆與狗，射手的投射和瓦瓶火把才打得到' },
   // ====== 第二章「另外的羊」 ======
   // detour 繞路：前面是牆、隔壁排同一格沒牆就跳過去（冷卻秒數）；slam 撞牆第一下傷害、slamStun 撞完自己暈幾秒、trample 踩爛荊棘
   // drift 在上下幾排之間飄、driftT 飄一圈幾秒；shiftEvery 每幾秒換一排；crouchAt 走到第幾格蹲、crouch 蹲幾秒、dash 之後衝幾格
-  jackal:  { name: '豺狼',   ico: '🐺', hp: 70,  speed: 0.26, bite: 12, cls: 'sly', detour: 6, prio: 3, ref: '耶 5:6',
+  jackal:  { name: '豺狼', title: '曠野的豺狼',   ico: '🐺', hp: 70,  speed: 0.26, bite: 12, cls: 'sly', detour: 6, prio: 3, ref: '耶 5:6',
              tip: '碰到牆就繞到隔壁排。光靠牆攔不住，派牧羊犬咬住牠' },
-  boar:    { name: '野豬',   ico: '🐗', hp: 320, speed: 0.30, bite: 20, cls: 'big boar', slam: 100, slamStun: 1.5, trample: true, prio: 2, ref: '詩 80:13',
+  boar:    { name: '野豬', title: '林中出來的野豬',   ico: '🐗', hp: 320, speed: 0.30, bite: 20, cls: 'big boar', slam: 100, slamStun: 1.5, trample: true, prio: 2, ref: '詩 80:13',
              tip: '撞牆第一下很重，還會踩爛荊棘。守望樓擋得住，機弦手打得快' },
-  owl:     { name: '夜鴞',   ico: '🦉', hp: 60,  speed: 0.18, bite: 0,  cls: 'fly owl', flying: true, drift: 1, driftT: 4, ref: '詩 102:6',
+  owl:     { name: '夜鴞', title: '荒場的鴞鳥',   ico: '🦉', hp: 60,  speed: 0.18, bite: 0,  cls: 'fly owl', flying: true, drift: 1, driftT: 4, ref: '詩 102:6',
              tip: '在排與排之間飄，單排射手常打空。投石隊一次打三排' },
-  leopard: { name: '豹',     ico: '🐆', hp: 650, speed: 0.28, bite: 28, cls: 'big leopard', thick: true, vaults: true, shiftEvery: 7, crouchAt: 5, crouch: 2, dash: 2, prio: 2, boss: true, ref: '耶 5:6',
+  leopard: { name: '豹', title: '窺伺城邑的豹子',     ico: '🐆', hp: 650, speed: 0.28, bite: 28, cls: 'big leopard', thick: true, vaults: true, shiftEvery: 7, crouchAt: 5, crouch: 2, dash: 2, prio: 2, boss: true, ref: '耶 5:6',
              tip: '跳過牆、每隔幾秒換一排走，蹲下來就要衝了。牧羊犬咬住牠，投石隊三排盯著' },
   // ====== 第三章「諸山間」 ======
   // throws 強盜：走到第 at 格就站住，每 every 秒朝這排最前面的夥伴丟一顆石頭（dmg）；這排沒夥伴了才繼續走
   // high 大鷹：飛進來時飛得高，投射物與瓦瓶都打不到；守望樓那一排飛不高；抓了羊往回飛就一直低
   // heavy 野牛：推不動（角聲、瓦瓶、滾石只傷不推、不暈）、狗不理、斜坡上不減速、荊棘減得慢；陷坑照 trapBoss 困得住
-  robber:  { name: '強盜',   ico: '🧔‍♂️', hp: 80,  speed: 0.25, bite: 10, cls: 'human', throws: { at: 5, every: 1.5, dmg: 10 }, prio: 3, ref: '路 10:30',
+  robber:  { name: '強盜', title: '落在強盜手中',   ico: '🧔‍♂️', hp: 80,  speed: 0.25, bite: 10, cls: 'human', throws: { at: 5, every: 1.5, dmg: 10 }, prio: 3, ref: '路 10:30',
              tip: '站在斜坡上丟石頭，專丟最前面的夥伴，直射打不到牠。派狗咬牠、拋石手砸、或推倒石堆' },
-  eagle:   { name: '大鷹',   ico: '🦅', hp: 90,  speed: 0.25, bite: 0,  cls: 'fly eagle', flying: true, high: true, steals: true, fleeSpeed: 0.45, ref: '伯 39:27',
+  eagle:   { name: '大鷹', title: '大鷹上騰，在高處搭窩',   ico: '🦅', hp: 90,  speed: 0.25, bite: 0,  cls: 'fly eagle', flying: true, high: true, steals: true, fleeSpeed: 0.45, ref: '伯 39:27',
              tip: '飛得高，投射物打不到，只有守望樓那排牠飛不高。抓了羊往回飛就低了，飛出場前打下來' },
-  aurochs: { name: '野牛',   ico: '🐂', hp: 900, speed: 0.14, bite: 30, cls: 'big aurochs', thick: true, heavy: true, boss: true, slam: 150, slamStun: 1.0, wallMul: 2, ref: '詩 22:21',
+  aurochs: { name: '野牛', title: '救我脫離野牛的角',   ico: '🐂', hp: 900, speed: 0.14, bite: 30, cls: 'big aurochs', thick: true, heavy: true, boss: true, slam: 150, slamStun: 1.0, wallMul: 2, ref: '詩 22:21',
              tip: '撞牆很重，推不動、狗咬不住、在斜坡上也不慢。陷坑困住牠 2.5 秒，所有人一起打' },
 };
 
