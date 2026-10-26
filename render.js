@@ -187,13 +187,13 @@ const Board = (() => {
       // 底圖是程式畫的（Recraft 那條路這一階段沒接，先用零點數的畫法；之後要換成一張圖，只動這一段）。碎石、草叢、山稜的位置用固定種子的亂數，每次重畫都長一樣，不會換夜就跳
       let sd = 0; const seed = n => { sd = 7919 + hill * 97 + n * 1013; }, rnd = () => (sd = (Math.imul(sd, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff; // 每一層（星、山、土層、碎石、草、坡下）各自一個種子：之後改某一層的數量，別層不會跟著搬家
       const ridge = x => yTop * (x - x0) / (W - x0); // 稜線：坡頂對著天空那條線在 x 的高度
-      g.poly([x0, 0, W, 0, W, yTop]).fill(0x121824); // 頂緣以上：夜空
+      g.poly([x0, 0, W, 0, W, yTop]).fill({ color: 0x121824, alpha: .45 }); // 頂緣以上：夜空（場景圖在底下，這裡只壓暗、讓它透上來）
       g.poly([x0, 0, W, yTop * .45, W, yTop]).fill({ color: 0x1b2236, alpha: .9 }); // 貼著山的那層天比較亮（夜裡的地平線總是比頭頂亮）
       seed(1); for (let i = 0; i < 16; i++) { const sx = x0 + cw * .15 + rnd() * (W - x0 - cw * .3); const sy = rnd() * ridge(sx) * .45; if (sy > 1) g.circle(sx, sy, .8 + rnd() * .9).fill({ color: 0xfff6d8, alpha: .3 + rnd() * .45 }); } // 星星：只撒在遠山上面那片天
       seed(2); for (const [k0, amp, col, al] of [[.42, .16, 0x1f2434, .95], [.66, .13, 0x2a2e3a, .95]]) { // 對面的遠山兩層：遠的淡、近的深，稜線用亂數起伏，夾在天空三角形裡
         const pts = [x0, 0]; const n = 7; for (let i = 1; i <= n; i++) { const sx = x0 + (W - x0) * i / n; pts.push(sx, ridge(sx) * (k0 + (rnd() - .5) * amp * 2)); } pts.push(W, yTop); g.poly(pts).fill({ color: col, alpha: al });
       }
-      g.poly([0, yBot, x0, yBot, W, yBotR, W, H, 0, H]).fill(0x1c1810); // 底緣以下：坡下的土地（平地那段多出來的一排，不是格子）
+      g.poly([0, yBot, x0, yBot, W, yBotR, W, H, 0, H]).fill({ color: 0x1c1810, alpha: .5 }); // 底緣以下：坡下的土地（平地那段多出來的一排，不是格子）；半透明讓場景圖的前景草叢透上來
       g.poly([0, yBot, x0, yBot, W, yBotR, W, yBotR + ch * .18, x0, yBot + ch * .18, 0, yBot + ch * .18]).fill({ color: 0x000000, alpha: .25 }); // 底緣下一道影，平地像一塊台地
       for (let c = hill; c < COLS; c++) g.poly([c * cw, yAt(0, c), (c + 1) * cw, yAt(0, c + 1), (c + 1) * cw, yAt(ROWS, c + 1), c * cw, yAt(ROWS, c)]).fill({ color: HILL_TINT[Math.min(HILL_TINT.length - 1, c - hill)], alpha: .38 + (c - hill) * .1 }); // 坡面：越往右越暗的土色
       seed(3); for (const ry of [.55, 1.4, 2.3, 3.35, 4.4]) { // 土層：五道順著坡的等高線，微微起伏，上緣一條淡亮邊像被月光照到的階；全部離整數至少 .35，不會剛好壓在排與排的交界上被看成格線（審查 2026-10-26）
