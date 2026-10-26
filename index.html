@@ -899,7 +899,7 @@ function onWin() {
   if (saved) clearCheckpoint(level.id); // 紀錄沒存進去就不清檢查點：至少還能「繼續上次」重守最後一波，不會畫面說守過、重開卻什麼都沒有
   const next = Engine.nextOf(level.id);
   dawn();
-  setTimeout(() => { // 先讓人看到天亮，結算頁慢 0.9 秒出來（減少動態：立刻）
+  setTimeout(() => { // 先讓人看到天亮，結算頁慢 2.6 秒出來（減少動態：立刻）
     const left = level.noShepherd ? `剩 ${Math.floor(G.food)} 糧。` : ''; // 第 25 夜一筆糧：天亮時剩多少（提案 §4 要記的那一筆，先給玩家看；調 startFood 用）
     endGame('天亮了 🌅', `${DIFFS[diff].name}守過了。${sheepSummary()}${left}${level.outroWin}${saved ? '' : ' ' + SAVE_FAILED_NOTE}`);
     showStars();
@@ -909,7 +909,7 @@ function onWin() {
       if (level.psalmTitle) { const h = document.createElement('div'); h.className = 'ref'; h.textContent = level.psalmTitle; box.appendChild(h); setTimeout(() => h.classList.add('on'), 300); } // 不認識的人也知道這是哪一篇（2026-10-20 G2）
       level.psalm.forEach((line, i) => { const d = document.createElement('div'); d.textContent = line; box.appendChild(d); setTimeout(() => d.classList.add('on'), 600 + i * 1500); });
     }
-  }, REDUCE_MOTION.matches ? 0 : 900);
+  }, REDUCE_MOTION.matches ? 0 : 2600); // 2026-10-26 James：場景淡成清晨要 1.8 秒，0.9 秒就被結算頁蓋住看不到；延到 2.6 秒（淡完再停 0.8 秒），失守那邊維持 0.9
 }
 // 結語依實際羊數選（2026-10-21 小居第 6 項）：有羊數的夜才講；接回幾隻、失去幾隻、圈裡剩幾隻都從引擎帶，不再一句「一隻不少」到底
 function sheepSummary() {
