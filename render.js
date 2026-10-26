@@ -229,7 +229,7 @@ const Board = (() => {
   // 圖示：有圖用圖，沒圖（載不到）退回系統 emoji 文字
   function makeIcon(emoji, size) {
     const f = ICONS[emoji], t = f && tex[f];
-    if (t) { const s = new PIXI.Sprite(t); s.anchor.set(.5); s.width = s.height = size; return s; }
+    if (t) { const s = new PIXI.Sprite(t); s.anchor.set(.5); s.width = s.height = size * (f.startsWith('c-') ? 1.35 : 1); return s; } // c-*：全身角色圖已裁到角色邊框，比原本填滿方格的圖示瘦長，放大 1.35 倍在手機上才看得到（James 10/26）
     const txt = new PIXI.Text({ text: emoji, style: { fontSize: size * .85, fontFamily: '-apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif' } }); txt.anchor.set(.5); return txt;
   }
   function makeText(text, size, fill, bold) {
@@ -359,7 +359,7 @@ const Board = (() => {
       if (human) { bg.roundRect(-br, -br, br * 2, br * 2, br * .6).fill(bodyCol); bg.rotation = -.1; }
       else if (cls.includes('boar')) bg.roundRect(-br, -br, br * 2, br * 2, br * .84).fill(bodyCol);
       else bg.circle(0, 0, br).fill(bodyCol);
-      if (boss) bg.stroke({ width: 3, color: GOLD }); else if (!swarm) bg.stroke({ width: 1.5, color: ENEMY_RING }); // 暗紅細圈＝敵人、金粗圈＝頭目（要緊接在身體後面：Pixi 的 stroke 只套用到最後一個形狀）
+      if (boss) bg.stroke({ width: 3, color: GOLD }); // 金粗圈＝頭目（要緊接在身體後面：Pixi 的 stroke 只套用到最後一個形狀）；一般敵人原本的暗紅細圈 10/26 James 要求拿掉
       if (dig) bg.rect(-br, br * .1, br * 2, br).fill(0x5a4a2a); // 鑽地的：上下分色
     } else { // 飛的：腳下影子。大鷹的影子是鷹形的（同一張圖塗黑、壓扁），飛高時放大變淡、往右偏一點（月光從左上來）；其他飛的還是一粒橢圓
       shadow = new PIXI.Container();
@@ -462,6 +462,7 @@ const Board = (() => {
     const alive = new Set(); const anim = !paused && !still && speed <= 1 && !reduce();
     const put = (id, emoji, kind, x, y, hpv, max, resting) => {
       alive.add(id); const v = MV.get(id) || moverVisual(id, emoji, kind);
+      if (kind !== 'patrol') { const dx = x * cw - v.cont.x; if (Math.abs(dx) > .3) v.faceRight = dx > 0; const sx = Math.abs(v.spr.scale.x) * (v.faceRight ? -1 : 1); v.spr.scale.x = sx; v.bright.scale.x = sx; } // 狗、迷羊的圖預設朝左；往右跑就左右鏡像，停下來維持最後的方向（James 10/26）
       v.cont.x = x * cw; v.cont.y = yAt(y, x); // 跑到坡上的狗、巡夜人、迷羊跟著沉下去、變小
       if (!paused) { v.swing = Math.max(0, v.swing - dt); v.brightT = Math.max(0, v.brightT - dt); }
       const sw = v.swing > 0 ? Math.sin((1 - v.swing / .3) * Math.PI) : 0;
