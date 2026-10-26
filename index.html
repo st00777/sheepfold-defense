@@ -126,7 +126,7 @@
   #scene.plain > #shell { position: relative; top: auto; }
   #scene.plain #board { background: #0d1230 url(img/scene-moon.webp) center 60% / cover no-repeat; } /* 沒場景時棋盤自己鋪草地那段 */
   #scene.dark, #scene.plain.dark #board { background-image: url(img/scene-dark.webp); } /* 無月夜（第二章 8-14 夜）：沒有月亮的那張 */
-  #scene.hill, #scene.plain.hill #board { background-image: url(img/scene-hill.webp); } /* 有坡的夜：右邊 40% 是斜坡的那張（坡緣在 60%，對棋盤第 4 欄起的坡） */
+  /* 有坡的夜沒有自己的場景圖：生的山坡斜度跟棋盤「右三格只沉一排」的幾何對不上（James 10/26 真機），所以底下照鋪平地那張，坡由 render.js 照格子幾何畫 */
   #shell { position: relative; width: 100%; padding-left: var(--lane); --lane: 28px; --rows: 5; } /* --rows：棋盤有幾排高；有坡的夜多 HILL_DROP 排（高地的排整排往下沉），看門的照這個數對位 */ /* 左邊留一條「門口」走道給看門的，不跟第 0 欄搶位置 */
   #lane { position: absolute; left: 0; top: 0; bottom: 0; width: var(--lane); border-radius: 8px 0 0 8px; background: linear-gradient(90deg, #2f2c24, #3d3929); box-shadow: inset -2px 0 4px #0006; }
   /* 棋盤本體是一張 canvas（render.js 用 PixiJS 畫），這裡只留盒子；開不了 WebGL 時 #board-fail 的說明會蓋在上面 */
@@ -402,7 +402,7 @@
 <script src="engine.js?v=18"></script>
 <script src="sound.js?v=7"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=13"></script>
+<script src="render.js?v=14"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS 由 data.js 直接提供
