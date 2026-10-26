@@ -462,7 +462,7 @@ const Board = (() => {
     const alive = new Set(); const anim = !paused && !still && speed <= 1 && !reduce();
     const put = (id, emoji, kind, x, y, hpv, max, resting) => {
       alive.add(id); const v = MV.get(id) || moverVisual(id, emoji, kind);
-      if (kind !== 'patrol') { const dx = x * cw - v.cont.x; if (Math.abs(dx) > .3) v.faceRight = dx > 0; const sx = Math.abs(v.spr.scale.x) * (v.faceRight ? -1 : 1); v.spr.scale.x = sx; v.bright.scale.x = sx; } // 狗、迷羊的圖預設朝左；往右跑就左右鏡像，停下來維持最後的方向（James 10/26）
+      if (kind !== 'patrol') { const dx = x * cw - v.cont.x; if (Math.abs(dx) > .3) v.faceRight = dx > 0; const sx = Math.abs(v.spr.scale.x) * (v.faceRight === false ? -1 : 1); v.spr.scale.x = sx; v.bright.scale.x = sx; } // 狗、迷羊的圖預設朝右（10/26 全部我方圖翻成面向敵人）；往左跑就左右鏡像，停下來維持最後的方向（James 10/26）
       v.cont.x = x * cw; v.cont.y = yAt(y, x); // 跑到坡上的狗、巡夜人、迷羊跟著沉下去、變小
       if (!paused) { v.swing = Math.max(0, v.swing - dt); v.brightT = Math.max(0, v.brightT - dt); }
       const sw = v.swing > 0 ? Math.sin((1 - v.swing / .3) * Math.PI) : 0;
