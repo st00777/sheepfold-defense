@@ -603,7 +603,7 @@ const Board = (() => {
   function drawSky(dt) {
     const s = L.skySpr;
     if (state.lose > 0) { s.texture = gradTex.lose; s.alpha = Math.min(.45, s.alpha + dt / .9 * .45); }
-    else if (state.dawn > 0) { s.texture = gradTex.dawn; s.alpha = Math.min(.42, s.alpha + dt / .9 * .42); }
+    else if (state.dawn > 0) { s.texture = gradTex.dawn; s.alpha = Math.min(.22, s.alpha + dt / .9 * .22); } // 場景圖自己會換成清晨版（index.html #scene.dawn），這層金光只留一點點，不然單位被洗黃
     else if (state.dusk > 0) { state.dusk -= dt; s.texture = gradTex.dusk; s.alpha = .3 * clamp(state.dusk / 4, 0, 1); }
     else s.alpha = 0;
   }

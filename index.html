@@ -119,7 +119,11 @@
   #stage { width: 100%; max-width: 640px; } /* 棋盤＋提示列一組，寬度由 fitBoard 依剩餘高度算 */
   /* 場景圖：一張 ChatGPT 照封面風格生的正方形夜景（上 1/5 夜空月亮、中間七成平草地、下一小條前景草叢）鋪滿 #scene，棋盤壓在草地那段（上緣 21%），canvas 本身透明讓草地透上來。直的手機高度有餘放得下；寬螢幕高度不夠會逼棋盤縮太多時 fitBoard 加 plain：拿掉場景、棋盤照舊尺寸。有坡的夜棋盤多一排高，場景拉高一點、棋盤往上貼（等山坡版場景圖生出來再換） */
   #scene { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden; background: #0d1230 url(img/scene-moon.webp) center / 100% 100% no-repeat; }
-  #scene > #shell { position: absolute; left: 0; right: 0; top: 21%; }
+  #scene > #shell { position: absolute; left: 0; right: 0; top: 21%; z-index: 1; }
+  /* 天亮：清晨版場景疊在夜景上面、棋盤底下，守夜成功那一刻 1.8 秒淡入（跟 render.js 的金光、單位跳一下同一個時間點）；沒場景（plain）時不做 */
+  #scene::after { content: ''; position: absolute; inset: 0; z-index: 0; background: url(img/scene-dawn.webp) center / 100% 100% no-repeat; opacity: 0; transition: opacity 1.8s ease; pointer-events: none; }
+  #scene.dawn::after { opacity: 1; }
+  #scene.plain::after { display: none; }
   #scene.hill { aspect-ratio: 1 / 1.04; }
   #scene.hill > #shell { top: 17%; }
   #scene.plain { aspect-ratio: auto; background: none; border-radius: 0; overflow: visible; }
@@ -402,7 +406,7 @@
 <script src="engine.js?v=18"></script>
 <script src="sound.js?v=7"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=14"></script>
+<script src="render.js?v=15"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS 由 data.js 直接提供
@@ -758,7 +762,7 @@ function bossEnter() {
 }
 // 天亮：金光罩上來、黑暗退掉、場上的人由左到右跳一下（render.js）；看門的發亮、由上到下跳一下（走道是 DOM，在這裡）
 function dawn() {
-  dawned = true; $('#shell').classList.add('dawn'); Board.dawn();
+  dawned = true; $('#shell').classList.add('dawn'); $('#scene').classList.add('dawn'); Board.dawn();
   if (REDUCE_MOTION.matches) return;
   gateEls.forEach((g, i) => { if (g && !g.classList.contains('used')) g.firstElementChild.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-28%)', offset: .4 }, { transform: 'translateY(0)' }], { duration: 420, delay: i * 70, easing: EASE_OUT }); });
 }
@@ -958,7 +962,7 @@ function startGame(fromCp) {
   Board.newGame(G, { diff, speed, resumed }); // 石頭格、場上單位、入夜暖橘（續玩不做）
   for (let i = G.events.length - 1; i >= 0; i--) if (G.events[i].t === 'unit') G.events.splice(i, 1); // 單位已直接畫了，其餘事件留給第一幀
   toast(resumed ? `從第 ${G.wave + 1} 波繼續，場上的人都還在${devUsed ? '；開著開發者模式，這局不存檔' : ''}` : broken ? CP_BROKEN : '先點一張卡，再點草地放下去');
-  dawned = false; $('#shell').classList.remove('dawn');
+  dawned = false; $('#shell').classList.remove('dawn'); $('#scene').classList.remove('dawn');
   draw(0);
   if (!resumed && level.id === 1 && (!tutDone() || /[?&]tut/.test(location.search))) tutStart();
   last = performance.now();
