@@ -715,8 +715,9 @@ function clearSelection() {
 // ====== 範圍預覽（2026-10-21 小居第 5 項：選卡看得到範圍） ======
 // 這張卡放在 (r,c) 會管到哪些格：數字全從 data.js 帶，射程、排數改了預覽跟著變。只放自己那格的（牧人、牆、荊棘）回空陣列
 let rangeTimer = 0;
-function rangeCells(key, r, c) {
-  const u = UNITS[key], out = [];
+function rangeCells(key, r, c, upgraded) {
+  // upgraded＝棋盤上已升級的單位（膏油 5×5、巧匠的機器…），範圍要用升級後的數值，跟 engine.js 的 effOf 同一套合併法
+  const u = upgraded && UNITS[key].upgrade ? { ...UNITS[key], ...UNITS[key].upgrade } : UNITS[key], out = [];
   const add = (rr, cc) => { if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) out.push([rr, cc]); };
   const span = (rr, from, to) => { for (let cc = from; cc <= to; cc++) add(rr, cc); };
   if (u.kind === 'shooter') { const lanes = u.lanes || 0, to = u.range ? Math.min(COLS - 1, c + Math.floor(u.range)) : COLS - 1; for (let rr = r - lanes; rr <= r + lanes; rr++) span(rr, c + 1, to); }
@@ -738,7 +739,9 @@ function tapCell(r, c) {
   if (!G || G.over) return;
   if (devOn && devEnemy) { if (devEnemy === 'stray') Engine.dev.stray(G, r, c); else Engine.dev.spawn(G, devEnemy, r, c); flushEvents(); draw(); return; }
   if (selected === 'shovel') { const res = Engine.sell(G, r, c); flushEvents(); if (res.ok) clearSelection(); toast(res.msg || ''); return; }
-  if (!selected) { if (tut.on) { toast(tut.waiting ? TUT_STEPS[tut.step].wait : TUT_STEPS[tut.step].say, true); return; } const res = Engine.tapUnit(G, r, c); flushEvents(); if (res.msg) toast(res.msg); return; }
+  if (!selected) { if (tut.on) { toast(tut.waiting ? TUT_STEPS[tut.step].wait : TUT_STEPS[tut.step].say, true); return; } const res = Engine.tapUnit(G, r, c); flushEvents(); if (res.msg) toast(res.msg);
+    const u = G.units[r + ',' + c]; if (u) showRange(rangeCells(u.type, r, c, u.upgraded), 1300); // 點棋盤上的單位（含剛升級）亮 1.3 秒它現在管得到的格子，膏油後看得到 5×5（James 10/26）
+    return; }
   if (tut.on) { const [tr, tc] = TUT_STEPS[tut.step].cell; if (r !== tr || c !== tc) { toast('放在亮著的那一格', true); return; } }
   // 格子有人就走「直接換」（同類更貴才會成功，其餘回原因）；沒人才是放下。水袋例外：直接倒在那一格（它就是要倒在受傷的守望樓上）；瓦瓶照舊要空格
   const res = G.units[r + ',' + c] && !UNITS[selected].healAll ? Engine.swap(G, r, c, selected) : Engine.place(G, r, c, selected);
