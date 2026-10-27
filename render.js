@@ -31,7 +31,7 @@ const Board = (() => {
   const reduce = () => REDUCE.matches;
 
   // ====== 狀態 ======
-  let app = null, el = null, ICONS = {}, tex = {}, radialTex, bandTex, vignetteTex, dotTex, rainTex, gradTex = {};
+  let app = null, el = null, ICONS = {}, ICON_TEXT = {}, tex = {}, radialTex, bandTex, vignetteTex, dotTex, rainTex, gradTex = {};
   let W = 0, H = 0, cw = 0, ch = 0, layoutN = 0; // layoutN：尺寸變了就 +1，畫面物件看到號碼不同就重建
   let G = null, diff = 'calm', speed = 1, paused = false, still = false, dawned = false, time = 0;
   let onTap = () => {}, onHover = () => {}, onError = () => {};
@@ -48,7 +48,7 @@ const Board = (() => {
 
   // ====== 啟動：載圖、建圖層 ======
   async function init(opts) {
-    el = opts.el; ICONS = opts.icons || {}; onTap = opts.onTap || onTap; onHover = opts.onHover || onHover; onError = opts.onError || onError;
+    el = opts.el; ICONS = opts.icons || {}; ICON_TEXT = opts.iconText || {}; onTap = opts.onTap || onTap; onHover = opts.onHover || onHover; onError = opts.onError || onError;
     if (typeof PIXI === 'undefined') return false;
     // 整段包起來：建 renderer、載圖、做貼圖任何一步丟例外都算「開不了」，app 歸零讓 index.html 顯示說明（不然 ready 會是 true、圖層卻只建一半）
     try {
@@ -232,7 +232,7 @@ const Board = (() => {
   function makeIcon(emoji, size) {
     const f = ICONS[emoji], t = f && tex[f];
     if (t) { const s = new PIXI.Sprite(t); s.anchor.set(.5); s.width = s.height = size * (f.startsWith('c-') || f.startsWith('q-') ? 1.35 : 1); return s; } // c-*／q-*：角色圖已裁到角色邊框，比原本填滿方格的圖示瘦長，放大 1.35 倍在手機上才看得到（James 10/26）
-    const txt = new PIXI.Text({ text: emoji, style: { fontSize: size * .85, fontFamily: '-apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif' } }); txt.anchor.set(.5); return txt;
+    const txt = new PIXI.Text({ text: ICON_TEXT[emoji] || emoji, style: { fontSize: size * .85, fontFamily: '-apple-system, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif' } }); txt.anchor.set(.5); return txt;
   }
   function makeText(text, size, fill, bold) {
     const t = new PIXI.Text({ text: String(text), style: { fontSize: size, fill, fontWeight: bold ? 'bold' : 'normal', fontFamily: '-apple-system, "PingFang TC", "Noto Sans TC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif', stroke: { color: 0x000000, width: 3 } } });
@@ -365,7 +365,7 @@ const Board = (() => {
       if (dig) bg.rect(-br, br * .1, br * 2, br).fill(0x5a4a2a); // 鑽地的：上下分色
     } else { // 飛的：腳下影子。大鷹的影子是鷹形的（同一張圖塗黑、壓扁），飛高時放大變淡、往右偏一點（月光從左上來）；其他飛的還是一粒橢圓
       shadow = new PIXI.Container();
-      if (cls.includes('eagle') && tex[ICONS[def.ico]]) { const sil = makeIcon(def.ico, ch * .46 * k); sil.tint = 0x000000; sil.alpha = .5; sil.scale.y *= .45; sil.y = ch * .36; sil.bx = sil.scale.x; shadow.sil = sil; shadow.addChild(sil); } // 圖載不到就不做鷹形（文字 emoji 塗黑不會是實心剪影），退回下面的橢圓
+      if (cls.includes('eagle') && tex[ICONS[def.img || def.ico]]) { const sil = makeIcon(def.img || def.ico, ch * .46 * k); sil.tint = 0x000000; sil.alpha = .5; sil.scale.y *= .45; sil.y = ch * .36; sil.bx = sil.scale.x; shadow.sil = sil; shadow.addChild(sil); } // 圖載不到就不做鷹形（文字 emoji 塗黑不會是實心剪影），退回下面的橢圓
       else shadow.addChild(new PIXI.Graphics().ellipse(0, ch * .36, cw * .18, 3).fill({ color: 0x000000, alpha: hillNow !== null ? .5 : .32 }));
       cont.addChildAt(shadow, 0);
     }
@@ -373,8 +373,8 @@ const Board = (() => {
       const sl = new PIXI.Graphics(); sl.rect(br * .9, -4, br * 1.4, 2.2).fill({ color: 0xf3ead8, alpha: .8 }); sl.rect(br * 1.1, 1.8, br * 1.1, 2.2).fill({ color: 0xf3ead8, alpha: .8 }); cont.addChild(sl);
     }
     const burnGlow = new PIXI.Sprite(radialTex); burnGlow.anchor.set(.5); burnGlow.blendMode = 'add'; burnGlow.tint = 0xff8a3d; burnGlow.width = burnGlow.height = br * 3.2; burnGlow.alpha = 0; body.addChildAt(burnGlow, 0);
-    const spr = makeIcon(def.ico, ch * (small ? .34 : swarm ? .3 : .46) * k); spr.y = fly ? -ch * .12 : -ch * .02; body.addChild(spr);
-    const flash = makeIcon(def.ico, ch * .46 * k); if (spr.width) { flash.width = spr.width; flash.height = spr.height; } flash.y = spr.y; // 亮影要跟本體一樣大：把 spr.width 丟回 makeIcon 會再放大 1.35 一次（10/27 審查） flash.blendMode = 'add'; flash.alpha = 0; body.addChild(flash);
+    const spr = makeIcon(def.img || def.ico, ch * (small ? .34 : swarm ? .3 : .46) * k); // img＝跟別人共用 emoji 的敵人自己那套圖（10/28） spr.y = fly ? -ch * .12 : -ch * .02; body.addChild(spr);
+    const flash = makeIcon(def.img || def.ico, ch * .46 * k); if (spr.width) { flash.width = spr.width; flash.height = spr.height; } flash.y = spr.y; // 亮影要跟本體一樣大：把 spr.width 丟回 makeIcon 會再放大 1.35 一次（10/27 審查） flash.blendMode = 'add'; flash.alpha = 0; body.addChild(flash);
     const hp = new PIXI.Graphics(); cont.addChild(hp);
     const st = makeText('', Math.max(9, ch * .16), TEXT, false); st.style.stroke = null; st.y = -ch * .42; cont.addChild(st);
     const v = { cont, body, bg, spr, flash, hp, st, shadow, stText: '', hpLast: -1, phase: Math.random() * 6.28, k, fly, swarm, boss, thick: boss || cls.includes('big'), flashT: 0, burnAcc: 0, poisonAcc: 0, shove: 0, dodge: 0, swing: 0, burnGlow, baseW: spr.width, br };
@@ -592,7 +592,7 @@ const Board = (() => {
     const cont = new PIXI.Container(); L.marks.addChild(cont);
     const special = type && type !== 'wolf' && type !== 'fast';
     if (special) { const boss = !!ENEMIES[type].boss; cont.addChild(new PIXI.Graphics().circle(0, 0, ch * .3).fill({ color: 0x000000, alpha: .3 }).stroke({ width: boss ? 3 : 2, color: boss ? GOLD : ENEMY_RING })); }
-    cont.addChild(makeIcon(special ? ENEMIES[type].ico : '🐾', ch * .38));
+    cont.addChild(makeIcon(special ? (ENEMIES[type].img || ENEMIES[type].ico) : '🐾', ch * .38));
     cont.x = W - cw * .5; cont.y = yAt(r + .5, COLS - .5); marker = { cont, r, type }; // 坡的夜：腳印跟著最右邊那格沉下去
   }
   function setStrayMark(r) {

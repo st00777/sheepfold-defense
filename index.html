@@ -420,11 +420,11 @@
   </div>
 </div>
 
-<script src="data.js?v=15"></script>
+<script src="data.js?v=16"></script>
 <script src="engine.js?v=18"></script>
 <script src="sound.js?v=7"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=19"></script>
+<script src="render.js?v=20"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS 由 data.js 直接提供
@@ -514,12 +514,14 @@ const ICON_IMG = {
   '🐗': 'c-boar', '🦉': 'c-owl', '🐆': 'c-leopard', '🐑': 'c-ewe',
   '🪃': 'c-thrower', '🕳️': 'c-pit', '🥛': 'c-waterskin', '⛰️': 'c-stonepile', '🧔‍♂️': 'c-bandit', '🐂': 'c-ox', // 第三章：拋石手、陷坑、水袋、石堆（圖鑑的「山坡」也用它）、強盜、野牛；大鷹跟鷙鳥同一張 eagle，靠放大與鷹形影子分
   '🦴': 'c-kennel', '🪵': 'c-post', '🧍': 'c-gatekeeper', '⛏️': 'c-shovel', '🐾': 'c-paws', '🧑': 'c-farmer', '🐩': 'c-wilddog', // 狗窩、崗位、看門的、鏟子、腳印、組合字備援（拼不出 🧑‍🌾／🐕‍🦺 的手機會把 ico 換成 🧑／🐩，一樣指到牧人與野狗的新圖；10/27 舊 Fluent 圖全刪）
-  '🛡': 'c-hide', '↕️': 'c-swap', '🌑': 'c-moonless', '🌾': 'c-ration', // 效果頁專用：厚皮、換排、無月夜、一筆糧（10/27 James：效果頁還有四格是系統 emoji；小居生圖）。費用列的「🌾 50」是純文字，不經 icoImg，不受影響
+  '🛡': 'c-hide', '↕️': 'c-swap', '🌑': 'c-moonless', '🌾': 'c-ration',
+  fastwolf: 'c-fastwolf', alphawolf: 'c-alphawolf', jackal: 'c-jackal', bird: 'c-bird', // 跟 🐺／🦅 共用 emoji 的敵人各自的圖（data.js 的 img 欄；10/28 小居生）。取圖一律用 icoKey(d)，文字備援仍是 d.ico // 效果頁專用：厚皮、換排、無月夜、一筆糧（10/27 James：效果頁還有四格是系統 emoji；小居生圖）。費用列的「🌾 50」是純文字，不經 icoImg，不受影響
 };
 // 角色（人與動物）各有三套圖：棋盤 q-*（Q 版小人，縮到一格還認得出）、卡片與行內 h-*（頭像）、圖鑑角色頁 l-*（512px 立繪，48 張都有）。道具與標記棋盤和卡片都用原本的 c-*（2026-10-26 仿主流手遊的分工）
-const CHAR_KEYS = new Set(['farmer', 'slinger', 'sling', 'dog', 'hireling', 'archer', 'horn', 'healer', 'patrol', 'volley', 'cradle', 'thrower', 'gatekeeper', 'ewe', 'wolf', 'bear', 'lion', 'thief', 'stealer', 'fox', 'locust', 'wilddog', 'eagle', 'boar', 'owl', 'leopard', 'bandit', 'ox']);
+const CHAR_KEYS = new Set(['farmer', 'slinger', 'sling', 'dog', 'hireling', 'archer', 'horn', 'healer', 'patrol', 'volley', 'cradle', 'thrower', 'gatekeeper', 'ewe', 'wolf', 'bear', 'lion', 'thief', 'stealer', 'fox', 'locust', 'wilddog', 'eagle', 'boar', 'owl', 'leopard', 'bandit', 'ox', 'fastwolf', 'alphawolf', 'jackal', 'bird']);
+const icoKey = d => d.img || d.ico; // 單位／敵人的取圖鍵：有自己的圖就用 img，否則用 emoji
 function icoFile(e, use) { const f = ICON_IMG[e]; if (!f) return null; const k = f.replace(/^c-/, ''); if (use === 'big') return f.startsWith('c-') ? 'l-' + k : f; if (!CHAR_KEYS.has(k)) return f; return use === 'board' ? 'q-' + k : 'h-' + k; }
-function icoImg(e) { const f = icoFile(e, 'head'); return f ? `<img class="ei" src="img/ico/${f}.webp" alt="${e}" onerror="icoFail(this)">` : e; }
+function icoImg(e, alt = e) { const f = icoFile(e, 'head'); return f ? `<img class="ei" src="img/ico/${f}.webp" alt="${alt}" onerror="icoFail(this)">` : alt; } // alt＝圖載不到時顯示的 emoji（img 鍵不是 emoji，要另外給）
 function icoFail(img) { img.replaceWith(document.createTextNode(img.alt)); }
 // 開局就把圖先載進快取：狼第一次出現、第一次開圖鑑都不會閃一下空白
 (window.requestIdleCallback || setTimeout)(() => { for (const f of new Set(Object.keys(ICON_IMG).map(e => icoFile(e, 'head')))) { const i = new Image(); i.src = `img/ico/${f}.webp`; } });
@@ -528,7 +530,7 @@ function icoFail(img) { img.replaceWith(document.createTextNode(img.alt)); }
 // 棋盤是 canvas（render.js）：點格子交給 tapCell；拿著卡滑過（桌機）或按住（手機）可放的格子，先亮出這張卡管得到的格子，放下後再亮 1.3 秒（tapCell）
 let boardReady = false;
 async function buildBoard() {
-  boardReady = await Board.init({ el: $('#board'), icons: Object.fromEntries(Object.keys(ICON_IMG).map(e => [e, icoFile(e, 'board')])), onTap: tapCell,
+  boardReady = await Board.init({ el: $('#board'), icons: Object.fromEntries(Object.keys(ICON_IMG).map(e => [e, icoFile(e, 'board')])), iconText: Object.fromEntries(Object.values(ENEMIES).filter(d => d.img).map(d => [d.img, d.ico])), onTap: tapCell,
     onHover: (r, c) => { if (r === null) { if (!rangeTimer) clearRange(); return; } if (selected && selected !== 'shovel' && hintMap.has(r + ',' + c)) showRange(rangeCells(selected, r, c)); },
     // 畫面層出錯：引擎沒事，遊戲照走；說一聲並記在 localStorage（sheepfold-lasterr，給除錯用），不像引擎出錯那樣回關卡
     onError: msg => { toast('畫面出了點狀況，已記下來；遊戲照常繼續', true); try { localStorage.setItem('sheepfold-lasterr', `${new Date().toISOString()} ${msg}`.slice(0, 2000)); } catch (e) {} } });
@@ -1081,7 +1083,7 @@ function renderRoster() {
       const e = ENEMIES[k], ok = seenEnemy(k), d = document.createElement('div');
       if (ok) seen++;
       d.className = 'rc' + (ok ? '' : ' locked') + (roster.focus === k ? ' focus' : '');
-      d.innerHTML = `<div class="ico">${ok ? icoImg(e.ico) : '❓'}</div><div class="name">${ok ? e.name : '還沒遇過'}</div>`;
+      d.innerHTML = `<div class="ico">${ok ? icoImg(icoKey(e), e.ico) : '❓'}</div><div class="name">${ok ? e.name : '還沒遇過'}</div>`;
       if (ok) d.addEventListener('click', () => { roster.focus = k; renderRoster(); });
       grid.appendChild(d);
     }
@@ -1089,7 +1091,7 @@ function renderRoster() {
   }
   renderRosterDetail();
   // 這一頁籤的立繪先載進快取，點開角色頁不會先空白一下（只載這頁、只載一次）
-  const keys = roster.tab === 'units' ? roster.units.map(k => UNITS[k].ico) : roster.tab === 'enemies' ? Object.keys(ENEMIES).filter(seenEnemy).map(k => ENEMIES[k].ico) : [];
+  const keys = roster.tab === 'units' ? roster.units.map(k => UNITS[k].ico) : roster.tab === 'enemies' ? Object.keys(ENEMIES).filter(seenEnemy).map(k => icoKey(ENEMIES[k])) : [];
   for (const f of new Set(keys.map(e => icoFile(e, 'big')).filter(Boolean))) { if (!prefetched.has(f)) { prefetched.add(f); const i = new Image(); i.src = `img/ico/${f}.webp`; } }
 }
 const prefetched = new Set();
@@ -1199,7 +1201,7 @@ function renderRosterDetail() {
   }
 }
 // 圖鑑角色頁的立繪：有 l-* 大圖就放，點一下開燈箱；大圖載不到就換成頭像（再載不到才拿掉，文字照排）
-function bigImg(d, tab, k) { const f = icoFile(d.ico, 'big'), h = icoFile(d.ico, 'head'); return f ? `<span class="bigw"><img class="big" src="img/ico/${f}.webp" alt="" data-tab="${tab}" data-key="${k}" data-fb="${h || ''}" onerror="bigFail(this)"><span class="zoom">🔍 點圖放大</span></span>` : ''; }
+function bigImg(d, tab, k) { const f = icoFile(icoKey(d), 'big'), h = icoFile(icoKey(d), 'head'); return f ? `<span class="bigw"><img class="big" src="img/ico/${f}.webp" alt="" data-tab="${tab}" data-key="${k}" data-fb="${h || ''}" onerror="bigFail(this)"><span class="zoom">🔍 點圖放大</span></span>` : ''; }
 function bigFail(img) { const fb = img.dataset.fb; if (fb && !img.dataset.tried) { img.dataset.tried = '1'; img.src = `img/ico/${fb}.webp`; } else img.parentElement.remove(); } // 連頭像都載不到：整個圖框（含角標）拿掉，文字照排
 // 敵人出處行：經文＋第幾夜初登場（從關卡波次算，不靠本機紀錄）
 const FIRST_NIGHT = {}; LEVELS.forEach((l, i) => (l.waves || []).forEach(w => (w.list || []).forEach(([t]) => { if (FIRST_NIGHT[t] === undefined) FIRST_NIGHT[t] = i + 1; })));

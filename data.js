@@ -89,9 +89,10 @@ const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'lobber', 'ca
 // thick 厚皮：石子和箭只打 THICK_MUL（35%），機弦、投石機、火、毒全額（所以「石子打不痛牠」）；prio 狗優先咬誰（越大越先）
 const ENEMIES = {
   // ref：經文出處（圖鑑敵方頁顯示；正本對照表在 docs/roster.md）
+  // img：跟別的敵人共用同一個 emoji 時，自己那套圖的鍵（index.html 的 ICON_IMG／CHAR_KEYS 有對應）；ico 仍是文字備援與提示用的 emoji（10/28）
   wolf:    { name: '狼', title: '夜裡來撕裂的',     ico: '🐺', hp: 60,  speed: 0.22, bite: 12, ref: '創 31:39' },
-  fast:    { name: '快狼', title: '比晚上的豺狼更猛',   ico: '🐺', hp: 40,  speed: 0.40, bite: 10, cls: 'fast', ref: '哈 1:8' },
-  alpha:   { name: '領頭狼', title: '一聲長嚎，狼群齊奔', ico: '🐺', hp: 200, speed: 0.20, bite: 15, cls: 'alpha', howl: 8, prio: 4, boss: true, ref: '哈 1:8',
+  fast:    { name: '快狼', title: '比晚上的豺狼更猛',   ico: '🐺', img: 'fastwolf', hp: 40,  speed: 0.40, bite: 10, cls: 'fast', ref: '哈 1:8' },
+  alpha:   { name: '領頭狼', title: '一聲長嚎，狼群齊奔', ico: '🐺', img: 'alphawolf', hp: 200, speed: 0.20, bite: 15, cls: 'alpha', howl: 8, prio: 4, boss: true, ref: '哈 1:8',
              tip: '嚎叫讓附近狼群加速。派牧羊犬咬住牠' },
   bear:    { name: '母熊', title: '田野裡丟崽子的母熊',   ico: '🐻', hp: 420, speed: 0.15, bite: 25, cls: 'big', enrage: 0.5, thick: true, prio: 2, boss: true, ref: '撒下 17:8',
              tip: '血量高，半血狂暴。石子傷害低，改用機弦手' },
@@ -107,12 +108,12 @@ const ENEMIES = {
              tip: '成群出現，用弓箭手穿透，一箭打多隻' },
   digger:  { name: '野狗', title: '曠野的野狗',   ico: '🐕‍🦺', hp: 80, speed: 0.22, bite: 12, cls: 'dig', digs: true, digSpeed: 0.35, ref: '瑪 1:3',
              tip: '鑽地繞過前排。土堆是牠冒出來的地方，在土堆左邊放牆或狗' },
-  bird:    { name: '鷙鳥', title: '鷙鳥下來落在祭物上',   ico: '🦅', hp: 50,  speed: 0.20, bite: 0,  cls: 'fly', flying: true, ref: '創 15:11',
+  bird:    { name: '鷙鳥', title: '鷙鳥下來落在祭物上',   ico: '🦅', img: 'bird', hp: 50,  speed: 0.20, bite: 0,  cls: 'fly', flying: true, ref: '創 15:11',
              tip: '飛越牆與狗，射手的投射和瓦瓶火把才打得到' },
   // ====== 第二章「另外的羊」 ======
   // detour 繞路：前面是牆、隔壁排同一格沒牆就跳過去（冷卻秒數）；slam 撞牆第一下傷害、slamStun 撞完自己暈幾秒、trample 踩爛荊棘
   // drift 在上下幾排之間飄、driftT 飄一圈幾秒；shiftEvery 每幾秒換一排；crouchAt 走到第幾格蹲、crouch 蹲幾秒、dash 之後衝幾格
-  jackal:  { name: '豺狼', title: '曠野的豺狼',   ico: '🐺', hp: 70,  speed: 0.26, bite: 12, cls: 'sly', detour: 6, prio: 3, ref: '耶 5:6',
+  jackal:  { name: '豺狼', title: '曠野的豺狼',   ico: '🐺', img: 'jackal', hp: 70,  speed: 0.26, bite: 12, cls: 'sly', detour: 6, prio: 3, ref: '耶 5:6',
              tip: '碰到牆就繞到隔壁排。光靠牆攔不住，派牧羊犬咬住牠' },
   boar:    { name: '野豬', title: '林中出來的野豬',   ico: '🐗', hp: 320, speed: 0.30, bite: 20, cls: 'big boar', slam: 100, slamStun: 1.5, trample: true, prio: 2, ref: '詩 80:13',
              tip: '撞牆第一下很重，還會踩爛荊棘。守望樓擋得住，機弦手打得快' },
