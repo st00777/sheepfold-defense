@@ -424,7 +424,7 @@
 <script src="engine.js?v=18"></script>
 <script src="sound.js?v=7"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=20"></script>
+<script src="render.js?v=21"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS 由 data.js 直接提供
@@ -512,10 +512,10 @@ const ICON_IMG = {
   '🛞': 'c-catapult', '🦯': 'c-staff', '🪔': 'c-lamp', '🚶': 'c-patrol', '🥌': 'c-volley', '🫂': 'c-cradle',
   '🐺': 'c-wolf', '🐻': 'c-bear', '🦁': 'c-lion', '🥷': 'c-thief', '🧔': 'c-stealer', '🦊': 'c-fox', '🦗': 'c-locust', '🐕‍🦺': 'c-wilddog', '🦅': 'c-eagle',
   '🐗': 'c-boar', '🦉': 'c-owl', '🐆': 'c-leopard', '🐑': 'c-ewe',
-  '🪃': 'c-thrower', '🕳️': 'c-pit', '🥛': 'c-waterskin', '⛰️': 'c-stonepile', '🧔‍♂️': 'c-bandit', '🐂': 'c-ox', // 第三章：拋石手、陷坑、水袋、石堆（圖鑑的「山坡」也用它）、強盜、野牛；大鷹跟鷙鳥同一張 eagle，靠放大與鷹形影子分
+  '🪃': 'c-thrower', '🕳️': 'c-pit', '🥛': 'c-waterskin', '⛰️': 'c-stonepile', '🧔‍♂️': 'c-bandit', '🐂': 'c-ox', // 第三章：拋石手、陷坑、水袋、石堆（圖鑑的「山坡」也用它）、強盜、野牛；大鷹用 eagle，鷙鳥 10/28 起有自己的 bird（見下面 img 鍵）
   '🦴': 'c-kennel', '🪵': 'c-post', '🧍': 'c-gatekeeper', '⛏️': 'c-shovel', '🐾': 'c-paws', '🧑': 'c-farmer', '🐩': 'c-wilddog', // 狗窩、崗位、看門的、鏟子、腳印、組合字備援（拼不出 🧑‍🌾／🐕‍🦺 的手機會把 ico 換成 🧑／🐩，一樣指到牧人與野狗的新圖；10/27 舊 Fluent 圖全刪）
-  '🛡': 'c-hide', '↕️': 'c-swap', '🌑': 'c-moonless', '🌾': 'c-ration',
-  fastwolf: 'c-fastwolf', alphawolf: 'c-alphawolf', jackal: 'c-jackal', bird: 'c-bird', // 跟 🐺／🦅 共用 emoji 的敵人各自的圖（data.js 的 img 欄；10/28 小居生）。取圖一律用 icoKey(d)，文字備援仍是 d.ico // 效果頁專用：厚皮、換排、無月夜、一筆糧（10/27 James：效果頁還有四格是系統 emoji；小居生圖）。費用列的「🌾 50」是純文字，不經 icoImg，不受影響
+  '🛡': 'c-hide', '↕️': 'c-swap', '🌑': 'c-moonless', '🌾': 'c-ration', // 效果頁專用：厚皮、換排、無月夜、一筆糧（10/27 James：效果頁還有四格是系統 emoji；小居生圖）。費用列的「🌾 50」是純文字，不經 icoImg，不受影響
+  fastwolf: 'c-fastwolf', alphawolf: 'c-alphawolf', jackal: 'c-jackal', bird: 'c-bird', // 跟 🐺／🦅 共用 emoji 的敵人各自的圖（data.js 的 img 欄；10/28 小居生）。取圖一律用 icoKey(d)，文字備援仍是 d.ico
 };
 // 角色（人與動物）各有三套圖：棋盤 q-*（Q 版小人，縮到一格還認得出）、卡片與行內 h-*（頭像）、圖鑑角色頁 l-*（512px 立繪，48 張都有）。道具與標記棋盤和卡片都用原本的 c-*（2026-10-26 仿主流手遊的分工）
 const CHAR_KEYS = new Set(['farmer', 'slinger', 'sling', 'dog', 'hireling', 'archer', 'horn', 'healer', 'patrol', 'volley', 'cradle', 'thrower', 'gatekeeper', 'ewe', 'wolf', 'bear', 'lion', 'thief', 'stealer', 'fox', 'locust', 'wilddog', 'eagle', 'boar', 'owl', 'leopard', 'bandit', 'ox', 'fastwolf', 'alphawolf', 'jackal', 'bird']);

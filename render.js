@@ -373,8 +373,8 @@ const Board = (() => {
       const sl = new PIXI.Graphics(); sl.rect(br * .9, -4, br * 1.4, 2.2).fill({ color: 0xf3ead8, alpha: .8 }); sl.rect(br * 1.1, 1.8, br * 1.1, 2.2).fill({ color: 0xf3ead8, alpha: .8 }); cont.addChild(sl);
     }
     const burnGlow = new PIXI.Sprite(radialTex); burnGlow.anchor.set(.5); burnGlow.blendMode = 'add'; burnGlow.tint = 0xff8a3d; burnGlow.width = burnGlow.height = br * 3.2; burnGlow.alpha = 0; body.addChildAt(burnGlow, 0);
-    const spr = makeIcon(def.img || def.ico, ch * (small ? .34 : swarm ? .3 : .46) * k); // img＝跟別人共用 emoji 的敵人自己那套圖（10/28） spr.y = fly ? -ch * .12 : -ch * .02; body.addChild(spr);
-    const flash = makeIcon(def.img || def.ico, ch * .46 * k); if (spr.width) { flash.width = spr.width; flash.height = spr.height; } flash.y = spr.y; // 亮影要跟本體一樣大：把 spr.width 丟回 makeIcon 會再放大 1.35 一次（10/27 審查） flash.blendMode = 'add'; flash.alpha = 0; body.addChild(flash);
+    const spr = makeIcon(def.img || def.ico, ch * (small ? .34 : swarm ? .3 : .46) * k); spr.y = fly ? -ch * .12 : -ch * .02; body.addChild(spr); // img＝跟別人共用 emoji 的敵人自己那套圖（10/28）
+    const flash = makeIcon(def.img || def.ico, ch * .46 * k); if (spr.width) { flash.width = spr.width; flash.height = spr.height; } flash.y = spr.y; flash.blendMode = 'add'; flash.alpha = 0; body.addChild(flash); // 亮影要跟本體一樣大：把 spr.width 丟回 makeIcon 會再放大 1.35 一次（10/27 審查）。註解一律放行尾：10/27 這條原本插在句中，把後面三句吃掉，敵人被打從來不亮（10/28 審查抓到）
     const hp = new PIXI.Graphics(); cont.addChild(hp);
     const st = makeText('', Math.max(9, ch * .16), TEXT, false); st.style.stroke = null; st.y = -ch * .42; cont.addChild(st);
     const v = { cont, body, bg, spr, flash, hp, st, shadow, stText: '', hpLast: -1, phase: Math.random() * 6.28, k, fly, swarm, boss, thick: boss || cls.includes('big'), flashT: 0, burnAcc: 0, poisonAcc: 0, shove: 0, dodge: 0, swing: 0, burnGlow, baseW: spr.width, br };
