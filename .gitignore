@@ -1,1 +1,3 @@
 .DS_Store
+# 角色原圖 PNG（1024px、共 150MB+）不進 git；備份在 ~/glc-work/sheepfold-char-src/
+img/char/

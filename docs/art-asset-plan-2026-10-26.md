@@ -104,3 +104,5 @@
     render v19。98 項引擎測試全過。
 
 - 2026-10-27 **James 真機看圖鑑三條**：(1) 三套圖逐張看方向，我方朝右、敵方朝左，翻了 19 張（頭像 8：弓箭手、抱羊羔、看門的、纏裹、巡夜人、拋石手、投石隊、野狗；立繪 8：弓箭手、看門的、纏裹、雇工、吹角手、巡夜人、強盜、豹；Q 版 3：抱羊羔、纏裹、強盜），`magick -flop` 直接改 webp，原圖沒動。(2) 立繪右下角加「🔍 點圖放大」角標（`.bigw` 包住 `img.big`，sticky 搬到外層）。(3) 效果頁四格原本是系統 emoji（厚皮 🛡、換排 ↕️、無月夜 🌑、一筆糧 🌾），請小居生四張（獸皮盾、木雕雙向箭頭、厚雲無月徽章、麥穗糧袋），存 `img/ico/c-hide / c-swap / c-moonless / c-ration.webp`，原圖 `img/char/<key>-full-src.png`；ICON_IMG 把這四個 emoji 接上（費用列的「🌾 50」是純文字，不受影響）。腳本在 scratchpad `gen/run.sh`：參考圖附油壺、石頭、油燈三張現成道具當風格錨，第一輪就全部可用。
+
+- 2026-10-27 **原圖搬出 repo**：`img/char/`（112 張 1024px PNG、153MB）從 git 拿掉並加進 .gitignore，備份放 `~/glc-work/sheepfold-char-src/`（上面各條寫的 `img/char/<key>-*-src.png` 都改到那裡找）。遊戲只用 `img/ico/*.webp`（3.2MB），不受影響。歷史 commit 裡的舊原圖還在，clone 仍會拖到；要清歷史得重寫並強推，另案決定。
