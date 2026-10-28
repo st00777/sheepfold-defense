@@ -157,7 +157,7 @@ test('大鷹羊的帳務：抓羊飛低；打下來羊落地走回圈不加羊�
   assert.strictEqual(G.strays.length, 0, '走回圈了'); assert.strictEqual(G.sheep, 3, '不加羊'); assert.strictEqual(G.sheepSaved, 0); assert.strictEqual(G.food, food, '不給糧（滴漏已關）');
   const G2 = setup(24); const f = spawn(G2, 'eagle', 1, 0.2); run(G2, 25);
   assert.strictEqual(G2.sheep, 2); assert.strictEqual(G2.sheepLost, 1); assert.ok(f.dead);
-  const G3 = setup(24); E.dev.stray(G3, 1, 6.5, true); const wolf = spawn(G3, 'wolf', 1, 6.6); run(G3, 6);
+  const G3 = setup(24); E.dev.stray(G3, 1, 5.0, true); const wolf = spawn(G3, 'wolf', 1, 5.1); run(G3, 10);
   assert.strictEqual(G3.sheep, 2); assert.strictEqual(G3.sheepLost, 1, '自己的羊被叼出場才算失落');
   const G4 = setup(24); E.dev.stray(G4, 1, 3, true); G4.wave = 2; const snap = E.snapshot(G4);
   assert.ok(E.checkSnapshot(snap, 24) && snap.strays[0].own === true, '檢查點記得羊的來源');

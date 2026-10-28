@@ -116,7 +116,7 @@ test('迷羊：走到抱羊羔的牧人那格就回圈；被狼叼走，狼倒�
   assert.strictEqual(G2.strays.length, 1, '羊落地繼續走'); assert.strictEqual(G2.sheep, 3);
   // 叼出場算失落
   const G3 = setup(10);
-  E.dev.stray(G3, 1, 6.5); const v = spawn(G3, 'wolf', 1, 6.6); run(G3, 6);
+  E.dev.stray(G3, 1, 5.0); const v = spawn(G3, 'wolf', 1, 5.1); run(G3, 10); // 10/28 起最右邊 1.5 格是安全區，要放進第 6 格才叼得到
   assert.strictEqual(G3.sheep, 2); assert.strictEqual(G3.sheepLost, 1);
 });
 

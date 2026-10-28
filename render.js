@@ -463,7 +463,8 @@ const Board = (() => {
     const spr = makeIcon(emoji, ch * (kind === 'stray' ? .38 : .44)); spr.y = -ch * .02; body.addChild(spr);
     const bright = makeIcon(emoji, ch * (kind === 'stray' ? .38 : .44)); if (spr.width) { bright.width = spr.width; bright.height = spr.height; } bright.y = spr.y; bright.blendMode = 'add'; bright.alpha = 0; body.addChild(bright);
     const hp = new PIXI.Graphics(); cont.addChild(hp);
-    const v = { cont, body, spr, bright, brightT: 0, hp, hpLast: -1, phase: Math.random() * 6, kind, swing: 0, zz: null }; MV.set(id, v); return v; // brightT：減少動態時巡夜人出手改用「亮一下」的剩餘秒數（跟 bright 精靈分開存，2026-10-23 混用過一次整局停掉）
+    let halo = null; if (kind === 'stray') { halo = new PIXI.Graphics().circle(0, 0, ch * .36).stroke({ width: 2, color: GOLD, alpha: .85 }); halo.visible = false; body.addChildAt(halo, 0); } // 迷羊還在最右邊安全區（狼叼不到）時套一圈金邊，走進第 6 格金邊消失＝開始有危險
+    const v = { cont, body, spr, bright, brightT: 0, hp, hpLast: -1, phase: Math.random() * 6, kind, swing: 0, zz: null, halo }; MV.set(id, v); return v; // brightT：減少動態時巡夜人出手改用「亮一下」的剩餘秒數（跟 bright 精靈分開存，2026-10-23 混用過一次整局停掉）
   }
   function drawMovers(dt) {
     const alive = new Set(); const anim = !paused && !still && speed <= 1 && !reduce();
@@ -480,7 +481,7 @@ const Board = (() => {
       if (max && v.hpLast !== hpv) { v.hpLast = hpv; hpBar(v.hp, cw * .8, ch * .38, clamp(hpv / max, 0, 1), OK); }
     };
     for (const k in G.units) { const u = G.units[k]; if (u.type === 'dog') put(u.id, '🐕', 'dog', u.x + .5, u.r + .5, u.hp, u.maxHp, !!u.resting); else if (u.type === 'patrol') put(u.id, UNITS.patrol.ico, 'patrol', u.c + .5, u.rv + .5, u.hp, u.maxHp, false); }
-    for (const s of G.strays) if (!s.dead) put(s.id, STRAY.ico, 'stray', s.x + .5, s.r + .5, 0, 0, false);
+    for (const s of G.strays) if (!s.dead) { put(s.id, STRAY.ico, 'stray', s.x + .5, s.r + .5, 0, 0, false); const v = MV.get(s.id); if (v && v.halo) v.halo.visible = s.x > COLS - STRAY.safe; }
     for (const [id, v] of MV) if (!alive.has(id)) { v.cont.destroy({ children: true }); MV.delete(id); }
   }
 

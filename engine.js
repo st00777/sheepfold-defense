@@ -171,7 +171,7 @@
   function makeUnit(G, r, c, k) {
     const def = UNITS[k];
     const u = { id: G.nextId++, type: k, r, c, hp: def.hp, maxHp: def.hp, timer: def.every ? def.every * 0.6 : 0, fear: 0, elder: false };
-    if (def.kind === 'dog') { u.x = c; u.holding = null; }
+    if (def.kind === 'dog') { u.x = c; u.holding = null; u.gripping = false; u.holdT = 0; } // holding：盯上哪隻（跑過去的路上就算）；gripping：真的咬住了；holdT：幾秒時盯上的（同一隻敵人上誰先誰後）
     if (def.kind === 'patrol') { u.rv = r; u.dir = 1; }   // rv：巡夜人現在走到哪一排（小數），dir 往上或往下
     if (def.kind === 'deflector') u.flip = false;        // 中間排的杖上下輪流趕
     if (def.kind === 'floor') u.stung = new Set(); // 記住叮過誰，同一隻只中一次毒
@@ -461,8 +461,18 @@
 
   // ====== 傷害與狀態 ======
   function hurt(G, e, dmg) { e.hp -= dmg; }
+  // 這隻敵人身上所有的狗都放開（牠死了、換排了、被嚇跑了）
   function release(G, e) {
-    if (e.heldBy) { const d = findUnitById(G, e.heldBy); if (d) d.holding = null; e.heldBy = null; }
+    for (const d of dogHolders(G, e)) { d.holding = null; d.gripping = false; }
+    e.heldBy = null;
+  }
+  // 盯著／咬著這隻敵人的狗（含還在跑過去的）
+  function dogHolders(G, e) { const a = []; for (const k in G.units) { const d = G.units[k]; if (UNITS[d.type].kind === 'dog' && d.holding === e.id) a.push(d); } return a; }
+  // 一隻狗放手：牠是主咬手（敵人正在咬牠的那隻）就換下一隻已咬住的狗接手，沒有就解除咬住、敵人繼續走
+  function unhold(G, u) {
+    if (!u.holding) return;
+    const e = G.enemies.find(x => x.id === u.holding); u.holding = null; u.gripping = false;
+    if (e && e.heldBy === u.id) { const nx = dogHolders(G, e).find(d => d.gripping); e.heldBy = nx ? nx.id : null; }
   }
   function findUnitById(G, id) { for (const k in G.units) if (G.units[k].id === id) return G.units[k]; return null; }
   // 敵人換排：排號立刻換（命中判定用），畫面上的 rv 之後自己滑過去；被狗咬住的先放開
@@ -582,7 +592,7 @@
     for (const k in G.units) {
       const u = G.units[k]; if (u.hp > 0) continue;
       // 狗不會死：放開咬住的、跑回窩趴著休息，回滿血再出動
-      if (UNITS[u.type].kind === 'dog') { if (u.holding) { const e = G.enemies.find(x => x.id === u.holding); if (e) e.heldBy = null; u.holding = null; } u.hp = 1; u.resting = true; u.restT = UNITS[u.type].rest; ev(G, { t: 'toast', msg: '牧羊犬受傷了，回窩趴著休息' }); ev(G, { t: 'fx', kind: 'rest', r: u.r, x: u.x }); continue; }
+      if (UNITS[u.type].kind === 'dog') { unhold(G, u); u.hp = 1; u.resting = true; u.restT = UNITS[u.type].rest; ev(G, { t: 'toast', msg: '牧羊犬受傷了，回窩趴著休息' }); ev(G, { t: 'fx', kind: 'rest', r: u.r, x: u.x }); continue; }
       removeUnit(G, u, !u.worn); // 自己磨損掉的（荊棘）不算損失；被咬倒、踩爛、嚇跑的算
     }
   }
@@ -591,7 +601,7 @@
   function removeUnit(G, u, lost) {
     if (lost) G.unitsLost++;
     if (lost && UNITS[u.type].rolls) rollStones(G, u); // 石堆被咬垮、撞垮：石頭一樣滾下坡（鏟除、換樓不滾）
-    if (u.holding) { const e = G.enemies.find(x => x.id === u.holding); if (e) e.heldBy = null; }
+    if (u.holding) unhold(G, u);
     delete G.units[key(u.r, u.c)];
     ev(G, { t: 'unit', r: u.r, c: u.c });
   }
@@ -721,29 +731,48 @@
       if (u.restT <= 0) { u.resting = false; u.hp = u.maxHp; ev(G, { t: 'pop', r: u.r, c: u.c, text: '汪！' }); }
       return;
     }
-    const held = u.holding ? G.enemies.find(e => e.id === u.holding) : null;
-    if (held && targetable(held) && !held.st.panic) {
-      u.x = held.x - 0.55;
-      hurt(G, held, (sneaky(held) ? def.hunt : def.dps) * dt);
+    // 2026-10-28 James 拍板的分工：同排的狗一隻敵人配一隻狗，先進來的敵人先有狗咬；新敵人進來、還沒狗盯時，由同一隻敵人上「最晚盯上的那隻狗」轉過去；
+    // 敵人比狗少時多的狗一起上去合咬（傷害疊加）；手上那隻死了就去幫忙咬別隻。叼著羊跑的最優先，排上有迷羊時先咬離羊最近的
+    const inRow = e => e.r === u.r && targetable(e) && !ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && !e.st.panic && e.x > -0.3 && e.x < COLS + 0.2; // 野牛狗咬不住，直接不理
+    let held = u.holding ? G.enemies.find(e => e.id === u.holding) : null;
+    if (held && !inRow(held)) { unhold(G, u); held = null; } // 死了、驚慌跑了、換排了：放手
+    const cands = G.enemies.filter(inRow);
+    const nDogs = e => dogHolders(G, e).length;
+    if (held) { // 要不要換目標：有敵人叼著羊沒狗追，或有新敵人沒狗盯而我不是手上這隻的第一隻狗
+      const free = cands.filter(e => e !== held && nDogs(e) === 0);
+      const first = dogHolders(G, held).reduce((a, b) => (b.holdT < a.holdT || (b.holdT === a.holdT && b.id < a.id) ? b : a)); // 同一幀一起盯上的，id 小的算先
+      if (free.some(e => e.carrying) || (free.length && first !== u)) { unhold(G, u); held = null; }
+    }
+    if (!held && cands.length) {
+      const stray = G.strays.find(s => s.r === u.r && !s.dead && s.x <= COLS - STRAY.safe); // 已經走進狼叼得到的範圍的迷羊
+      const score = e => [e.carrying ? 1 : 0, -nDogs(e), stray ? -Math.abs(e.x - stray.x) : 0, ENEMIES[e.type].prio || 1, -Math.abs(e.x - u.x)];
+      const better = (a, b) => { const sa = score(a), sb = score(b); for (let i = 0; i < sa.length; i++) if (sa[i] !== sb[i]) return sb[i] > sa[i]; return false; };
+      held = cands.reduce((a, b) => (better(a, b) ? b : a));
+      u.holding = held.id; u.holdT = G.time; u.gripping = false;
+    }
+    if (held) {
+      const idx = dogHolders(G, held).sort((a, b) => a.holdT - b.holdT || a.id - b.id).indexOf(u); // 第幾隻：後到的站前一隻後面一點，不疊成一團
+      const goal = held.x - 0.55 - 0.3 * idx;
+      const d = goal - u.x;
+      if (u.gripping || Math.abs(d) < 0.12) {
+        if (!u.gripping) { u.gripping = true; ev(G, { t: 'fx', kind: 'bark', r: u.r, x: goal }); }
+        if (!held.heldBy) held.heldBy = u.id; // 第一隻咬住的當主咬手：敵人停下來咬牠
+        u.x = goal;
+        hurt(G, held, (sneaky(held) ? def.hunt : def.dps) * dt);
+      } else u.x += Math.sign(d) * Math.min(Math.abs(d), def.run * dt);
       return;
     }
-    if (held) { held.heldBy = null; }
-    u.holding = null;
-    const cands = G.enemies.filter(e => e.r === u.r && targetable(e) && !ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && !e.heldBy && !e.st.panic && e.x > -0.3 && e.x < COLS + 0.2); // 野牛狗咬不住，直接不理
-    if (cands.length) {
-      const pr = e => (e.carrying ? 9 : (ENEMIES[e.type].prio || 1));
-      const e = cands.reduce((a, b) => (pr(b) > pr(a) || (pr(b) === pr(a) && Math.abs(b.x - u.x) < Math.abs(a.x - u.x)) ? b : a));
-      const goal = e.x - 0.55;
-      const d = goal - u.x;
-      if (Math.abs(d) < 0.12) { u.x = goal; u.holding = e.id; e.heldBy = u.id; ev(G, { t: 'fx', kind: 'bark', r: u.r, x: u.x }); }
-      else u.x += Math.sign(d) * Math.min(Math.abs(d), def.run * dt);
-    } else {
-      // 沒敵人時：同排有迷羊就走在牠右邊護送，不然回窩
-      const s = G.strays.find(s => s.r === u.r && !s.dead);
-      const goal = s ? Math.min(COLS - 0.3, s.x + 0.6) : u.c;
-      const d = goal - u.x;
-      if (Math.abs(d) > 0.01) u.x += Math.sign(d) * Math.min(Math.abs(d), def.run * dt);
+    // 沒敵人時：同排有迷羊就走在牠右邊護送（幾隻閒狗輪流跟幾隻羊），不然回窩
+    const strays = G.strays.filter(s => s.r === u.r && !s.dead);
+    let goal = u.c;
+    if (strays.length) {
+      const idle = []; for (const k in G.units) { const v = G.units[k]; if (UNITS[v.type].kind === 'dog' && v.r === u.r && !v.resting && !v.holding) idle.push(v); }
+      idle.sort((a, b) => a.c - b.c);
+      const s = strays[Math.max(0, idle.indexOf(u)) % strays.length];
+      goal = Math.min(COLS - 0.3, s.x + 0.6);
     }
+    const d = goal - u.x;
+    if (Math.abs(d) > 0.01) u.x += Math.sign(d) * Math.min(Math.abs(d), def.run * dt);
   }
 
   // ====== 巡夜人（2026-10-21 小居審查第 1 項：站位、攻擊排、碰撞排統一） ======
@@ -807,7 +836,7 @@
   function spawnStray(G, r, x, own) {
     const s = { id: G.nextId++, r: r === null || r === undefined ? pickStrayRow(G) : r, x, dead: false, own: !!own };
     G.strays.push(s); ev(G, { t: 'stray', s });
-    if (!own && !G.toldStray) { G.toldStray = true; ev(G, { t: 'toast', msg: '有一隻迷羊從東邊走過來了，別讓狼碰到牠' }); }
+    if (!own && !G.toldStray) { G.toldStray = true; ev(G, { t: 'toast', msg: '有一隻迷羊從東邊走過來了，走進第 6 格起狼就叼得到，狗先去等' }); }
     return s;
   }
   // 迷羊回圈：自己走到最左邊，或被抱羊羔的牧人接回（receiver）。接回的畫面要看得出是誰接的（2026-10-21 小居第 5 項）：
@@ -827,7 +856,8 @@
       const c = Math.round(s.x);
       const receiver = Object.values(G.units).find(u => UNITS[u.type].cradle && Math.abs(u.r - s.r) <= 1 && Math.abs(s.x - u.c) < 0.3);
       if (receiver || s.x < -0.4) { strayHome(G, s, receiver ? receiver.c : c, receiver); continue; }
-      // 地面敵人碰到就叼走（被咬住、嚇退、暈眩、翻牆中的不會）
+      // 地面敵人碰到就叼走（被咬住、嚇退、暈眩、翻牆中的不會）；剛進場、還在最右邊 STRAY.safe 格內的羊叼不到（不然跟出生的狼同格，玩家無從應對）
+      if (s.x > COLS - STRAY.safe) continue;
       for (const e of G.enemies) {
         if (e.r !== s.r || !targetable(e) || ENEMIES[e.type].flying || e.carrying || e.heldBy || e.st.panic || e.st.stun || e.vaulting > 0 || e.crouchT > 0) continue;
         if (Math.abs(e.x - s.x) < 0.45) { e.carrying = true; e.carryStray = true; e.carryOwn = !!s.own; s.dead = true; ev(G, { t: 'toast', msg: `${ENEMIES[e.type].name}叼走了一隻迷羊，追上去！` }); ev(G, { t: 'fx', kind: 'grab', r: s.r, x: s.x }); break; }
@@ -1068,7 +1098,7 @@
     nextWave(G) { if (G.over) return; G.started = true; G.holdWaves = false; if (G.phase === 'wave') { dev.clear(G); } G.timer = Math.min(G.timer, 0.5); },
     food(G, n) { G.food += n; },
     allCards(G) { G.level = { ...G.level, units: Object.keys(UNITS), fresh: [] }; if (G.level.conveyor) for (const k of Object.keys(UNITS)) if (!G.hand.includes(k)) G.hand.push(k); ev(G, { t: 'hand' }); },
-    stray(G, r, x, own) { if (G.over) return; spawnStray(G, r, x, own); },
+    stray(G, r, x, own) { if (G.over) return null; return spawnStray(G, r, x, own); },
   };
 
   // 關卡資料守門：會抓羊的（大鷹、偷羊人）出現的夜一定要有 sheep；只能放坡上的卡出現的夜一定要有 hill。載入時印錯誤，測試也能叫

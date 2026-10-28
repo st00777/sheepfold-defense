@@ -19,7 +19,7 @@ const UNITS = {
   sling:    { name: '機弦手', title: '一顆石子，撂倒巨人',   ico: '🎯',   cost: 150, hp: 60,  kind: 'shooter', every: 3.2, dmg: 90, shot: 'sling',
               desc: '單發傷害高、攻擊間隔長，專打獅子和熊', ref: '撒上 17:40' },
   dog:      { name: '牧羊犬', title: '追賊的，不要命的',   ico: '🐕',   cost: 75,  hp: 220, kind: 'dog', dps: 10, hunt: 30, run: 1.6, rest: 10,
-              desc: '抓賊的。追咬賊、偷羊人、狐狸、野狗；大傢伙也能拖幾秒。受傷回窩休息，不會死', ref: '伯 30:1' },
+              desc: '抓賊的。追咬賊、偷羊人、狐狸、野狗；大傢伙也能拖幾秒。同排幾隻狗會分頭咬，敵人少就一起上。受傷回窩休息，不會死', ref: '伯 30:1' },
   hireling: { name: '雇工', title: '見狼來就撇下羊逃走',     ico: '🤾',   cost: 25,  hp: 40,  kind: 'shooter', every: 0.9, dmg: 10, shot: 'stone', range: 2.5, flees: 1.0,
               desc: '低費短射程投石手，敵人一靠近就逃跑', ref: '約 10:12' },
   tower:    { name: '守望樓', title: '葡萄園中的樓，賊也翻不過',   ico: '🗼',   cost: 125, hp: 600, kind: 'blocker', tall: true,
@@ -134,7 +134,7 @@ const ENEMIES = {
 };
 
 // 迷羊（中立，不是敵人）：從右邊走進來往羊圈走，走到最左邊或抱羊羔的牧人那格就回圈；地面敵人碰到就叼走
-const STRAY = { name: '迷羊', ico: '🐑', speed: 0.15, reward: 25, ref: '路 15:4' };
+const STRAY = { name: '迷羊', ico: '🐑', speed: 0.15, reward: 25, safe: 1.5, ref: '路 15:4' }; // safe：從右邊界算起幾格內狼叼不到（走進玩家看到的第 6 格才叼得到；2026-10-28 James：剛進場就被出生的狼叼走，玩家無從應對）
 
 const THICK_MUL = 0.35; // 厚皮敵人吃石子、箭的比例（圖鑑「效果」頁也讀這個）
 
