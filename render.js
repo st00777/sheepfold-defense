@@ -314,6 +314,20 @@ const Board = (() => {
   function hopUnit(r, c) { const v = UN.get(key(r, c)); if (v && UNITS[v.u.type].kind === 'producer' && speed <= 1 && !reduce()) v.hop = .24; }
   function recoilUnit(r, c) { const v = UN.get(key(r, c)); if (v && speed <= 1 && !reduce()) v.recoil = .09; }
   function squashUnit(r, c) { placed(r, c, null); }
+  // 單位離場動畫（10/29 James：嚇跑、踩爛不能憑空消失）。引擎 removeUnit 前送 gone，原因 why：down 被咬倒／撞垮、worn 自己磨損（荊棘、陷坑）、sold 鏟除換卡；
+  // 嚇跑（flee）與踩爛（trample）在 gone 之前就有 fx，fx 把原因記在 v.leaving，這裡優先用它。鏟除、減少動態、快轉照舊直接消失
+  function unitGone(r, c, why) {
+    const k = key(r, c), v = UN.get(k); if (!v) return;
+    UN.delete(k); removeHole(k); if (v.glow) v.glow.destroy(); if (v.pool) v.pool.destroy(); if (v.up) v.up.destroy({ children: true });
+    const how = v.leaving || why, cont = v.cont, inner = v.inner;
+    const end = () => { if (!cont.destroyed) cont.destroy({ children: true }); };
+    if (how === 'sold' || reduce() || speed > 1) { end(); return; }
+    const x0 = cont.x, y0 = cont.y, sx = Math.abs(v.spr.scale.x);
+    if (how === 'flee') { v.spr.scale.x = -sx; tween(.6, q => { const e = EASE(q); cont.x = x0 - e * cw * 1.4; cont.y = y0 - Math.abs(Math.sin(q * Math.PI * 3)) * ch * .1; cont.alpha = 1 - q * q; }, end); } // 轉身往左邊跑掉，小跳三下、邊跑邊淡
+    else if (how === 'trample') tween(.4, q => { const e = EASE(q); inner.scale.set(1 + .35 * e, Math.max(.1, 1 - .9 * e)); inner.y = ch * .22 * e; cont.alpha = q < .6 ? 1 : 1 - (q - .6) / .4; }, end); // 壓扁：橫向撐開、直向壓到剩一成，最後淡掉
+    else if (how === 'down') tween(.5, q => { const e = EASE(q); inner.rotation = -.8 * e; inner.y = ch * .12 * e; cont.alpha = 1 - q * q; }, end); // 被咬倒：往左倒下、沉一點、淡掉
+    else tween(.35, q => { cont.alpha = 1 - q; inner.scale.set(1 - .15 * q); }, end); // 磨損用完：縮小淡出
+  }
 
   // 無月夜：油燈照亮上下共 light 排（規則同引擎 rowLit）：黑暗擦掉一條橫跨棋盤的亮帶，燈附近再多擦一圈更亮
   function ensureHole(k, x, y, light) {
@@ -528,7 +542,7 @@ const Board = (() => {
       case 'howl': ripple(px, py, 0xc9a0dc); break;
       case 'roar': ripple(px, py, GOLD); break;
       case 'horn': { if (speed <= 1) squashUnit(r, x); popText(r, x, FX_TEXT.horn); if (reduce()) break; const g = new PIXI.Graphics(); L.fx.addChild(g); tween(.45, k => { const e = EASE(k); g.clear().ellipse(px + e * W * .9, yAt(r + .5, (px + e * W * .9) / cw), cw * .25, ch * .45).stroke({ width: 3, color: 0xffe28a, alpha: 1 - k }); }, () => g.destroy()); hornShove(ev && ev.moved); break; } // 吹的人回彈＋衝擊波＋被推的滑移
-      case 'trample': case 'emerge': case 'flee': burst(px, py + ch * .2, 6, [0xc9bda0], ch * .4, .3); if (kind === 'flee') popText(r, x, FX_TEXT.flee); break;
+      case 'trample': case 'emerge': case 'flee': { burst(px, py + ch * .2, 6, [0xc9bda0], ch * .4, .3); if (kind === 'flee') popText(r, x, FX_TEXT.flee); const v = kind !== 'emerge' ? UN.get(key(r, Math.round(x))) : null; if (v) v.leaving = kind; break; } // 嚇跑／踩爛：先記在那格單位上，緊接著的 gone 事件照這個播離場動畫
       case 'gate': gateSweep(r); break;
       case 'strike': { burst(px, py, 6, [0xffe28a, 0xffffff], ch * .4, .25); const t = makeText('✦', Math.max(16, ch * .5), GOLD, true); t.x = px; t.y = py; L.text.addChild(t); tween(.45, k => { t.scale.set(1 + k * .4); t.alpha = 1 - k; }, () => t.destroy()); swingPatrol(id); break; }
       case 'mound': { const g = new PIXI.Graphics(); g.mr = r; g.mx = x; drawMound(g); L.marks.addChild(g); mounds.set(id, g); break; } // 鑽地的會從這裡冒出來：常駐、在 drawMarks 裡閃，emerge 時移除
@@ -700,6 +714,7 @@ const Board = (() => {
           case 'die': dieFx(e.e); break;
           case 'hit': flashHit(e.id); break;
           case 'pop': popText(e.r, e.c, e.text); if (String(e.text)[0] === '+') hopUnit(e.r, e.c); break;
+          case 'gone': unitGone(e.r, e.c, e.why); break;
           case 'unit': renderUnit(e.r, e.c); break;
           case 'fx': fx(e.kind, e.r, e.x, e.id, e); break;
           case 'marker': setMarker(e.r, e.type); break;

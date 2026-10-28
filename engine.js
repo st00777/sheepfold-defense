@@ -602,6 +602,7 @@
     if (lost) G.unitsLost++;
     if (lost && UNITS[u.type].rolls) rollStones(G, u); // 石堆被咬垮、撞垮：石頭一樣滾下坡（鏟除、換樓不滾）
     if (u.holding) unhold(G, u);
+    ev(G, { t: 'gone', r: u.r, c: u.c, why: lost ? 'down' : u.worn ? 'worn' : 'sold' }); // 畫面層照原因播離場動畫（嚇跑／踩爛的在這之前已另送 fx flee／trample）；sold＝鏟除、換卡，直接消失
     delete G.units[key(u.r, u.c)];
     ev(G, { t: 'unit', r: u.r, c: u.c });
   }
@@ -943,8 +944,9 @@
             for (const o of G.enemies) if (o !== e && targetable(o) && dist(o, e) <= 2) o.st.howl = STATUS.howl.t;
             ev(G, { t: 'fx', kind: 'howl', r: e.r, x: e.x }); ev(G, { t: 'toast', msg: '領頭狼嚎叫，狼群衝過來了' });
           } else {
-            for (const k in G.units) { const u = G.units[k]; const d = Math.hypot(u.c - e.x, u.r - e.r); if (d <= 2 && !['floor', 'blocker', 'dog'].includes(UNITS[u.type].kind) && !UNITS[u.type].brave) { u.fear = STATUS.fear.t; if (UNITS[u.type].flees) u.hp = 0; } }
-            ev(G, { t: 'fx', kind: 'roar', r: e.r, x: e.x }); ev(G, { t: 'toast', msg: '獅子吼叫，附近的人都僵住了' });
+            let fled = 0; // 被吼跑的雇工數：要讓玩家看得出他是嚇跑的，不是被咬死的（10/29 James）
+            for (const k in G.units) { const u = G.units[k]; const d = Math.hypot(u.c - e.x, u.r - e.r); if (d <= 2 && !['floor', 'blocker', 'dog'].includes(UNITS[u.type].kind) && !UNITS[u.type].brave) { u.fear = STATUS.fear.t; if (UNITS[u.type].flees) { u.hp = 0; fled++; ev(G, { t: 'fx', kind: 'flee', r: u.r, x: u.c }); } } }
+            ev(G, { t: 'fx', kind: 'roar', r: e.r, x: e.x }); ev(G, { t: 'toast', msg: fled ? '獅子吼叫，附近的人都僵住了，雇工嚇得撇下羊逃走' : '獅子吼叫，附近的人都僵住了' });
           }
         }
       }

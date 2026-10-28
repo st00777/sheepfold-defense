@@ -97,3 +97,20 @@ test('閒狗輪流跟羊：兩隻狗兩隻羊，一狗跟一羊', () => {
   assert.ok(Math.abs(d1.x - (sA.x + 0.6)) < 0.15, '第一隻狗跟第一隻羊');
   assert.ok(Math.abs(d2.x - (sB.x + 0.6)) < 0.15, '第二隻狗跟第二隻羊');
 });
+
+// 10/29 James：雇工被嚇跑、荊棘被踩爛、單位被咬倒都不能憑空消失。引擎在移除前送 gone（原因），嚇跑另送 fx flee
+test('離場事件：獅子吼跑雇工有 flee 效果＋gone down；鏟除是 gone sold', () => {
+  const G = setup(7);
+  assert.ok(E.place(G, 1, 4, 'hireling').ok); assert.ok(E.place(G, 3, 2, 'wall').ok);
+  spawn(G, 'lion', 2, 6);
+  const got = [];
+  for (let i = 0; i < Math.round(4.3 * 30); i++) { E.step(G, 1 / 30); got.push(...G.events); G.events.length = 0; }
+  assert.ok(!G.units['1,4'], '鄰排 2 格內的雇工被吼跑了');
+  assert.ok(got.some(e => e.t === 'fx' && e.kind === 'flee' && e.r === 1 && e.x === 4), '有逃跑效果');
+  const gone = got.find(e => e.t === 'gone' && e.r === 1 && e.c === 4);
+  assert.ok(gone && gone.why === 'down', 'gone 事件原因 down');
+  assert.ok(got.some(e => e.t === 'toast' && /雇工/.test(e.msg)), '提示有說雇工逃走');
+  assert.ok(got.indexOf(got.find(e => e.t === 'fx' && e.kind === 'flee')) < got.indexOf(gone), 'flee 在 gone 之前');
+  G.events.length = 0; E.sell(G, 3, 2);
+  const s = G.events.find(e => e.t === 'gone'); assert.ok(s && s.why === 'sold', '鏟除是 sold');
+});
