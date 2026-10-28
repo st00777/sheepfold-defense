@@ -58,8 +58,12 @@ test('舊檔沒有冷卻全長時，長於首輪的倒數仍使用完整冷卻�
 // UI 仍是原生單頁；直接執行實際的存檔訊息函式，儲存服務以記憶體替身提供。
 const ui = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const storageCode = ui.slice(ui.indexOf('function saveCheckpoint('), ui.indexOf('function clearCheckpoint('));
+// 2026-10-30 期 0 起檢查點住在 save.js 的單一存檔裡：這裡用同一支 save.js 包住替身儲存，寫入失敗／讀不回來的判斷在 SAVE.save()
+const Save = require('../save.js');
 function storageContext(storage, cp) {
-  const ctx = { localStorage: storage, CKEY: id => 'checkpoint-' + id, loadCheckpoint: () => cp, level: { id: 2 }, Engine: E, DIFFS: D.DIFFS };
+  const st = { get: k => (storage.getItem ? storage.getItem(k) : null), set: (k, v) => storage.setItem(k, v), remove: () => {}, keys: () => [] };
+  const SAVE = Save.open(st, { check: E.checkSnapshot });
+  const ctx = { SAVE, SD: SAVE.data, loadCheckpoint: () => cp, level: { id: 2 }, Engine: E, DIFFS: D.DIFFS };
   vm.createContext(ctx); vm.runInContext(storageCode, ctx); return ctx;
 }
 test('沒有有效檢查點時，不承諾可以續玩', () => {
