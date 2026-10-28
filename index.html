@@ -287,6 +287,16 @@
     .card:active, .btn:active, .diff:active, .tab:active, .lv:active, .rc:active, #pause-btn:active, #snd-btn:active, .corner:active, .snd-row button:active, #tut-skip:active { transform: none; }
   }
   @keyframes fadeOut { to { opacity: 0; } }
+  /* 設定頁（首頁左上 ⚙️）與更新公告（2026-10-30 期 0） */
+  .corner.left { right: auto; left: 12px; }
+  #save-note { background: #0004; border: 1px solid var(--new); border-radius: 8px; padding: 6px 10px; font-size: 13px; margin: 6px 0 2px; text-align: left; line-height: 1.5; }
+  .set-box { padding: 8px 0 4px; border-top: 1px dashed #0004; text-align: left; }
+  .set-box textarea { width: 100%; box-sizing: border-box; font: 12px/1.4 ui-monospace, Menlo, monospace; background: #0005; color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 8px; resize: vertical; word-break: break-all; }
+  .set-box .btn.small { margin-top: 6px; }
+  .set-note { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.5; text-align: left; }
+  .set-notes { font-size: 14px; text-align: left; line-height: 1.7; margin: 8px 0 4px; }
+  .snd-row small { display: block; font-size: 12px; color: var(--muted); }
+  .btn.warn { background: #b85c3a; color: #fff; }
 </style>
 </head>
 <body>
@@ -325,8 +335,10 @@
 <div class="overlay" id="levels">
   <div class="dialog home">
     <button class="corner snd-btn" id="snd-btn-levels" title="聲音">🔊</button>
+    <button class="corner left" id="settings-btn" title="設定：存檔碼、統計">⚙️</button>
     <h1>羊圈守夜</h1>
     <div class="ref">受託守夜的無名牧人。每一夜都取材自聖經裡牧人的故事。</div>
+    <div id="save-note" hidden></div>
     <button class="btn" id="continue-btn" hidden></button>
     <button class="btn alt small" id="levels-codex">📖 圖鑑</button>
     <div class="tabs" id="ch-tabs"></div>
@@ -421,9 +433,45 @@
   </div>
 </div>
 
+<!-- 設定（首頁左上 ⚙️）：存檔碼匯出／匯入、匿名統計開關、版本與更新紀錄 -->
+<div class="overlay" id="settings" hidden>
+  <div class="dialog">
+    <h1>設定</h1>
+    <div class="ref" id="set-save-state"></div>
+    <div class="snd">
+      <div class="snd-row"><span>存檔碼 <small>換手機、備份用</small></span><div class="seg"><button id="set-export">匯出</button><button id="set-import">匯入</button></div></div>
+      <div class="set-box" id="set-export-box" hidden>
+        <textarea id="set-export-code" readonly rows="4" aria-label="存檔碼"></textarea>
+        <button class="btn small" id="set-copy">複製</button>
+        <div class="set-note" id="set-copy-note">這一串就是這支手機的全部紀錄。貼到 LINE 或備忘錄留著，換手機時在設定頁按「匯入」貼回來。</div>
+      </div>
+      <div class="set-box" id="set-import-box" hidden>
+        <textarea id="set-import-code" rows="4" placeholder="把存檔碼貼在這裡（SF4. 開頭）" aria-label="貼上存檔碼"></textarea>
+        <button class="btn small" id="set-import-read">讀取</button>
+        <div class="set-note" id="set-import-preview"></div>
+        <button class="btn small warn" id="set-import-go" hidden>確定匯入，蓋掉目前紀錄</button>
+      </div>
+      <div class="snd-row"><span>匿名統計 <small>只記玩到第幾夜、用了哪些卡，不記姓名帳號</small></span><button id="ga-btn">開</button></div>
+    </div>
+    <div class="set-note" id="set-version"></div>
+    <div class="set-notes" id="set-notes"></div>
+    <button class="btn alt" id="set-back">回首頁</button>
+  </div>
+</div>
+<!-- 更新公告：版本變了、已經有存檔的玩家開頁時彈一次 -->
+<div class="overlay" id="notice" hidden>
+  <div class="dialog">
+    <h1>更新了</h1>
+    <div class="ref" id="notice-ver"></div>
+    <div class="set-notes" id="notice-notes"></div>
+    <button class="btn" id="notice-ok">知道了</button>
+  </div>
+</div>
+
 <script src="data.js?v=17"></script>
 <script src="engine.js?v=20"></script>
-<script src="sound.js?v=7"></script>
+<script src="save.js?v=1"></script>
+<script src="sound.js?v=8"></script>
 <script src="lib/pixi.min.js"></script>
 <script src="render.js?v=24"></script>
 <script>
@@ -467,27 +515,16 @@ let devUsed = false;   // 這一局有沒有開過開發者面板；開過就不
 let pendingCp = null;  // 續玩前要先點兵時，先把存檔記著
 const CP_BROKEN = '上次的存檔讀不出來，這一夜要從頭守。';
 
-// ====== 進度（只存在這支手機） ======
-const PKEY = 'sheepfold-progress-v3';
-function loadProgress() {
-  let p = { cleared: {}, best: {}, stars: {} };
-  try { p = Object.assign(p, JSON.parse(localStorage.getItem(PKEY) || '{}')); } catch (e) {}
-  if (!p.stars || typeof p.stars !== 'object') p.stars = {}; // 舊存檔沒這欄
-  // 舊版只有第一關的紀錄，搬過來
-  try {
-    const old = JSON.parse(localStorage.getItem('sheepfold-best-v2') || 'null');
-    if (old && !p.migrated) { for (const k in old) { p.best['1:' + k] = old[k]; if (old[k].cleared) (p.cleared[1] = p.cleared[1] || {})[k] = true; } p.migrated = true; saveProgress(p); }
-  } catch (e) {}
-  return p;
-}
-let P = loadProgress();
-// 回傳存成功了沒（寫完讀回來對一次）。寫不進去（空間滿、無痕瀏覽、被瀏覽器擋）以前是默默吞掉，畫面說通關、重開卻沒紀錄（小居 10/21 第 2 項）；現在失敗會記在 saveFailed，結算頁說明、檢查點先留著當備份、回關卡時再試一次
+// ====== 存檔（只存在這支手機）======
+// 2026-10-30 期 0：整支手機的紀錄放在一份 `sheepfold-save`（save.js，v4）——進度、星、每關檢查點、隊伍、看過的介紹、教學、設定。
+// 以前十幾個散放的 key 第一次開新版會自動搬進來、搬成功才刪；主檔讀不出來會先試上次開頁抄的備份、再不行才從頭，原文留在 -broken，首頁會說一聲
+const SAVE = Save.open(Save.localStore(), { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS) });
+const SD = SAVE.data;
+Sound.attach(SD.prefs.sound, () => SAVE.save()); // 音效設定也住在存檔裡
+let P = SD.progress;
+// 回傳存成功了沒（save.js 寫完讀回來對一次）。寫不進去（空間滿、無痕瀏覽、被瀏覽器擋）以前是默默吞掉，畫面說通關、重開卻沒紀錄（小居 10/21 第 2 項）；現在失敗會記在 saveFailed，結算頁說明、檢查點先留著當備份、回關卡時再試一次
 let saveFailed = false;
-function saveProgress(p) {
-  try { const text = JSON.stringify(p || P); localStorage.setItem(PKEY, text); saveFailed = localStorage.getItem(PKEY) !== text; }
-  catch (e) { saveFailed = true; }
-  return !saveFailed;
-}
+function saveProgress() { saveFailed = !SAVE.save(); return !saveFailed; }
 const SAVE_FAILED_NOTE = '這一夜的紀錄沒能存進這支手機（可能是空間不足、無痕瀏覽或瀏覽器擋了存檔）。上一波的檢查點先留著，下次進來可以「繼續上次」再守一次最後一波。';
 const unlockAll = /[?&]all/.test(location.search);
 // 星級：每夜三顆——守過／零損失（沒失羊就算；單位被咬垮不算，2026-10-24 James 定）／看門的都在（這個難度一開始有幾位就要幾位都在）。自動累積（不同局拿到的可以合起來）、不解鎖任何東西，只是看得見的完整度
@@ -502,7 +539,14 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來', 3: '羊圈在山上，斜坡上的敵人直射打不到：要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛' };
-const HOME_UPDATE = '最近更新 10/26：第三章「諸山間」第 21-30 夜上線——羊圈在山上、敵人從斜坡爬上來，直射打不到坡上；新夥伴拋石手、石堆、陷坑、水袋，新敵人強盜、大鷹、野牛；第 30 夜天亮念詩篇 121';
+const HOME_UPDATE = '最近更新 10/30：左上 ⚙️ 設定——可以匯出存檔碼換手機接著玩；存檔整理成一份、壞了會說不會默默清；匿名統計（設定裡可關）';
+// 版本變了彈一次的三行摘要（只給已經有存檔的玩家看；看過記在存檔 announced）
+const APP_VERSION = '2026.10.30';
+const UPDATE_NOTES = [
+  '首頁左上多了 ⚙️ 設定：可以把全部紀錄匯出成一串存檔碼，換手機時貼回去就接著玩',
+  '存檔整理成一份、有版本號：讀不出來會先用備份接回、再不行才從頭，而且會說一聲，不會默默清掉',
+  '加了匿名統計，只記玩到第幾夜、用了哪些卡，不記姓名帳號；不想被記就在設定裡關掉',
+];
 
 // ====== 圖示：ChatGPT 生的 3D 黏土風圖（圖在 img/ico/，256px WebP；原圖 PNG 不進 git、備份在 ~/glc-work/sheepfold-char-src/；做法見 docs/art-asset-plan-2026-10-26.md）======
 // 2026-10-27 起舊的 Microsoft Fluent Emoji 圖全部刪掉，授權文件一併移除。
@@ -536,7 +580,7 @@ async function buildBoard() {
     // 畫面層出錯：引擎沒事，遊戲照走；說一聲並記在 localStorage（sheepfold-lasterr，給除錯用），不像引擎出錯那樣回關卡
     onError: msg => { toast('畫面出了點狀況，已記下來；遊戲照常繼續', true); try { localStorage.setItem('sheepfold-lasterr', `${new Date().toISOString()} ${msg}`.slice(0, 2000)); } catch (e) {} } });
   if (!boardReady) { $('#board-fail').classList.add('on'); $('#start').disabled = true; }
-  else try { const saved = localStorage.getItem('sheepfold-lite'); applyLite(saved === null ? Board.software : saved === '1', false); } catch (e) {}
+  else applyLite(SD.prefs.lite === null ? Board.software : SD.prefs.lite, false); // 沒設過：電腦是軟體繪圖就自動開
 }
 function buildCards() {
   const wrap = $('#cards'); wrap.innerHTML = '';
@@ -600,6 +644,7 @@ function buildLevels() {
     list.appendChild(d);
   }
   $('#home-upd').textContent = HOME_UPDATE;
+  const sn = $('#save-note'); sn.hidden = !SAVE.problems.length; sn.textContent = SAVE.problems.join('；'); // 存檔搬移／接回／壞掉的說明，首頁說一次（不靜默）
 }
 function openIntro(L) {
   level = L;
@@ -630,9 +675,8 @@ function openIntro(L) {
   $('#levels').hidden = true; $('#intro').hidden = false;
 }
 // 這一夜新開的卡、或舊卡在這一夜學會的新招（升級 from＝這一夜），第一次來先引去圖鑑看
-const NKEY = 'sheepfold-intro-seen';
 let markIntroSeen = () => {}; // 開場頁有新夥伴框時由 showIntroNew 換成真的；開始守夜也會叫
-function introSeen() { try { return JSON.parse(localStorage.getItem(NKEY) || '[]'); } catch (e) { return []; } }
+function introSeen() { return SD.seen.intro; }
 function newThisNight(L) {
   const seen = introSeen();
   const fresh = L.fresh.filter(k => !seen.includes(`${L.id}:${k}`));
@@ -653,7 +697,7 @@ function showIntroNew(L, quiet) {
   if (gateNew) parts.push('🧍 看門的可替受保護的排救場一次，配置見下方');
   $('#intro-new-text').textContent = parts.join('；') + '。完整能力與數值可在圖鑑查看。';
   // 不管是按「先看圖鑑」還是直接「開始守夜」，這一夜的新夥伴介紹都只跳一次（2026-10-20 U3：以前只有按圖鑑才記）
-  markIntroSeen = () => { try { const a = introSeen(); for (const k of [...fresh, ...upg]) if (!a.includes(`${L.id}:${k}`)) a.push(`${L.id}:${k}`); if (gateNew && !a.includes('gate')) a.push('gate'); localStorage.setItem(NKEY, JSON.stringify(a)); } catch (e) {} };
+  markIntroSeen = () => { try { const a = introSeen(); for (const k of [...fresh, ...upg]) if (!a.includes(`${L.id}:${k}`)) a.push(`${L.id}:${k}`); if (gateNew && !a.includes('gate')) a.push('gate'); SAVE.save(); } catch (e) {} };
   $('#intro-new-btn').onclick = () => {
     const focus = fresh[0] || upg[0];
     markIntroSeen();
@@ -663,7 +707,7 @@ function showIntroNew(L, quiet) {
     const el = [...document.querySelectorAll('#roster-grid .rc')].find(x => x.dataset.key === focus); if (el) el.scrollIntoView({ block: 'nearest' });
   };
 }
-function savedDiff() { try { const k = localStorage.getItem('sheepfold-diff'); return DIFFS[k] ? k : diff; } catch (e) { return diff; } }
+function savedDiff() { return DIFFS[SD.prefs.diff] ? SD.prefs.diff : diff; }
 function gateAdvice(L, key) {
   const rows = Engine.gateRows(L, key);
   if (!rows.length) return '今晚沒有看門的，任何一排都不能漏。';
@@ -676,7 +720,7 @@ function applyDiff(key, save = true) {
   $('#diff-hint').textContent = `${DIFFS[key].hint}。${gateAdvice(level, key)}`;
   const rows = Engine.gateRows(level, key);
   $('#gate-preview').innerHTML = Array.from({ length: ROWS }, (_, r) => `<span class="${rows.includes(r) ? 'protected' : ''}" aria-label="第 ${r + 1} 排${rows.includes(r) ? '有看門的' : '沒有看門的'}">${r + 1} 排 ${rows.includes(r) ? '🧍' : '—'}</span>`).join('');
-  if (save) try { localStorage.setItem('sheepfold-diff', key); } catch (e) {}
+  if (save && SD.prefs.diff !== key) { SD.prefs.diff = key; SAVE.save(); }
 }
 function showBest() {
   const lines = Object.keys(DIFFS).filter(k => P.best[level.id + ':' + k]).map(k => { const b = P.best[level.id + ':' + k]; return `${DIFFS[k].name}：${b.cleared ? '守過整夜 ✅' : `撐到第 ${b.wave} 波`}`; });
@@ -685,12 +729,12 @@ function showBest() {
 }
 
 // 新卡閃光只到玩家第一次點選那張卡為止
-function seenCard(key) { try { return (JSON.parse(localStorage.getItem('sheepfold-seen-cards') || '[]')).includes(key); } catch (e) { return false; } }
-function markSeen(key) { try { const a = JSON.parse(localStorage.getItem('sheepfold-seen-cards') || '[]'); if (!a.includes(key)) { a.push(key); localStorage.setItem('sheepfold-seen-cards', JSON.stringify(a)); } } catch (e) {} }
+function seenCard(key) { return SD.seen.cards.includes(key); }
+function markSeen(key) { if (!SD.seen.cards.includes(key)) { SD.seen.cards.push(key); SAVE.save(); } }
 
 // 敵人第一次出現的弱點提示只跳一次，之後不再打擾
-function seenEnemy(t) { try { return (JSON.parse(localStorage.getItem('sheepfold-seen-enemies') || '[]')).includes(t); } catch (e) { return false; } }
-function markSeenEnemy(t) { try { const a = JSON.parse(localStorage.getItem('sheepfold-seen-enemies') || '[]'); if (!a.includes(t)) { a.push(t); localStorage.setItem('sheepfold-seen-enemies', JSON.stringify(a)); } } catch (e) {} }
+function seenEnemy(t) { return SD.seen.enemies.includes(t); }
+function markSeenEnemy(t) { if (!SD.seen.enemies.includes(t)) { SD.seen.enemies.push(t); SAVE.save(); } }
 
 function toast(msg, tip) {
   const t = $('#toast'); t.textContent = msg; t.classList.toggle('tip', !!tip);
@@ -774,6 +818,7 @@ function tapCell(r, c) {
   const res = G.units[r + ',' + c] && !UNITS[selected].healAll ? Engine.swap(G, r, c, selected) : Engine.place(G, r, c, selected);
   flushEvents();
   if (!res.ok) { toast(res.msg || ''); return; }
+  if (nightStat) nightStat.placed[selected] = (nightStat.placed[selected] || 0) + 1; // 統計：這一夜每張卡放了幾次
   if (UNITS[selected].kind !== 'instant') { Sound.play('place'); Board.placed(r, c, selected); } // 放下壓扁回彈；火盆油燈先點亮。瓦瓶的聲音走 fx blast，也不回彈
   showRange(rangeCells(selected, r, c), 1300); // 放下後亮 1.3 秒這張卡管得到的格子（手機沒有滑過，靠這個看範圍）
   clearSelection();
@@ -853,10 +898,10 @@ function setSpeed(n) {
   speed = n; Board.setSpeed(speed);
   document.querySelectorAll('#dev [data-speed]').forEach(x => x.classList.toggle('on', Number(x.dataset.speed) === speed));
   const fb = $('#fast-btn'); fb.classList.toggle('on', speed > 1); fb.textContent = speed > 1 ? `⏩${speed}×` : '⏩'; fb.title = speed > 1 ? `加速中 ${speed}×，點一下回正常` : '加速（二倍速）';
-  try { localStorage.setItem('sheepfold-speed', String(speed)); } catch (e) {}
+  const want = speed > 1 ? 2 : 1; if (SD.prefs.speed !== want) { SD.prefs.speed = want; SAVE.save(); } // 開發者列的 4／8× 不存，下次開還是二倍
 }
 $('#fast-btn').addEventListener('click', () => { setSpeed(speed > 1 ? 1 : 2); Sound.play('tap'); });
-try { const sp = Number(localStorage.getItem('sheepfold-speed')); if (sp === 2) setSpeed(2); } catch (e) {}
+if (SD.prefs.speed === 2) setSpeed(2);
 
 function draw(dt = 0) {
   setText($('#food'), G.level.conveyor ? '—' : String(Math.floor(G.food)));
@@ -926,6 +971,7 @@ function showStars() {
 function onWin() {
   Sound.ambient(false); Sound.play('dawn');
   const saved = recordBest(true);
+  trackNightEnd('win');
   if (saved) clearCheckpoint(level.id); // 紀錄沒存進去就不清檢查點：至少還能「繼續上次」重守最後一波，不會畫面說守過、重開卻什麼都沒有
   const next = Engine.nextOf(level.id);
   dawn();
@@ -954,6 +1000,7 @@ function sheepSummary() {
 function onLose(reason, by) {
   Sound.ambient(false); Sound.play('lose');
   recordBest(false); clearCheckpoint(level.id);
+  trackNightEnd('lose');
   const who = by && ENEMIES[by] ? ENEMIES[by].name : null; // 標題寫闖進來的那一隻的名字：夜鴞就是夜鴞、母熊就是母熊，不再一律翻成狼／鷙鳥
   const titles = { wolf: `${who || '狼'}闖進羊圈了`, bird: `${who || '鷙鳥'}飛進羊圈了`, sheep: '羊被偷光了' };
   const text = (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
@@ -998,6 +1045,8 @@ function startGame(fromCp) {
   last = performance.now();
   raf = requestAnimationFrame(tick);
   Sound.ambient(true);
+  nightStat = { placed: {}, t0: Date.now(), resumed };
+  track('night_start', { night: Engine.posOf(level.id), level_id: level.id, diff, resumed: resumed ? 1 : 0 });
 }
 function backToLevels() {
   clearBoard(); Sound.ambient(false);
@@ -1011,12 +1060,11 @@ function backToLevels() {
 
 // ====== 點兵與圖鑑 ======
 // 一關的卡超過 MAX_CARDS 張就要點兵；帶哪幾張存在這支手機，每關各存一份
-const LKEY = 'sheepfold-loadout';
 const sessionPick = {};   // 這次開著的頁面裡各關選好的名單；localStorage 寫不進去也照用
 const GROUP = { producer: 0, shooter: 1, dog: 1, blocker: 2, floor: 3, instant: 4, support: 4 }; // 卡片固定分組
 const sortUnits = keys => [...keys].sort((a, b) => GROUP[UNITS[a].kind] - GROUP[UNITS[b].kind] || keys.indexOf(a) - keys.indexOf(b));
-function loadLoadouts() { try { return JSON.parse(localStorage.getItem(LKEY) || '{}') || {}; } catch (e) { return {}; } }
-function saveLoadout(id, keys) { sessionPick[id] = keys; try { const a = loadLoadouts(); a[id] = keys; localStorage.setItem(LKEY, JSON.stringify(a)); } catch (e) {} }
+function loadLoadouts() { return SD.loadouts; }
+function saveLoadout(id, keys) { sessionPick[id] = keys; SD.loadouts[id] = keys; SAVE.save(); }
 // 這一關實際上場的卡；卡不超過上限就回 null（全帶）
 function pickedFor(L) {
   if (L.conveyor || L.units.length <= MAX_CARDS) return null; // 送卡模式沒得選，卡是送來的
@@ -1030,6 +1078,7 @@ const roster = { mode: 'view', tab: 'units', picked: new Set(), focus: null, uni
 // mode 'pick'＝這一關要點兵；'view'＝從關卡選單看圖鑑（所有已開放的單位）
 function openRoster(mode, from) {
   roster.mode = mode; roster.tab = 'units'; roster.focus = null; roster.from = from || 'levels'; pendingCp = null;
+  if (mode === 'view') track('open_codex', { from: roster.from });
   if (mode === 'pick') {
     roster.units = sortUnits(level.units);
     roster.picked = new Set(pickedFor(level) || level.units);
@@ -1223,14 +1272,13 @@ $('#intro-roster').addEventListener('click', () => openRoster(pickedFor(level) ?
 $('#levels-codex').addEventListener('click', () => openRoster('view', 'levels'));
 
 // ====== 第 1 關手把手（只教一次；網址加 ?tut 可重看） ======
-const TKEY = 'sheepfold-tutorial-done';
 const TUT_STEPS = [
   { card: 'shepherd', cell: [2, 0], say: '先點「牧人」卡，再點亮著的格子。牧人會產糧' },
   { card: 'slinger',  cell: [2, 1], need: 100, wait: '牧人會送糧來，等糧到 100', say: '點「投石手」，放在牧人右邊。他朝這一排丟石頭' },
   { card: 'wall',     cell: [2, 4], need: 50,  wait: '再等一下，糧到 50',       say: '點「石牆」，放在前面擋路。狼會先咬牆' },
 ];
 const tut = { on: false, step: 0, waiting: false };
-function tutDone() { try { return localStorage.getItem(TKEY) === '1'; } catch (e) { return false; } }
+function tutDone() { return SD.tutorial; }
 function tutStart() { tut.on = true; tut.step = 0; G.holdWaves = true; $('#tut-skip').classList.add('on'); tutShow(); }
 function tutShow() {
   const st = TUT_STEPS[tut.step], ready = !st.need || G.food >= st.need;
@@ -1249,7 +1297,7 @@ function tutEnd(msg) {
   document.querySelectorAll('#cards .card').forEach(c => c.classList.remove('dim'));
   Board.setTeach(null);
   $('#tut-skip').classList.remove('on');
-  try { localStorage.setItem(TKEY, '1'); } catch (e) {}
+  if (!SD.tutorial) { SD.tutorial = true; SAVE.save(); }
   if (msg) toast(msg, true);
 }
 $('#tut-skip').addEventListener('click', () => tutEnd('好，自己來。狼要來了'));
@@ -1280,6 +1328,7 @@ $('#resume-btn').addEventListener('click', resumeGame);
 $('#pause-codex').addEventListener('click', () => openRoster('view', 'pause')); // 暫停中查圖鑑，看完回暫停
 $('#pause-back').addEventListener('click', () => { resumeGame(); backToLevels(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) { pauseGame(); Sound.suspend(); } else Sound.resume(); });
+window.addEventListener('pagehide', () => { pauseGame(); Sound.suspend(); }); // iOS 有時不發 visibilitychange（來電、上滑切 App），pagehide 補一道
 
 // ====== 聲音設定 ======
 // 頂欄與開場頁的喇叭：一下切全部靜音；暫停層裡才有細項（音效／蟲鳴／音量三檔）
@@ -1296,34 +1345,25 @@ document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.addEventListen
 // iOS 要有一次手勢才能出聲：第一次點任何地方就把聲音打開
 document.addEventListener('pointerdown', () => Sound.unlock(), { capture: true, passive: true });
 // 大字只放大文字，棋盤與底部提示仍受同一個視窗高度限制。
-function applyBig(on, save = true) { document.documentElement.classList.toggle('big', !!on); const b = $('#big-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) try { localStorage.setItem('sheepfold-bigtext', on ? '1' : '0'); } catch (e) {} }
+function applyBig(on, save = true) { document.documentElement.classList.toggle('big', !!on); const b = $('#big-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) { SD.prefs.big = !!on; SAVE.save(); } }
 $('#big-btn').addEventListener('click', () => { applyBig(!document.documentElement.classList.contains('big')); Sound.play('tap'); });
-try { applyBig(localStorage.getItem('sheepfold-bigtext') === '1', false); } catch (e) {}
+applyBig(SD.prefs.big, false);
 // 省效能模式（2026-10-28 James：手機順、電腦卡）：暫停選單手動開（存 sheepfold-lite）；沒設過的電腦若 WebGL 是軟體模擬就自動開；玩到一半連續三秒掉到 30fps 以下也自動開、說一聲（每次開頁只自動切一次，不會來回跳）
-function applyLite(on, save = true) { Board.setLite(on); const b = $('#lite-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) try { localStorage.setItem('sheepfold-lite', on ? '1' : '0'); } catch (e) {} }
+function applyLite(on, save = true) { Board.setLite(on); const b = $('#lite-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) { SD.prefs.lite = !!on; SAVE.save(); } }
 $('#lite-btn').addEventListener('click', () => { applyLite(!Board.lite); Sound.play('tap'); });
 let liteAuto = false, ftSum = 0, ftN = 0;
 function watchFps(dt) { if (liteAuto || Board.lite || document.hidden || G.phase !== 'wave') { ftSum = ftN = 0; return; } ftSum += dt; ftN++; if (ftSum < 3) return; const avg = ftSum / ftN; ftSum = ftN = 0; if (avg > 1 / 30) { liteAuto = true; applyLite(true); toast('畫面跑不太動，已切到省效能模式；暫停選單裡可以關掉'); } }
 syncSoundUI();
 
 // 檢查點：每清完一波存一次，每關各存一份（去玩別關不會蓋掉）；守完、輸了、重新開始同一關只清自己這關的
-const CKEY = id => `sheepfold-checkpoint-${id}`;
-function loadCheckpoint(id) { try { const c = JSON.parse(localStorage.getItem(CKEY(id)) || 'null'); return c && typeof c === 'object' ? c : null; } catch (e) { return null; } }
-function saveCheckpoint(snap) {
-  try {
-    const text = JSON.stringify(snap), key = CKEY(snap.levelId);
-    localStorage.setItem(key, text);
-    return localStorage.getItem(key) === text;
-  } catch (e) { return false; }
-}
+function loadCheckpoint(id) { const c = SD.checkpoints[id]; return c && typeof c === 'object' ? c : null; }
+function saveCheckpoint(snap) { SD.checkpoints[snap.levelId] = snap; return SAVE.save(); }
 function checkpointNote() {
   const cp = loadCheckpoint(level.id);
   if (cp && Engine.checkSnapshot(cp, level.id)) return `已存到${DIFFS[cp.diff].name}第 ${cp.wave} 波結束，可從第 ${cp.wave + 1} 波繼續。`;
   return '目前沒有可用的檢查點，離開後需從這一夜開頭重來。';
 }
-function clearCheckpoint(id) { try { localStorage.removeItem(CKEY(id)); } catch (e) {} }
-// 舊版只有一份存檔：搬到那一關自己的欄位，不讓玩家的進度不見
-try { const old = JSON.parse(localStorage.getItem('sheepfold-checkpoint') || 'null'); if (old && old.levelId && !localStorage.getItem(CKEY(old.levelId))) localStorage.setItem(CKEY(old.levelId), JSON.stringify(old)); localStorage.removeItem('sheepfold-checkpoint'); } catch (e) {}
+function clearCheckpoint(id) { if (SD.checkpoints[id] !== undefined) { delete SD.checkpoints[id]; SAVE.save(); } }
 // 續玩前要點兵：存檔裡場上的單位一定勾著，其餘照預設補滿，卡列和棋盤才對得上
 function prepickFromCp(cp) {
   const s = new Set(level.units.includes('shepherd') ? ['shepherd'] : []); // 一筆糧的夜沒有牧人這張卡
@@ -1372,8 +1412,89 @@ buildDevEnemies(); setDev(devOn);
     for (const [k, alt] of Object.entries(FALLBACK)) { const d = UNITS[k] || ENEMIES[k]; if (d && broken(d.ico)) d.ico = alt; }
   } catch (e) {}
 })();
+// ====== 匿名統計（GA4） ======
+// 跟靈修冒險共用同一個 GA4 資源（James 10/29：先用原本的）；每個事件都帶 game:'sheepfold'，報表用這個欄位分開看。要換成羊圈守夜自己的資料串流，只改 GA_ID 這一行。
+// 只記四種：進夜、結束夜（夜數／難度／結果／波／星／失羊／秒數）、每夜每張卡放了幾次、開圖鑑。不記姓名帳號。設定頁可關；開著 ?dev 的頁面、本機 file: 開的頁面、開過開發者面板的那局不送
+const GA_ID = 'G-HZ3EGYB8BB';
+let gaOn = false, nightStat = null; // nightStat：這一夜放了哪些卡幾次、什麼時候開始、是不是續玩
+function gaInit() {
+  if (gaOn || SD.prefs.analytics === false || devOn || location.protocol === 'file:') return;
+  if (!SD.playerKind) { SD.playerKind = Object.keys(SD.progress.cleared).length ? 'returning' : 'new'; SAVE.save(); } // 第一次接統計：已經有通關紀錄的是老玩家，之後不變，報表才分得開 10/29 以前推廣過的那一批
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
+  window['ga-disable-' + GA_ID] = false;
+  window.gtag('js', new Date());
+  window.gtag('config', GA_ID, { page_title: '羊圈守夜', send_page_view: true });
+  window.gtag('set', 'user_properties', { player_kind: SD.playerKind, game: 'sheepfold' });
+  const sc = document.createElement('script'); sc.async = true; sc.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID; document.head.appendChild(sc);
+  gaOn = true;
+}
+function track(name, params) { if (!gaOn || SD.prefs.analytics === false) return; try { window.gtag('event', name, Object.assign({ game: 'sheepfold', ver: APP_VERSION }, params)); } catch (e) {} }
+function trackNightEnd(result) {
+  if (!nightStat || devUsed) { nightStat = null; return; }
+  const st = (G.result && G.result.stars) || {}, stars = (result === 'win' ? 1 : 0) + (st.noLoss ? 1 : 0) + (st.gates ? 1 : 0);
+  const base = { night: Engine.posOf(level.id), level_id: level.id, diff };
+  track('night_end', Object.assign({ result, wave: G.wave, stars, sheep_lost: G.sheepLost || 0, seconds: Math.round((Date.now() - nightStat.t0) / 1000), resumed: nightStat.resumed ? 1 : 0 }, base));
+  for (const k in nightStat.placed) track('card_used', Object.assign({ card: k, count: nightStat.placed[k], result }, base)); // 續玩那局只算續玩後放的（檢查點不存次數），看趨勢夠用
+  nightStat = null;
+}
+function setAnalytics(on) { SD.prefs.analytics = !!on; SAVE.save(); window['ga-disable-' + GA_ID] = !on; if (on) gaInit(); syncSettingsUI(); }
+gaInit();
+
+// ====== 設定頁（首頁左上 ⚙️）：存檔碼匯出／匯入、匿名統計開關、版本 ======
+const fmtDate = iso => { const d = new Date(iso); return isNaN(d) ? '不明' : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; };
+let importPending = null; // 讀取過、等按「確定匯入」的那份
+function syncSettingsUI() {
+  const on = SD.prefs.analytics !== false, b = $('#ga-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', on);
+  const sm = Save.summary(SD);
+  $('#set-save-state').textContent = `這支手機：守過 ${sm.nights} 夜、${sm.checkpoints} 份檢查點${sm.nights || sm.checkpoints ? `，最後更新 ${fmtDate(sm.updated)}` : ''}${SAVE.problems.length ? '。' + SAVE.problems.join('；') : ''}`;
+  $('#set-version').textContent = `版本 ${APP_VERSION}`;
+  $('#set-notes').innerHTML = UPDATE_NOTES.map(x => `<div>・${x}</div>`).join('');
+}
+function openSettings() {
+  $('#levels').hidden = true; $('#settings').hidden = false;
+  $('#set-export-box').hidden = true; $('#set-import-box').hidden = true; $('#set-import-preview').textContent = ''; $('#set-import-go').hidden = true; importPending = null;
+  syncSettingsUI();
+}
+$('#settings-btn').addEventListener('click', () => { openSettings(); Sound.play('tap'); });
+$('#set-back').addEventListener('click', () => { $('#settings').hidden = true; $('#levels').hidden = false; Sound.play('tap'); });
+$('#set-export').addEventListener('click', () => { $('#set-export-code').value = Save.encode(SD); $('#set-export-box').hidden = false; $('#set-import-box').hidden = true; $('#set-copy-note').textContent = '這一串就是這支手機的全部紀錄。貼到 LINE 或備忘錄留著，換手機時在設定頁按「匯入」貼回來。'; Sound.play('tap'); });
+$('#set-copy').addEventListener('click', async () => {
+  const ta = $('#set-export-code'); let ok = false;
+  try { await navigator.clipboard.writeText(ta.value); ok = true; } catch (e) { try { ta.focus(); ta.select(); ok = document.execCommand('copy'); } catch (e2) {} }
+  $('#set-copy-note').textContent = ok ? '已複製。貼到 LINE 或備忘錄留著；換手機時在設定頁按「匯入」貼回來。' : '這支瀏覽器不讓自動複製：請長按上面的字、全選後複製。';
+  Sound.play(ok ? 'clear' : 'tap');
+});
+$('#set-import').addEventListener('click', () => { $('#set-import-box').hidden = false; $('#set-export-box').hidden = true; $('#set-import-code').value = ''; $('#set-import-preview').textContent = ''; $('#set-import-go').hidden = true; importPending = null; Sound.play('tap'); });
+$('#set-import-read').addEventListener('click', () => {
+  const r = Save.decode($('#set-import-code').value, { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS) });
+  if (r.error) { importPending = null; $('#set-import-preview').textContent = r.error; $('#set-import-go').hidden = true; Sound.play('tap'); return; }
+  importPending = r.data;
+  const sm = Save.summary(r.data), mine = Save.summary(SD);
+  $('#set-import-preview').textContent = `這份存檔：守過 ${sm.nights} 夜、${sm.checkpoints} 份檢查點，最後更新 ${fmtDate(sm.updated)}。${r.problems.length ? r.problems.join('；') + '。' : ''}匯入會整份蓋掉這支手機目前的紀錄（守過 ${mine.nights} 夜）。確定的話再按一次下面的按鈕。`;
+  $('#set-import-go').hidden = false; Sound.play('tap');
+});
+$('#set-import-go').addEventListener('click', () => {
+  if (!importPending) return;
+  if (SAVE.replace(importPending)) { $('#set-import-preview').textContent = '匯入好了，重新載入中…'; $('#set-import-go').hidden = true; Sound.play('clear'); setTimeout(() => location.reload(), 600); }
+  else $('#set-import-preview').textContent = '寫不進這支手機（空間不足或無痕瀏覽），沒有匯入。';
+});
+$('#ga-btn').addEventListener('click', () => { setAnalytics(SD.prefs.analytics === false); Sound.play('tap'); });
+
+// ====== 更新公告：版本變了、已經有存檔的玩家開頁時彈一次 ======
+function showUpdateNotice() {
+  if (SD.announced === APP_VERSION) return;
+  const show = SAVE.status !== 'fresh'; // 全新玩家沒有「更新了什麼」好看，直接標成看過
+  SD.announced = APP_VERSION; if (show) SAVE.save();
+  if (!show) return;
+  $('#notice-ver').textContent = `版本 ${APP_VERSION}`;
+  $('#notice-notes').innerHTML = UPDATE_NOTES.map(x => `<div>・${x}</div>`).join('');
+  $('#notice').hidden = false;
+}
+$('#notice-ok').addEventListener('click', () => { $('#notice').hidden = true; Sound.play('tap'); });
+
 buildBoard(); buildLevels(); // buildBoard 是非同步的（載圖）；開始守夜前會確認棋盤已就緒
-try { diff = localStorage.getItem('sheepfold-diff') || 'calm'; } catch (e) {}
+diff = SD.prefs.diff || 'calm';
 if (!DIFFS[diff]) diff = 'calm';
 document.querySelectorAll('.diff').forEach(b => b.addEventListener('click', () => applyDiff(b.dataset.key)));
 $('#start').addEventListener('click', () => { if (!boardReady) { toast(Board.ready ? '棋盤圖還在載入，等一下再按' : '這支瀏覽器開不了棋盤畫面', true); return; } markIntroSeen(); if (pickedFor(level) && !hasLoadout(level)) { openRoster('pick', 'intro'); return; } $('#intro').hidden = true; startGame(); });
@@ -1381,6 +1502,7 @@ $('#intro-back').addEventListener('click', backToLevels);
 $('#retry').addEventListener('click', () => startGame());
 $('#back').addEventListener('click', backToLevels);
 $('#next').addEventListener('click', () => { const nx = Engine.nextOf(level.id); clearBoard(); if (nx) openIntro(nx); else backToLevels(); });
+showUpdateNotice();
 </script>
 </body>
 </html>

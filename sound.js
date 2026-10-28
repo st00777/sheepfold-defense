@@ -1,20 +1,21 @@
 // 羊圈守夜 · 音效。全部用 Web Audio 現場合成，沒有音檔、沒有授權問題。
 // 用法：Sound.unlock() 在第一次點擊時叫（iOS 要有手勢才出聲）；Sound.play('howl')；Sound.set('vol', 2)
-// 設定存在 localStorage 'sheepfold-sound'：{ sfx 音效開關, amb 蟲鳴開關, vol 音量 0 小 1 中 2 大 }
+// 設定 { sfx 音效開關, amb 蟲鳴開關, vol 音量 0 小 1 中 2 大 } 住在存檔裡（save.js 的 prefs.sound）：頁面開好後叫 Sound.attach(存檔裡那個物件, 寫回存檔的函式)；attach 之前用預設值（2026-10-30 期 0 以前自己存 localStorage 'sheepfold-sound'）
 'use strict';
 (function (root) {
-  const KEY = 'sheepfold-sound';
   const VOLS = [0.35, 0.6, 1.0];
   let ctx = null, master = null, amb = null, ambWanted = false;
   const lastAt = {};  // 每種音效上次播放的時間，太密就不重播（咬牆、石子每幀都在發生）
   const GAP = { shot: 0.08, bite: 0.45, die: 0.12, ignite: 0.25, food: 0.05, place: 0.05, hit: 0.1, whine: 0.3, grab: 0.2, sheep: 0.2, overfly: 0.5, throw: 0.1, roll: 0.3 }; // 咻：一排五個射手一起射也只響一聲
 
-  const prefs = load();
-  function load() {
-    try { const p = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; return { sfx: p.sfx !== false, amb: !!p.amb, vol: [0, 1, 2].includes(p.vol) ? p.vol : 1 }; }
-    catch (e) { return { sfx: true, amb: false, vol: 1 }; }
+  const prefs = { sfx: true, amb: false, vol: 1 };
+  let store = null, onChange = null; // 存檔裡的那個物件、改了要叫誰寫回
+  function attach(obj, fn) {
+    store = obj || null; onChange = typeof fn === 'function' ? fn : null;
+    if (store) { prefs.sfx = store.sfx !== false; prefs.amb = !!store.amb; prefs.vol = [0, 1, 2].includes(store.vol) ? store.vol : 1; }
+    if (master) master.gain.setValueAtTime(prefs.sfx ? VOLS[prefs.vol] : 0, ctx.currentTime);
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) {} }
+  function save() { if (store) Object.assign(store, prefs); if (onChange) try { onChange(); } catch (e) {} }
 
   function ensure() {
     if (ctx) return ctx;
@@ -143,5 +144,5 @@
   function suspend() { if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}); }
   function resume() { wake(); }
 
-  root.Sound = { unlock, play, ambient, set, suspend, resume, prefs, names: Object.keys(SFX), state: () => (ctx ? ctx.state : 'none') };
+  root.Sound = { unlock, play, ambient, set, suspend, resume, attach, prefs, names: Object.keys(SFX), state: () => (ctx ? ctx.state : 'none') };
 })(typeof window !== 'undefined' ? window : globalThis);

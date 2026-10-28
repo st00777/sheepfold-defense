@@ -1,0 +1,182 @@
+// 羊圈守夜 · 存檔。整支手機的紀錄放在一份結構裡（版本欄、遷移鏈、匯出匯入），純邏輯、無 DOM，node 測試也能跑。
+// 2026-10-30 期 0 之前是十幾個散放的 localStorage key（progress-v3、每關一份 checkpoint、loadout、seen-*、diff、speed、bigtext、lite、sound），
+// 第一次開新版會全部搬進 `sheepfold-save`，搬成功才刪舊 key。
+// 用法：const SAVE = Save.open(Save.localStore(), { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS) });
+//       SAVE.data.progress.cleared …改完叫 SAVE.save()（回傳有沒有真的寫進去）；Save.encode(SAVE.data) 出存檔碼；Save.decode(code, opts) 讀回來
+'use strict';
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.Save = factory();
+})(typeof window !== 'undefined' ? window : globalThis, function () {
+  const VERSION = 4;                  // 存檔結構版本。v1 best-v2（只有第一關）、v2 progress-v3、v3 檢查點每關一份：都是舊的散放 key；v4 起單一結構
+  const KEY = 'sheepfold-save', BAK = KEY + '-bak', BROKEN = KEY + '-broken';
+  const CP_RE = /^sheepfold-checkpoint-(\d+)$/;
+  const LEGACY = ['sheepfold-progress-v3', 'sheepfold-best-v2', 'sheepfold-checkpoint', 'sheepfold-loadout', 'sheepfold-intro-seen', 'sheepfold-seen-cards', 'sheepfold-seen-enemies', 'sheepfold-tutorial-done', 'sheepfold-diff', 'sheepfold-speed', 'sheepfold-bigtext', 'sheepfold-lite', 'sheepfold-sound'];
+  const DIFFS_DEFAULT = ['calm', 'windy', 'storm'];
+
+  const isObj = x => !!x && typeof x === 'object' && !Array.isArray(x);
+  const strArr = a => (Array.isArray(a) ? a.filter(x => typeof x === 'string') : []);
+
+  // 全新一份
+  function empty(now) {
+    return {
+      version: VERSION, created: now, updated: now,
+      progress: { cleared: {}, best: {}, stars: {} },   // cleared[夜 id][難度]=true；best['夜:難度']={score,cleared,wave}；stars[夜 id]={noLoss,gates}
+      checkpoints: {},                                   // 夜 id → Engine.snapshot()
+      loadouts: {},                                      // 夜 id → 帶的卡
+      seen: { intro: [], cards: [], enemies: [] },       // 開場頁介紹過的、新卡閃光點過的、弱點提示跳過的
+      tutorial: false,
+      prefs: { diff: 'calm', speed: 1, big: false, lite: null, sound: { sfx: true, amb: false, vol: 1 }, analytics: true }, // lite null＝沒設過，由電腦是不是軟體繪圖決定
+      announced: '',                                     // 看過哪一版的更新公告
+      playerKind: '',                                    // 第一次接統計時：有通關紀錄＝returning、沒有＝new（之後不變）
+    };
+  }
+
+  // ====== 舊的散放 key → v4 ======
+  function fromLegacy(st, now) {
+    const d = empty(now); let any = false;
+    const raw = k => { const s = st.get(k); if (s === null || s === undefined) return undefined; any = true; return s; };
+    const J = k => { const s = raw(k); if (s === undefined) return undefined; try { return JSON.parse(s); } catch (e) { return undefined; } };
+    const p = J('sheepfold-progress-v3');
+    if (isObj(p)) for (const f of ['cleared', 'best', 'stars']) if (isObj(p[f])) d.progress[f] = p[f];
+    const old = J('sheepfold-best-v2'); // v1：只有第一關；progress-v3 自己搬過（migrated）就不重搬
+    if (isObj(old) && !(isObj(p) && p.migrated)) for (const k in old) { if (!d.progress.best['1:' + k]) d.progress.best['1:' + k] = old[k]; if (old[k] && old[k].cleared) (d.progress.cleared[1] = d.progress.cleared[1] || {})[k] = true; }
+    const cp0 = J('sheepfold-checkpoint'); if (isObj(cp0) && cp0.levelId) d.checkpoints[cp0.levelId] = cp0; // 更舊：只有一份
+    for (const k of st.keys()) { const m = CP_RE.exec(k); if (m) { const c = J(k); if (isObj(c)) d.checkpoints[m[1]] = c; } }
+    const lo = J('sheepfold-loadout'); if (isObj(lo)) d.loadouts = lo;
+    d.seen.intro = strArr(J('sheepfold-intro-seen')); d.seen.cards = strArr(J('sheepfold-seen-cards')); d.seen.enemies = strArr(J('sheepfold-seen-enemies'));
+    d.tutorial = raw('sheepfold-tutorial-done') === '1';
+    const diff = raw('sheepfold-diff'); if (diff) d.prefs.diff = diff;
+    if (Number(raw('sheepfold-speed')) === 2) d.prefs.speed = 2;
+    const big = raw('sheepfold-bigtext'); if (big !== undefined) d.prefs.big = big === '1';
+    const lite = raw('sheepfold-lite'); if (lite !== undefined) d.prefs.lite = lite === '1';
+    const snd = J('sheepfold-sound'); if (isObj(snd)) d.prefs.sound = { sfx: snd.sfx !== false, amb: !!snd.amb, vol: [0, 1, 2].includes(snd.vol) ? snd.vol : 1 };
+    return any ? d : null;
+  }
+  function removeLegacy(st) {
+    for (const k of LEGACY) { try { st.remove(k); } catch (e) {} }
+    for (const k of st.keys()) if (CP_RE.test(k)) { try { st.remove(k); } catch (e) {} }
+  }
+
+  // ====== 遷移鏈：STEPS[n] 把第 n 版改成第 n+1 版。v4 是第一個單一結構，之後改欄位就在這裡加一步 ======
+  const STEPS = {};
+  function migrate(d) { while (d.version < VERSION && STEPS[d.version]) { STEPS[d.version](d); d.version++; } return d; }
+
+  // ====== 檢查與補齊：缺的欄位補預設、型別不對的丟掉；檢查點交給 opts.check（Engine.checkSnapshot）驗，壞的只丟那一份 ======
+  // 回 { data, problems }；整份不能用（不是物件、來自更新版本）時 data 為 null
+  function validate(input, opts = {}) {
+    const problems = [];
+    if (!isObj(input)) return { data: null, problems: ['存檔不是一份紀錄'] };
+    if (Number.isFinite(input.version) && input.version > VERSION) return { data: null, problems: [`這份存檔來自更新的版本（v${input.version}），請先更新遊戲再匯入`] };
+    const now = typeof opts.now === 'string' ? opts.now : new Date().toISOString();
+    const d = empty(now);
+    d.version = Number.isFinite(input.version) ? input.version : VERSION;
+    if (typeof input.created === 'string') d.created = input.created;
+    if (typeof input.updated === 'string') d.updated = input.updated;
+    const P = isObj(input.progress) ? input.progress : {};
+    if (isObj(P.cleared)) for (const id in P.cleared) if (isObj(P.cleared[id])) { const o = {}; for (const k in P.cleared[id]) if (P.cleared[id][k]) o[k] = true; d.progress.cleared[id] = o; }
+    if (isObj(P.best)) for (const k in P.best) { const b = P.best[k]; if (isObj(b) && Number.isFinite(b.score)) d.progress.best[k] = { score: b.score, cleared: !!b.cleared, wave: Number.isFinite(b.wave) ? b.wave : 0 }; }
+    if (isObj(P.stars)) for (const id in P.stars) if (isObj(P.stars[id])) d.progress.stars[id] = { noLoss: !!P.stars[id].noLoss, gates: !!P.stars[id].gates };
+    if (isObj(input.checkpoints)) for (const id in input.checkpoints) {
+      const c = input.checkpoints[id], lid = Number(id);
+      if (!isObj(c)) continue;
+      if (typeof opts.check === 'function' && !opts.check(c, lid)) { problems.push(`第 ${id} 夜的檢查點讀不出來，已丟掉（那一夜要從頭守）`); continue; }
+      d.checkpoints[id] = c;
+    }
+    if (isObj(input.loadouts)) for (const id in input.loadouts) if (Array.isArray(input.loadouts[id])) d.loadouts[id] = strArr(input.loadouts[id]);
+    if (isObj(input.seen)) for (const f of ['intro', 'cards', 'enemies']) d.seen[f] = strArr(input.seen[f]);
+    d.tutorial = !!input.tutorial;
+    const pr = isObj(input.prefs) ? input.prefs : {}, diffs = Array.isArray(opts.diffs) ? opts.diffs : DIFFS_DEFAULT;
+    if (diffs.includes(pr.diff)) d.prefs.diff = pr.diff;
+    if (pr.speed === 2) d.prefs.speed = 2;
+    d.prefs.big = !!pr.big;
+    d.prefs.lite = typeof pr.lite === 'boolean' ? pr.lite : null;
+    if (isObj(pr.sound)) d.prefs.sound = { sfx: pr.sound.sfx !== false, amb: !!pr.sound.amb, vol: [0, 1, 2].includes(pr.sound.vol) ? pr.sound.vol : 1 };
+    d.prefs.analytics = pr.analytics !== false;
+    if (typeof input.announced === 'string') d.announced = input.announced;
+    if (input.playerKind === 'new' || input.playerKind === 'returning') d.playerKind = input.playerKind;
+    return { data: migrate(d), problems };
+  }
+  function parse(text, opts) {
+    let obj; try { obj = JSON.parse(text); } catch (e) { return { data: null, problems: ['存檔不是正確的格式'] }; }
+    return validate(obj, opts);
+  }
+
+  // ====== 開檔：主檔 → 壞了試備份 → 沒有主檔就搬舊 key → 都沒有就全新 ======
+  // 回 { data, status, problems, save() }。status：ok／restored（備份接回）／broken（主檔壞、備份也沒救）／migrated（從舊 key 搬來）／fresh（全新）
+  function open(st, opts = {}) {
+    const now = typeof opts.now === 'string' ? opts.now : new Date().toISOString();
+    const nowFn = typeof opts.nowFn === 'function' ? opts.nowFn : () => new Date().toISOString();
+    let raw = null; try { raw = st.get(KEY); } catch (e) { raw = null; }
+    let d = null, status = 'fresh', problems = [];
+    if (raw !== null && raw !== undefined) {
+      const r = parse(raw, opts);
+      if (r.data) { d = r.data; status = 'ok'; problems = r.problems; }
+      else {
+        try { st.set(BROKEN, raw); } catch (e) {} // 原文留著，之後還有機會救
+        let bak = null; try { bak = st.get(BAK); } catch (e) {}
+        const rb = bak ? parse(bak, opts) : null;
+        if (rb && rb.data) { d = rb.data; status = 'restored'; problems = ['上次的紀錄讀不出來，已用前一次開遊戲時的備份接回來（最近一兩夜的紀錄可能不見）', ...rb.problems]; }
+        else { status = 'broken'; problems = ['上次的紀錄讀不出來，備份也沒有，只好從頭開始；原本那份留在這支手機裡沒刪', ...r.problems]; }
+      }
+    } else {
+      try { d = fromLegacy(st, now); } catch (e) { d = null; }
+      if (d) { const r = validate(d, opts); d = r.data; problems = r.problems; status = 'migrated'; }
+    }
+    if (!d) d = empty(now);
+    const api = { data: d, status, problems, KEY };
+    api.save = function () {
+      try { d.updated = nowFn(); const text = JSON.stringify(d); st.set(KEY, text); return st.get(KEY) === text; }
+      catch (e) { return false; }
+    };
+    // 另存成一份給別支手機（整份覆蓋）；寫完讀回對一次
+    api.replace = function (data) { const r = validate(data, opts); if (!r.data) return false; Object.keys(d).forEach(k => delete d[k]); Object.assign(d, r.data); return api.save(); };
+    if (status === 'migrated') { if (api.save()) removeLegacy(st); }            // 搬成功才刪舊 key
+    else if (status === 'restored' || status === 'broken') api.save();
+    if (status === 'ok' || status === 'restored') { try { st.set(BAK, JSON.stringify(d)); } catch (e) {} } // 每次開頁抄一份「上次好的」當備份，不是每次寫都抄
+    return api;
+  }
+
+  // ====== 存檔碼：SF4.<base64url(JSON)>.<FNV-1a 8 碼>。純 ASCII，貼來貼去不會被改字；校驗碼擋少字、改字 ======
+  function utf8ToB64(s) {
+    if (typeof TextEncoder !== 'undefined' && typeof btoa === 'function') { const b = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]); return btoa(bin); }
+    return Buffer.from(s, 'utf8').toString('base64');
+  }
+  function b64ToUtf8(b64) {
+    if (typeof TextDecoder !== 'undefined' && typeof atob === 'function') { const bin = atob(b64); const b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return new TextDecoder().decode(b); }
+    return Buffer.from(b64, 'base64').toString('utf8');
+  }
+  const toUrl = s => s.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const fromUrl = s => { const t = s.replace(/-/g, '+').replace(/_/g, '/'); return t + '='.repeat((4 - t.length % 4) % 4); };
+  function fnv(s) { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); }
+  function encode(d) { const body = toUrl(utf8ToB64(JSON.stringify(d))); return `SF${VERSION}.${body}.${fnv(body)}`; }
+  // 回 { data, problems } 或 { error }
+  function decode(code, opts = {}) {
+    const s = String(code || '').replace(/\s+/g, '');
+    const m = /^SF(\d+)\.([A-Za-z0-9_-]+)\.([0-9a-f]{8})$/.exec(s);
+    if (!m) return { error: s ? '這不是羊圈守夜的存檔碼（開頭應該是 SF）' : '還沒貼上存檔碼' };
+    if (Number(m[1]) > VERSION) return { error: `這份存檔來自更新的版本（v${m[1]}），請先更新遊戲再匯入` };
+    if (fnv(m[2]) !== m[3]) return { error: '存檔碼少了字或被改過，請重新複製整段' };
+    let text; try { text = b64ToUtf8(fromUrl(m[2])); } catch (e) { return { error: '存檔碼解不開' }; }
+    const r = parse(text, opts);
+    if (!r.data) return { error: r.problems[0] || '存檔碼解不開' };
+    return r;
+  }
+  // 給匯入前的預覽：守過幾夜、幾份檢查點、最後更新
+  function summary(d) {
+    const nights = Object.keys(d.progress.cleared).filter(id => Object.keys(d.progress.cleared[id]).length).length;
+    return { nights, checkpoints: Object.keys(d.checkpoints).length, updated: d.updated, created: d.created };
+  }
+
+  // ====== 儲存介面：瀏覽器 localStorage；測試用記憶體版 ======
+  function localStore() {
+    const ls = () => root.localStorage;
+    return { get: k => ls().getItem(k), set: (k, v) => ls().setItem(k, v), remove: k => ls().removeItem(k), keys: () => { const a = []; for (let i = 0; i < ls().length; i++) a.push(ls().key(i)); return a; } };
+  }
+  function memoryStore(init = {}) {
+    const m = new Map(Object.entries(init));
+    return { get: k => (m.has(k) ? m.get(k) : null), set: (k, v) => { m.set(k, String(v)); }, remove: k => { m.delete(k); }, keys: () => [...m.keys()], _map: m };
+  }
+
+  return { VERSION, KEY, BAK, BROKEN, LEGACY, empty, fromLegacy, migrate, validate, open, encode, decode, summary, localStore, memoryStore };
+});
