@@ -53,6 +53,19 @@
     const snd = J('sheepfold-sound'); if (isObj(snd)) d.prefs.sound = { sfx: snd.sfx !== false, amb: !!snd.amb, vol: [0, 1, 2].includes(snd.vol) ? snd.vol : 1 };
     return any ? d : null;
   }
+  // 舊紀錄併進已有的新檔：進度取聯集（最高紀錄取分數高的）、檢查點／隊伍只補沒有的、看過的介紹取聯集、教學做過就算；設定以新檔為準，除非新檔完全沒玩過
+  function mergeLegacy(d, leg) {
+    const fresh = !Object.keys(d.progress.cleared).length && !Object.keys(d.progress.best).length;
+    for (const id in leg.progress.cleared) d.progress.cleared[id] = Object.assign({}, leg.progress.cleared[id], d.progress.cleared[id] || {});
+    for (const k in leg.progress.best) { const a = d.progress.best[k], b = leg.progress.best[k]; if (!a || !(a.score >= b.score)) d.progress.best[k] = b; }
+    for (const id in leg.progress.stars) { const a = d.progress.stars[id] || {}, b = leg.progress.stars[id]; d.progress.stars[id] = { noLoss: !!(a.noLoss || b.noLoss), gates: !!(a.gates || b.gates) }; }
+    for (const id in leg.checkpoints) if (!d.checkpoints[id]) d.checkpoints[id] = leg.checkpoints[id];
+    for (const id in leg.loadouts) if (!d.loadouts[id]) d.loadouts[id] = leg.loadouts[id];
+    for (const f of ['intro', 'cards', 'enemies']) for (const x of leg.seen[f]) if (!d.seen[f].includes(x)) d.seen[f].push(x);
+    d.tutorial = d.tutorial || leg.tutorial;
+    if (fresh) { d.prefs = Object.assign({}, leg.prefs, { analytics: d.prefs.analytics }); d.playerKind = Object.keys(leg.progress.cleared).length ? 'returning' : d.playerKind; }
+    return d;
+  }
   function removeLegacy(st) {
     for (const k of LEGACY) { try { st.remove(k); } catch (e) {} }
     for (const k of st.keys()) if (CP_RE.test(k)) { try { st.remove(k); } catch (e) {} }
@@ -130,6 +143,11 @@
       if (d) { const r = validate(d, opts); d = r.data; problems = r.problems; status = 'migrated'; }
     }
     if (!d) d = empty(now);
+    // 主檔已經有了、但舊 key 還在（例：第一次開到的是快取裡的舊版遊戲，它寫了一份空的新檔，之後就沒人去搬舊紀錄——10/30 James 真機）：把舊紀錄併進來，併成功才刪舊 key
+    if (status === 'ok' || status === 'restored') {
+      let leg = null; try { leg = fromLegacy(st, now); } catch (e) { leg = null; }
+      if (leg) { const r = validate(leg, opts); if (r.data) { mergeLegacy(d, r.data); problems = [...problems, ...r.problems, '找回了這支手機原本的紀錄，已併進新存檔']; status = 'migrated'; } }
+    }
     const api = { data: d, status, problems, KEY };
     api.save = function () {
       try { d.updated = nowFn(); const text = JSON.stringify(d); st.set(KEY, text); return st.get(KEY) === text; }

@@ -191,3 +191,34 @@ test('localStore 真的接得到 localStorage（假的全域物件）：舊 key 
     assert.ok(m.has(Save.KEY)); assert.ok(!m.has('sheepfold-diff'));
   } finally { delete globalThis.localStorage; }
 });
+
+test('主檔已有（空的，舊版快取寫的）但舊 key 還在：舊紀錄併進來、舊 key 刪掉、老玩家標回 returning', () => {
+  const st = legacyStore();
+  const blank = Save.empty('2026-10-29T00:00:00.000Z'); blank.playerKind = 'new'; blank.announced = 'x'; blank.prefs.analytics = false;
+  st.set(Save.KEY, JSON.stringify(blank));
+  const S = Save.open(st, OPTS);
+  assert.strictEqual(S.status, 'migrated');
+  assert.deepStrictEqual(S.data.progress.cleared[1], { calm: true, windy: true });
+  assert.strictEqual(S.data.progress.best['2:calm'].score, 7);
+  assert.strictEqual(S.data.checkpoints[2].levelId, 2);
+  assert.deepStrictEqual(S.data.prefs.sound, { sfx: true, amb: true, vol: 2 }, '新檔沒玩過：設定用舊的');
+  assert.strictEqual(S.data.prefs.analytics, false, '統計開關維持新檔的');
+  assert.strictEqual(S.data.playerKind, 'returning');
+  assert.strictEqual(S.data.announced, 'x');
+  assert.ok(S.problems.some(p => p.includes('找回')));
+  assert.strictEqual(st.get('sheepfold-progress-v3'), null);
+  assert.ok(JSON.parse(st.get(Save.KEY)).progress.cleared[1].windy);
+});
+
+test('主檔已有進度、舊 key 也有：取聯集、最高紀錄取高分、設定以新檔為準', () => {
+  const st = legacyStore();
+  const mine = Save.empty('2026-10-29T00:00:00.000Z');
+  mine.progress.cleared = { 2: { storm: true } }; mine.progress.best = { '2:calm': { score: 9, cleared: true, wave: 8 } }; mine.prefs.sound.vol = 0; mine.playerKind = 'new';
+  st.set(Save.KEY, JSON.stringify(mine));
+  const S = Save.open(st, OPTS);
+  assert.deepStrictEqual(S.data.progress.cleared[2], { calm: true, storm: true });
+  assert.deepStrictEqual(S.data.progress.cleared[1], { calm: true, windy: true });
+  assert.strictEqual(S.data.progress.best['2:calm'].score, 9);
+  assert.strictEqual(S.data.prefs.sound.vol, 0);
+  assert.strictEqual(S.data.playerKind, 'new');
+});
