@@ -470,7 +470,7 @@
 
 <script src="data.js?v=17"></script>
 <script src="engine.js?v=20"></script>
-<script src="save.js?v=2"></script>
+<script src="save.js?v=3"></script>
 <script src="sound.js?v=8"></script>
 <script src="lib/pixi.min.js"></script>
 <script src="render.js?v=24"></script>
@@ -898,7 +898,7 @@ function setSpeed(n) {
   speed = n; Board.setSpeed(speed);
   document.querySelectorAll('#dev [data-speed]').forEach(x => x.classList.toggle('on', Number(x.dataset.speed) === speed));
   const fb = $('#fast-btn'); fb.classList.toggle('on', speed > 1); fb.textContent = speed > 1 ? `⏩${speed}×` : '⏩'; fb.title = speed > 1 ? `加速中 ${speed}×，點一下回正常` : '加速（二倍速）';
-  const want = speed > 1 ? 2 : 1; if (SD.prefs.speed !== want) { SD.prefs.speed = want; SAVE.save(); } // 開發者列的 4／8× 不存，下次開還是二倍
+  if (speed <= 2 && SD.prefs.speed !== speed) { SD.prefs.speed = speed; SAVE.save(); } // 只存 1×／2×；開發者列的 4／8× 不存（code review 10/30：以前也不會把 8× 存成 2×）
 }
 $('#fast-btn').addEventListener('click', () => { setSpeed(speed > 1 ? 1 : 2); Sound.play('tap'); });
 if (SD.prefs.speed === 2) setSpeed(2);
@@ -1020,6 +1020,7 @@ function clearBoard() {
 function startGame(fromCp) {
   // 開始、重來、下一夜、繼續上次都走這裡：棋盤還沒就緒（圖還在載／開不了 WebGL）一律擋下，不然畫面層會對著半套圖層丟例外
   if (!boardReady) { toast(Board.ready ? '棋盤圖還在載入，等一下再按' : '這支瀏覽器開不了棋盤畫面', true); return; }
+  if (G && !G.over && nightStat) trackNightEnd('quit'); // 打到一半按重來：這一夜算放棄，統計才知道大家在哪一夜走掉
   clearBoard();
   devUsed = devOn;
   if (fromCp) applyDiff(fromCp.diff, false); // 續玩用存檔那一夜的難度，只套用這一局；回開場頁會換回平常的預設
@@ -1045,11 +1046,12 @@ function startGame(fromCp) {
   last = performance.now();
   raf = requestAnimationFrame(tick);
   Sound.ambient(true);
-  nightStat = { placed: {}, t0: Date.now(), resumed };
-  track('night_start', { night: Engine.posOf(level.id), level_id: level.id, diff, resumed: resumed ? 1 : 0 });
+  nightStat = devUsed ? null : { placed: {}, t0: Date.now(), resumed }; // 開著開發者面板的那局整局不記
+  if (nightStat) track('night_start', { night: Engine.posOf(level.id), level_id: level.id, diff, resumed: resumed ? 1 : 0 });
 }
 function backToLevels() {
   clearBoard(); Sound.ambient(false);
+  if (G && !G.over && nightStat) trackNightEnd('quit'); // 中途回關卡＝放棄這一夜（續玩再接的話會再來一筆 night_start，resumed=1）
   if (G) G.over = true; // 中途回關卡不清檢查點，之後可以「繼續上次」
   if (saveFailed && saveProgress()) toast('剛才沒存進去的紀錄，這次存好了'); // 上次寫失敗的永久進度再試一次（P 在記憶體裡還是對的）
   paused = false; $('#pause').hidden = true; syncPause();
@@ -1440,8 +1442,11 @@ function trackNightEnd(result) {
 }
 function setAnalytics(on) { SD.prefs.analytics = !!on; SAVE.save(); window['ga-disable-' + GA_ID] = !on; if (on) gaInit(); syncSettingsUI(); }
 gaInit();
+// 同一支瀏覽器開兩個分頁：別的分頁寫了存檔，這邊沒在打的話就重新載入拿最新的，免得等一下用舊的蓋回去（code review 10/30；打到一半不動，這一局打完存的會以這邊為準）
+window.addEventListener('storage', ev => { if (ev.key === SAVE.KEY && ev.newValue && (!G || G.over) && $('#settings').hidden) location.reload(); });
 
 // ====== 設定頁（首頁左上 ⚙️）：存檔碼匯出／匯入、匿名統計開關、版本 ======
+const fillNotes = box => { box.textContent = ''; for (const x of UPDATE_NOTES) { const d = document.createElement('div'); d.textContent = '・' + x; box.appendChild(d); } }; // 不走 innerHTML，之後就算文案來自存檔也不會變成程式
 const fmtDate = iso => { const d = new Date(iso); return isNaN(d) ? '不明' : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; };
 let importPending = null; // 讀取過、等按「確定匯入」的那份
 function syncSettingsUI() {
@@ -1449,7 +1454,7 @@ function syncSettingsUI() {
   const sm = Save.summary(SD);
   $('#set-save-state').textContent = `這支手機：守過 ${sm.nights} 夜、${sm.checkpoints} 份檢查點${sm.nights || sm.checkpoints ? `，最後更新 ${fmtDate(sm.updated)}` : ''}${SAVE.problems.length ? '。' + SAVE.problems.join('；') : ''}`;
   $('#set-version').textContent = `版本 ${APP_VERSION}`;
-  $('#set-notes').innerHTML = UPDATE_NOTES.map(x => `<div>・${x}</div>`).join('');
+  fillNotes($('#set-notes'));
 }
 function openSettings() {
   $('#levels').hidden = true; $('#settings').hidden = false;
@@ -1488,7 +1493,7 @@ function showUpdateNotice() {
   SD.announced = APP_VERSION; if (show) SAVE.save();
   if (!show) return;
   $('#notice-ver').textContent = `版本 ${APP_VERSION}`;
-  $('#notice-notes').innerHTML = UPDATE_NOTES.map(x => `<div>・${x}</div>`).join('');
+  fillNotes($('#notice-notes'));
   $('#notice').hidden = false;
 }
 $('#notice-ok').addEventListener('click', () => { $('#notice').hidden = true; Sound.play('tap'); });

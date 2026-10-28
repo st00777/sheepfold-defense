@@ -102,12 +102,27 @@ test('主檔壞掉、沒備份：從頭開始、status broken、壞檔留著', (
   assert.strictEqual(st.get(Save.BROKEN), 'not json at all');
 });
 
-test('來自未來版本的主檔：不碰它當壞檔處理、不覆蓋原文', () => {
-  const st = Save.memoryStore({ [Save.KEY]: JSON.stringify({ version: 99, progress: {} }) });
+test('來自未來版本的主檔：唯讀、不寫任何東西（舊版遊戲快取不能把新存檔蓋掉）', () => {
+  const text = JSON.stringify({ version: 99, progress: { cleared: { 30: { calm: true } } } });
+  const st = Save.memoryStore({ [Save.KEY]: text });
   const S = Save.open(st, OPTS);
-  assert.strictEqual(S.status, 'broken');
+  assert.strictEqual(S.status, 'newer');
   assert.ok(S.problems.some(p => p.includes('更新')), S.problems.join('|'));
-  assert.ok(st.get(Save.BROKEN).includes('"version":99'));
+  assert.strictEqual(S.save(), false);
+  assert.strictEqual(st.get(Save.KEY), text, '主檔原封不動');
+  assert.strictEqual(st.get(Save.BROKEN), null); assert.strictEqual(st.get(Save.BAK), null);
+});
+
+test('replace 寫失敗：記憶體退回原狀；成功：匯入前那份留在 -before-import', () => {
+  const st = Save.memoryStore();
+  const S = Save.open(st, OPTS); S.data.tutorial = true; S.save();
+  const other = Save.open(legacyStore(), OPTS).data;
+  const realSet = st.set; st.set = () => { throw new Error('quota'); };
+  assert.strictEqual(S.replace(other), false);
+  assert.strictEqual(S.data.tutorial, true); assert.deepStrictEqual(S.data.progress.cleared, {});
+  st.set = realSet;
+  assert.ok(S.replace(other));
+  assert.strictEqual(JSON.parse(st.get(Save.KEY + '-before-import')).tutorial, true);
 });
 
 test('validate 補齊缺欄、丟掉型別錯的，不會丟例外', () => {

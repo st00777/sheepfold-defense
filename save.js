@@ -108,8 +108,14 @@
     const now = typeof opts.now === 'string' ? opts.now : new Date().toISOString();
     const nowFn = typeof opts.nowFn === 'function' ? opts.nowFn : () => new Date().toISOString();
     let raw = null; try { raw = st.get(KEY); } catch (e) { raw = null; }
-    let d = null, status = 'fresh', problems = [];
+    let d = null, status = 'fresh', problems = [], readOnly = false;
     if (raw !== null && raw !== undefined) {
+      // 存檔來自更新的版本（這支瀏覽器快取到舊版遊戲）：不碰它、不寫任何東西，這一次當作唯讀的全新局（code review 10/30）
+      let peek = null; try { peek = JSON.parse(raw); } catch (e) {}
+      if (isObj(peek) && Number.isFinite(peek.version) && peek.version > VERSION) {
+        const api = { data: empty(now), status: 'newer', problems: [`這支手機的存檔來自更新的版本（v${peek.version}），這個版本的遊戲讀不懂；請重新整理拿新版，這次玩的不會存`], KEY, save: () => false, replace: () => false };
+        return api;
+      }
       const r = parse(raw, opts);
       if (r.data) { d = r.data; status = 'ok'; problems = r.problems; }
       else {
@@ -130,7 +136,15 @@
       catch (e) { return false; }
     };
     // 另存成一份給別支手機（整份覆蓋）；寫完讀回對一次
-    api.replace = function (data) { const r = validate(data, opts); if (!r.data) return false; Object.keys(d).forEach(k => delete d[k]); Object.assign(d, r.data); return api.save(); };
+    api.replace = function (data) {
+      const r = validate(data, opts); if (!r.data) return false;
+      const before = JSON.stringify(d);
+      try { st.set(KEY + '-before-import', before); } catch (e) {} // 匯入前那份另外留一份，匯錯了還救得回來
+      Object.keys(d).forEach(k => delete d[k]); Object.assign(d, r.data);
+      if (api.save()) return true;
+      Object.keys(d).forEach(k => delete d[k]); Object.assign(d, JSON.parse(before)); // 寫不進去：記憶體也退回去，不然下一次 save 會把沒匯成的資料帶進去
+      return false;
+    };
     if (status === 'migrated') { if (api.save()) removeLegacy(st); }            // 搬成功才刪舊 key
     else if (status === 'restored' || status === 'broken') api.save();
     if (status === 'ok' || status === 'restored') { try { st.set(BAK, JSON.stringify(d)); } catch (e) {} } // 每次開頁抄一份「上次好的」當備份，不是每次寫都抄
