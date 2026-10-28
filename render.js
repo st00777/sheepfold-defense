@@ -29,6 +29,7 @@ const Board = (() => {
 
   const REDUCE = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
   const reduce = () => REDUCE.matches;
+  let lite = false, glName = '', fno = 0; // 省效能模式（2026-10-28 James：電腦卡）：解析度 1、粒子減量、雨量減、黑暗／光照離屏圖隔幀才重畫；glName 給 index.html 判斷是不是軟體繪圖
 
   // ====== 狀態 ======
   let app = null, el = null, ICONS = {}, ICON_TEXT = {}, tex = {}, radialTex, bandTex, vignetteTex, dotTex, rainTex, gradTex = {};
@@ -55,6 +56,7 @@ const Board = (() => {
       app = new PIXI.Application();
       await app.init({ resizeTo: el, backgroundAlpha: 0, antialias: true, autoStart: false, sharedTicker: false, preference: 'webgl', resolution: Math.min(2, window.devicePixelRatio || 1), autoDensity: true });
       el.appendChild(app.canvas);
+      try { const gl = app.renderer.gl; const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); glName = d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : ''; } catch (e) {}
       // 圖一張一張載：哪張載不到就那張退回系統 emoji 文字，不會整批空白
       const files = new Set(Object.values(ICONS));
       // q-*（Q 版小人）載不到就退回同名的 c-* 全身圖，再不行才退文字
@@ -152,6 +154,7 @@ const Board = (() => {
     const hill = hillOf(G); if (hill !== hillNow) { hillNow = hill; if (app.resize) app.resize(); W = 0; } // 換到有坡／沒坡的夜：格高變了，逼 layout 整個重排（格子、單位、腳印都在裡面重建）
     layout();
     if (!paused) time += dt;
+    fno++;
     const info = { biting: false, shots: 0 };
     if (!G) { app.render(); return info; }
     try {
@@ -327,6 +330,7 @@ const Board = (() => {
     const want = dawned && state.lose <= 0 ? 0 : 1;
     L.lightSpr.alpha = paused ? L.lightSpr.alpha : L.lightSpr.alpha + (want - L.lightSpr.alpha) * Math.min(1, dt * 1.5);
     L.light.visible = L.lightSpr.alpha > .01; if (!L.light.visible) return;
+    if (lite && (fno & 1)) return; // 省效能：火光的呼吸隔幀畫
     app.renderer.render({ container: L.lightScene, target: L.lightRT, clear: true });
   }
   function drawDark(dt) {
@@ -342,6 +346,7 @@ const Board = (() => {
     for (let r = 0; r < ROWS; r++) { const lit = keepDark() && !!Engine.rowLit(G, r); if (lit !== state.litRows[r]) { state.litRows[r] = lit; changed = true; } const f = L.fogs[r]; if (!paused) f.alpha += ((lit ? 0 : 1) - f.alpha) * Math.min(1, dt * 5); f.visible = f.alpha > .01; }
     if (changed) { const g = L.litG.clear(); for (let r = 0; r < ROWS; r++) if (state.litRows[r]) for (let c = 0; c < COLS; c++) g.poly(cellPts(r, c)).fill({ color: (r + c) % 2 ? 0x8a9847 : 0x7d8a3f, alpha: .7 }); }
     L.litG.alpha = state.darkA;
+    if (lite && (fno & 1) && !changed) return; // 省效能：沒換排就隔幀畫（只有漸變在動，差一幀看不出來）
     app.renderer.render({ container: L.darkScene, target: L.darkRT, clear: true });
   }
 
@@ -612,8 +617,9 @@ const Board = (() => {
   }
   function drawWeather(dt) {
     const storm = diff === 'storm';
-    L.stormRect.clear(); if (storm) L.stormRect.rect(0, 0, W, H).fill({ color: 0x5a6a8a, alpha: state.dark ? .08 : .14 });
-    if (storm && !still && !reduce()) { const gap = speed > 1 ? .024 : .012; rainAcc += dt; while (rainAcc > gap) { rainAcc -= gap; spawnParticle(Math.random() * (W + 40) - 20, -20, -ch * .6, ch * 7, .85, 0xcfd8ff, 1, 0, .28, true, rainTex); } } // 壽命 .85 秒：以 7 排／秒落下剛好穿過整張棋盤（5 排），不會下到一半消失。加速時雨量減半不停掉，暴風夜的氛圍留著（James 2026-10-23）
+    state.stormK = !storm ? 0 : dawned ? Math.max(0, (state.stormK ?? 1) - dt / 1.5) : 1; // 天亮了雨就停、冷色罩 1.5 秒淡掉（James 10/28）；還在飄的雨絲 .85 秒內自己落完
+    L.stormRect.clear(); if (state.stormK > 0) L.stormRect.rect(0, 0, W, H).fill({ color: 0x5a6a8a, alpha: (state.dark ? .08 : .14) * state.stormK });
+    if (storm && !still && !dawned && !reduce()) { const gap = (speed > 1 ? .024 : .012) * (lite ? 3 : 1); rainAcc += dt; while (rainAcc > gap) { rainAcc -= gap; spawnParticle(Math.random() * (W + 40) - 20, -20, -ch * .6, ch * 7, .85, 0xcfd8ff, 1, 0, .28, true, rainTex); } } // 壽命 .85 秒：以 7 排／秒落下剛好穿過整張棋盤（5 排），不會下到一半消失。加速時雨量減半不停掉，暴風夜的氛圍留著（James 2026-10-23）
     if (state.flash > 0) { state.flash -= dt; L.flashRect.clear().rect(0, 0, W, H).fill({ color: 0xf4f0ff, alpha: .5 * clamp(state.flash / .18, 0, 1) }); if (state.flash <= 0) { L.flashRect.clear(); if (state.bolt) { state.bolt.destroy(); state.bolt = null; } } }
   }
   function lightning() {
@@ -635,7 +641,7 @@ const Board = (() => {
 
   // ====== 粒子與補間（簡單的池）======
   function spawnParticle(x, y, vx, vy, life, color, size, grav, alpha, plain, t) {
-    if (particles.length > 400) return;
+    if (particles.length > (lite ? 120 : 400)) return;
     const s = new PIXI.Sprite(t || dotTex); s.anchor.set(.5); s.x = x; s.y = y; s.tint = color; s.alpha = alpha;
     if (t) { s.width = 2; s.height = 18; s.rotation = Math.atan2(vy, vx) - Math.PI / 2; } else s.width = s.height = size * 2;
     if (!plain && !t) s.blendMode = 'add';
@@ -702,6 +708,9 @@ const Board = (() => {
     },
     setHints, setRange, setTeach, placed, squashUnit, lightning, dawn, lose,
     setSpeed(n) { speed = n; }, setPaused(p) { paused = p; }, setStill(s) { still = s; },
+    // 省效能模式：開關時把畫布解析度切到 1／回到裝置值，離屏圖跟著 layout 重建；software：WebGL 是軟體模擬（沒開硬體加速）的電腦一開始就該用省效能
+    setLite(on) { lite = !!on; if (!app) return; try { const res = lite ? 1 : Math.min(2, window.devicePixelRatio || 1); if (app.renderer.resolution !== res) { app.renderer.resolution = res; app.resize(); W = H = 0; layout(); frame(G, 0); } } catch (e) { report(e); } },
+    get lite() { return lite; }, get software() { return /swiftshader|llvmpipe|software|basic render/i.test(glName); }, get glName() { return glName; },
     get ready() { return !!app; },
     get lastError() { return lastError; }, get errCount() { return errCount; },
   };

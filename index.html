@@ -396,6 +396,7 @@
     <p id="pause-note">狼也在等。回來再按繼續。</p>
     <div class="snd" id="snd-panel">
       <div class="snd-row"><span>大字</span><button id="big-btn">關</button></div>
+      <div class="snd-row"><span>省效能</span><button id="lite-btn" title="畫面卡的電腦開這個：解析度降一級、雨和火花減量">關</button></div>
       <div class="snd-row"><span>音效</span><button data-snd="sfx">開</button></div>
       <div class="snd-row"><span>蟲鳴</span><button data-snd="amb">關</button></div>
       <div class="snd-row"><span>音量</span><div class="seg"><button data-vol="0">小</button><button data-vol="1">中</button><button data-vol="2">大</button></div></div>
@@ -424,7 +425,7 @@
 <script src="engine.js?v=18"></script>
 <script src="sound.js?v=7"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=21"></script>
+<script src="render.js?v=22"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS 由 data.js 直接提供
@@ -535,6 +536,7 @@ async function buildBoard() {
     // 畫面層出錯：引擎沒事，遊戲照走；說一聲並記在 localStorage（sheepfold-lasterr，給除錯用），不像引擎出錯那樣回關卡
     onError: msg => { toast('畫面出了點狀況，已記下來；遊戲照常繼續', true); try { localStorage.setItem('sheepfold-lasterr', `${new Date().toISOString()} ${msg}`.slice(0, 2000)); } catch (e) {} } });
   if (!boardReady) { $('#board-fail').classList.add('on'); $('#start').disabled = true; }
+  else try { const saved = localStorage.getItem('sheepfold-lite'); applyLite(saved === null ? Board.software : saved === '1', false); } catch (e) {}
 }
 function buildCards() {
   const wrap = $('#cards'); wrap.innerHTML = '';
@@ -836,7 +838,7 @@ function tick(now) {
   try {
     for (let i = 0; i < speed; i++) { Engine.step(G, dt); flushEvents(); if (G.over) break; }
     if (!wasWave && G.phase === 'wave') { Sound.play('wave'); if (diff === 'storm' && Math.random() < .35) Board.lightning(); } // 暴風夜：波開始時偶爾閃一次電
-    draw(dt);
+    draw(dt); watchFps(dt);
   } catch (err) {
     // 引擎或畫面丟例外：以前 rAF 迴圈會就此停掉、畫面定格沒有任何提示（2026-10-20 P3）。現在停下這一局、說一聲、回關卡；清完的波已存，可以「繼續上次」
     console.error(err);
@@ -1286,7 +1288,7 @@ function syncSoundUI() {
   document.querySelectorAll('.snd-btn').forEach(b => { b.textContent = p.sfx ? '🔊' : '🔇'; b.title = p.sfx ? '聲音：開（點一下靜音）' : '聲音：關（點一下打開）'; });
   document.querySelectorAll('#snd-panel [data-snd]').forEach(b => { const on = !!p[b.dataset.snd]; b.textContent = on ? '開' : '關'; b.classList.toggle('on', on); });
   document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.classList.toggle('on', Number(b.dataset.vol) === p.vol));
-  document.querySelectorAll('#snd-panel .snd-row').forEach((row, i) => row.classList.toggle('off', i > 1 && !p.sfx)); // 第 0 列是大字、第 1 列是音效開關，之後的才跟著音效壓暗
+  document.querySelectorAll('#snd-panel .snd-row').forEach((row, i) => row.classList.toggle('off', i > 2 && !p.sfx)); // 第 0 列是大字、第 1 列是省效能、第 2 列是音效開關，之後的才跟著音效壓暗
 }
 document.querySelectorAll('.snd-btn').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); Sound.set('sfx', !Sound.prefs.sfx); syncSoundUI(); Sound.play('tap'); }));
 document.querySelectorAll('#snd-panel [data-snd]').forEach(b => b.addEventListener('click', () => { Sound.set(b.dataset.snd, !Sound.prefs[b.dataset.snd]); syncSoundUI(); Sound.play('tap'); }));
@@ -1297,6 +1299,11 @@ document.addEventListener('pointerdown', () => Sound.unlock(), { capture: true, 
 function applyBig(on, save = true) { document.documentElement.classList.toggle('big', !!on); const b = $('#big-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) try { localStorage.setItem('sheepfold-bigtext', on ? '1' : '0'); } catch (e) {} }
 $('#big-btn').addEventListener('click', () => { applyBig(!document.documentElement.classList.contains('big')); Sound.play('tap'); });
 try { applyBig(localStorage.getItem('sheepfold-bigtext') === '1', false); } catch (e) {}
+// 省效能模式（2026-10-28 James：手機順、電腦卡）：暫停選單手動開（存 sheepfold-lite）；沒設過的電腦若 WebGL 是軟體模擬就自動開；玩到一半連續三秒掉到 30fps 以下也自動開、說一聲（每次開頁只自動切一次，不會來回跳）
+function applyLite(on, save = true) { Board.setLite(on); const b = $('#lite-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) try { localStorage.setItem('sheepfold-lite', on ? '1' : '0'); } catch (e) {} }
+$('#lite-btn').addEventListener('click', () => { applyLite(!Board.lite); Sound.play('tap'); });
+let liteAuto = false, ftSum = 0, ftN = 0;
+function watchFps(dt) { if (liteAuto || Board.lite || document.hidden || G.phase !== 'wave') { ftSum = ftN = 0; return; } ftSum += dt; ftN++; if (ftSum < 3) return; const avg = ftSum / ftN; ftSum = ftN = 0; if (avg > 1 / 30) { liteAuto = true; applyLite(true); toast('畫面跑不太動，已切到省效能模式；暫停選單裡可以關掉'); } }
 syncSoundUI();
 
 // 檢查點：每清完一波存一次，每關各存一份（去玩別關不會蓋掉）；守完、輸了、重新開始同一關只清自己這關的
