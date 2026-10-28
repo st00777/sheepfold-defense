@@ -170,7 +170,7 @@
 
   // ====== 儲存介面：瀏覽器 localStorage；測試用記憶體版 ======
   function localStore() {
-    const ls = () => root.localStorage;
+    const ls = () => globalThis.localStorage; // 工廠函式裡沒有 root，用 globalThis（10/30 真機抓到：舊 key 一個都沒搬，因為這裡丟了 ReferenceError 被 open 吞掉）
     return { get: k => ls().getItem(k), set: (k, v) => ls().setItem(k, v), remove: k => ls().removeItem(k), keys: () => { const a = []; for (let i = 0; i < ls().length; i++) a.push(ls().key(i)); return a; } };
   }
   function memoryStore(init = {}) {

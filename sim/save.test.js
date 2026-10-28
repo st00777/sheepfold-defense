@@ -164,3 +164,15 @@ test('寫不進去（配額滿）：save 回 false，不丟例外', () => {
   st.set = () => { throw new Error('QuotaExceeded'); };
   assert.strictEqual(S.save(), false);
 });
+
+test('localStore 真的接得到 localStorage（假的全域物件）：舊 key 搬得動', () => {
+  const m = new Map([['sheepfold-tutorial-done', '1'], ['sheepfold-diff', 'storm']]);
+  globalThis.localStorage = { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), get length() { return m.size; }, key: i => [...m.keys()][i] };
+  try {
+    const S = Save.open(Save.localStore(), OPTS);
+    assert.strictEqual(S.status, 'migrated');
+    assert.strictEqual(S.data.tutorial, true);
+    assert.strictEqual(S.data.prefs.diff, 'storm');
+    assert.ok(m.has(Save.KEY)); assert.ok(!m.has('sheepfold-diff'));
+  } finally { delete globalThis.localStorage; }
+});
