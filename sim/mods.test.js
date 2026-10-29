@@ -1,4 +1,4 @@
-// 修飾詞（期 1，2026-10-30）：Engine.create 第四個參數。白名單、開局糧、看門數、波數、送卡／一筆糧開關、檢查點、模擬器：node --test sim/*.test.js
+// 修飾詞（期 1，2026-10-29）：Engine.create 第四個參數。白名單、開局糧、看門數、波數、送卡／一筆糧開關、檢查點、模擬器：node --test sim/*.test.js
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');

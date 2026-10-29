@@ -9,7 +9,7 @@ const E = require(path.join(__dirname, '..', 'engine.js'));
 const Save = require(path.join(__dirname, '..', 'save.js'));
 const { LEVELS, DIFFS } = D;
 
-const OPTS = { check: E.checkSnapshot, diffs: Object.keys(DIFFS), now: '2026-10-30T00:00:00.000Z', nowFn: () => '2026-10-30T01:00:00.000Z' };
+const OPTS = { check: E.checkSnapshot, diffs: Object.keys(DIFFS), now: '2026-10-29T00:00:00.000Z', nowFn: () => '2026-10-29T01:00:00.000Z' };
 const lv2 = LEVELS.find(l => l.id === 2);
 function realSnapshot() { const G = E.create(lv2.id, 'windy'); G.food = 300; assert.ok(E.place(G, 2, 0, 'shepherd').ok); G.wave = 1; return JSON.parse(JSON.stringify(E.snapshot(G))); }
 
@@ -71,7 +71,7 @@ test('什麼都沒有：全新一份，不寫任何東西', () => {
   assert.strictEqual(S.status, 'fresh');
   assert.strictEqual(st.get(Save.KEY), null, '全新玩家不急著寫');
   assert.ok(S.save());
-  assert.strictEqual(JSON.parse(st.get(Save.KEY)).updated, '2026-10-30T01:00:00.000Z');
+  assert.strictEqual(JSON.parse(st.get(Save.KEY)).updated, '2026-10-29T01:00:00.000Z');
 });
 
 test('第二次開：status ok，並抄一份備份', () => {
@@ -169,7 +169,7 @@ test('replace 整份覆蓋後寫入；summary 算得出守過幾夜', () => {
   const other = Save.open(legacyStore(), OPTS).data;
   assert.ok(S.replace(other));
   assert.deepStrictEqual(S.data.progress.cleared[2], { calm: true });
-  assert.deepStrictEqual(Save.summary(S.data), { nights: 2, checkpoints: 1, trials: 0, trialCheckpoints: 0, updated: '2026-10-30T01:00:00.000Z', created: '2026-10-30T00:00:00.000Z' });
+  assert.deepStrictEqual(Save.summary(S.data), { nights: 2, checkpoints: 1, trials: 0, trialCheckpoints: 0, updated: '2026-10-29T01:00:00.000Z', created: '2026-10-29T00:00:00.000Z' });
   assert.strictEqual(S.replace('garbage'), false);
 });
 
@@ -223,7 +223,7 @@ test('主檔已有進度、舊 key 也有：取聯集、最高紀錄取高分、
   assert.strictEqual(S.data.playerKind, 'new');
 });
 
-// ====== v5：守夜試煉（期 2，2026-10-30）======
+// ====== v5：守夜試煉（期 2，2026-10-29）======
 test('v4 主檔升到 v5：多出 trials 四格，其餘原樣；SF4 存檔碼也讀得進來', () => {
   const v4 = { version: 4, created: '2026-10-29T00:00:00.000Z', updated: '2026-10-29T00:00:00.000Z', progress: { cleared: { 7: { calm: true } }, best: {}, stars: {} }, checkpoints: {}, loadouts: {}, seen: { intro: [], cards: [], enemies: [] }, tutorial: true, prefs: { diff: 'windy' }, announced: 'x', playerKind: 'returning' };
   const st = Save.memoryStore({ [Save.KEY]: JSON.stringify(v4) });

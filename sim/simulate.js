@@ -198,7 +198,7 @@ function decideConveyor(G) {
   if (G.hand.length && (!G.started || G.hand.length >= (G.level.conveyor.max || 6))) { const k = G.hand[0]; if (UNITS[k].kind !== 'instant') for (const r of rows) if (tryPlace(G, r, freeCell(G, r, 1), k)) return; }
 }
 
-// SIM_MODS：修飾詞 JSON（期 1，2026-10-30），直接交給 Engine.create；壞的 JSON 直接停，壞的欄位由引擎印錯誤後略過
+// SIM_MODS：修飾詞 JSON（期 1，2026-10-29），直接交給 Engine.create；壞的 JSON 直接停，壞的欄位由引擎印錯誤後略過
 // 例：SIM_MODS='{"units":["shepherd","slinger","wall"],"startFood":300,"gates":2,"waves":3}' node sim/simulate.js 3 calm 50
 const ENV_MODS = (() => { const s = process.env.SIM_MODS; if (!s) return undefined; try { return JSON.parse(s); } catch (e) { console.error('SIM_MODS 不是合法的 JSON：' + e.message); process.exit(1); } })();
 const modsLabel = m => m ? ' 修飾詞 ' + JSON.stringify(m) : '';

@@ -59,7 +59,7 @@ test('舊檔沒有冷卻全長時，長於首輪的倒數仍使用完整冷卻�
 const ui = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 // 期 2 起檢查點分格（cpSlot／cpKey）定義在 loadCheckpoint 前一行：一起抓，但 loadCheckpoint 本體跳過（下面用替身）
 const storageCode = ui.slice(ui.indexOf('const cpSlot'), ui.indexOf('function loadCheckpoint(')) + ui.slice(ui.indexOf('function saveCheckpoint('), ui.indexOf('function clearCheckpoint('));
-// 2026-10-30 期 0 起檢查點住在 save.js 的單一存檔裡：這裡用同一支 save.js 包住替身儲存，寫入失敗／讀不回來的判斷在 SAVE.save()
+// 2026-10-29 期 0 起檢查點住在 save.js 的單一存檔裡：這裡用同一支 save.js 包住替身儲存，寫入失敗／讀不回來的判斷在 SAVE.save()
 const Save = require('../save.js');
 function storageContext(storage, cp) {
   const st = { get: k => (storage.getItem ? storage.getItem(k) : null), set: (k, v) => storage.setItem(k, v), remove: () => {}, keys: () => [] };

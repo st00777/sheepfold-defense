@@ -73,7 +73,7 @@
   }
   // 這一題實際打的那一夜（套好修飾詞的關卡物件；id 跟原夜一樣，存檔要用 trial.id 另開一格）
   function trialLevel(trial) { const base = levelById(trial.levelId); return applyMods(base, normalizeMods(base, trial.mods).mods); }
-  // 「今日推薦一題」：日期取模，不隨機。只在已開的題裡輪（審查 10/30：推薦一題鎖著的沒有用）；一題都沒開就回 null
+  // 「今日推薦一題」：日期取模，不隨機。只在已開的題裡輪（審查 10/29：推薦一題鎖著的沒有用）；一題都沒開就回 null
   function dailyTrial(now = new Date(), cleared = null) {
     const pool = TRIALS.filter(t => isTrialUnlocked(cleared, t)); if (!pool.length) return null;
     const day = Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
@@ -106,7 +106,7 @@
   // 讓這一局只用名單上的卡
   function applyPick(G, keys) { G.level = { ...G.level, units: keys, fresh: G.level.fresh.filter(k => keys.includes(k)) }; }
 
-  // ====== 修飾詞（期 1，2026-10-30）：建局時套在關卡上的一層，試煉冊、今日推薦、模擬器都用這一條 ======
+  // ====== 修飾詞（期 1，2026-10-29）：建局時套在關卡上的一層，試煉冊、今日推薦、模擬器都用這一條 ======
   // 六個欄位，沒寫的就照關卡原樣：
   //   units      可用卡白名單（任何卡都行，不限這一夜原本開的；順序＝卡片順序；fresh／must 只留名單上的）
   //   startFood  開局糧，寫多少就多少（不乘一筆糧的 budgetMul）

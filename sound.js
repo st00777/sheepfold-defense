@@ -1,6 +1,6 @@
 // 羊圈守夜 · 音效。全部用 Web Audio 現場合成，沒有音檔、沒有授權問題。
 // 用法：Sound.unlock() 在第一次點擊時叫（iOS 要有手勢才出聲）；Sound.play('howl')；Sound.set('vol', 2)
-// 設定 { sfx 音效開關, amb 蟲鳴開關, vol 音量 0 小 1 中 2 大 } 住在存檔裡（save.js 的 prefs.sound）：頁面開好後叫 Sound.attach(存檔裡那個物件, 寫回存檔的函式)；attach 之前用預設值（2026-10-30 期 0 以前自己存 localStorage 'sheepfold-sound'）
+// 設定 { sfx 音效開關, amb 蟲鳴開關, vol 音量 0 小 1 中 2 大 } 住在存檔裡（save.js 的 prefs.sound）：頁面開好後叫 Sound.attach(存檔裡那個物件, 寫回存檔的函式)；attach 之前用預設值（2026-10-29 期 0 以前自己存 localStorage 'sheepfold-sound'）
 'use strict';
 (function (root) {
   const VOLS = [0.35, 0.6, 1.0];

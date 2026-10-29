@@ -1,4 +1,4 @@
-// 守夜試煉（期 2，2026-10-30）：data.js TRIALS 六題、解鎖規則、今日推薦、每題建得起局且修飾詞乾淨、檢查點走自己的格子。node --test sim/*.test.js
+// 守夜試煉（期 2，2026-10-29）：data.js TRIALS 六題、解鎖規則、今日推薦、每題建得起局且修飾詞乾淨、檢查點走自己的格子。node --test sim/*.test.js
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');

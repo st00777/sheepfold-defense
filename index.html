@@ -293,7 +293,7 @@
     .card:active, .btn:active, .diff:active, .tab:active, .lv:active, .rc:active, #pause-btn:active, #snd-btn:active, .corner:active, .snd-row button:active, #tut-skip:active { transform: none; }
   }
   @keyframes fadeOut { to { opacity: 0; } }
-  /* 設定頁（首頁左上 ⚙️）與更新公告（2026-10-30 期 0） */
+  /* 設定頁（首頁左上 ⚙️）與更新公告（2026-10-29 期 0） */
   .corner.left { right: auto; left: 12px; }
   #save-note { background: #0004; border: 1px solid var(--new); border-radius: 8px; padding: 6px 10px; font-size: 13px; margin: 6px 0 2px; text-align: left; line-height: 1.5; }
   .set-box { padding: 8px 0 4px; border-top: 1px dashed #0004; text-align: left; }
@@ -485,7 +485,7 @@
     <h1>更新紀錄</h1>
     <div class="ref">只列玩起來有差的改動；純整理程式的小進版不列。</div>
     <div class="clog" id="changelog-list"></div>
-    <div class="ref">2026.10.30 以前的改動（第二、三章、新圖、動畫）當時沒留版本號，不另外補。</div>
+    <div class="ref">2026.10.29 以前的改動（第二、三章、新圖、動畫）當時沒留版本號，不另外補。</div>
     <button class="btn alt" id="changelog-back">回設定</button>
   </div>
 </div>
@@ -548,7 +548,7 @@ let pendingCp = null;  // 續玩前要先點兵時，先把存檔記著
 const CP_BROKEN = '上次的存檔讀不出來，這一夜要從頭守。';
 
 // ====== 存檔（只存在這支手機）======
-// 2026-10-30 期 0：整支手機的紀錄放在一份 `sheepfold-save`（save.js，v4）——進度、星、每關檢查點、隊伍、看過的介紹、教學、設定。
+// 2026-10-29 期 0：整支手機的紀錄放在一份 `sheepfold-save`（save.js，v4）——進度、星、每關檢查點、隊伍、看過的介紹、教學、設定。
 // 以前十幾個散放的 key 第一次開新版會自動搬進來、搬成功才刪；主檔讀不出來會先試上次開頁抄的備份、再不行才從頭，原文留在 -broken，首頁會說一聲
 const SAVE_OPTS = { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS), trialIds: TRIALS.map(t => t.id) }; // 匯入時也用同一組
 const SAVE = Save.open(Save.localStore(), SAVE_OPTS);
@@ -572,17 +572,17 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來', 3: '羊圈在山上，斜坡上的敵人直射打不到：要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛' };
-const HOME_UPDATE = '最近更新 10/31：首頁多了「守夜試煉」——6 道固定題目（排陣解謎、送卡護羊、一筆糧各 2），守過一章最後一夜就開那一章的題；每天推薦一題';
+const HOME_UPDATE = '最近更新 10/29：首頁多了「守夜試煉」——6 道固定題目（排陣解謎、送卡護羊、一筆糧各 2），守過一章最後一夜就開那一章的題；每天推薦一題';
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
-  { ver: '2026.10.31', notes: [
+  { ver: '2026.10.29.2', notes: [
     '首頁多了「守夜試煉」：6 道固定題目——排陣解謎、送卡護羊、一筆糧各 2 題，難度固定不分三檔',
     '守過一章的最後一夜（任一難度），那一章的題就開；試煉的進度和檢查點另外存，不會動到故事模式',
     '試煉冊每天推薦一題，輪著來、不隨機',
     '設定頁多了「更新紀錄」，歷次改了什麼都查得到',
   ] },
-  { ver: '2026.10.30', notes: [
+  { ver: '2026.10.29', notes: [
     '首頁左上多了 ⚙️ 設定：可以把全部紀錄匯出成一串存檔碼，換手機時貼回去就接著玩',
     '存檔整理成一份、有版本號：讀不出來會先用備份接回、再不行才從頭，而且會說一聲，不會默默清掉',
     '加了匿名統計，只記玩到第幾夜、用了哪些卡，不記姓名帳號；不想被記就在設定裡關掉',
@@ -769,7 +769,7 @@ function modsText(T, L) {
   const m = T.mods, out = [];
   if (L.conveyor) out.push(`📦 卡每 ${L.conveyor.every} 秒送一張，手上最多 ${L.conveyor.max} 張，滿了就不送${Array.isArray(L.conveyor.start) && L.conveyor.start.length ? `；開局先給 ${L.conveyor.start.map(k => UNITS[k] ? UNITS[k].name : k).join('、')}` : ''}`);
   if (m.waves !== undefined) out.push(`🌙 只打 ${L.waves.length} 波就天亮`);
-  return out; // 看門的幾位在難度提示那行（gateAdvice）與五格預覽；哪幾張卡在「今晚上場」那行——不重講（審查 10/30：同一件事講三次）
+  return out; // 看門的幾位在難度提示那行（gateAdvice）與五格預覽；哪幾張卡在「今晚上場」那行——不重講（審查 10/29：同一件事講三次）
 }
 // 試煉的修飾詞整理成引擎認得的那一組（檢查點對帳用）
 const trialMods = T => Engine.normalizeMods(Engine.levelById(T.levelId), T.mods).mods;
@@ -966,7 +966,7 @@ function setSpeed(n) {
   speed = n; Board.setSpeed(speed);
   document.querySelectorAll('#dev [data-speed]').forEach(x => x.classList.toggle('on', Number(x.dataset.speed) === speed));
   const fb = $('#fast-btn'); fb.classList.toggle('on', speed > 1); fb.textContent = speed > 1 ? `⏩${speed}×` : '⏩'; fb.title = speed > 1 ? `加速中 ${speed}×，點一下回正常` : '加速（二倍速）';
-  if (speed <= 2 && SD.prefs.speed !== speed) { SD.prefs.speed = speed; SAVE.save(); } // 只存 1×／2×；開發者列的 4／8× 不存（code review 10/30：以前也不會把 8× 存成 2×）
+  if (speed <= 2 && SD.prefs.speed !== speed) { SD.prefs.speed = speed; SAVE.save(); } // 只存 1×／2×；開發者列的 4／8× 不存（code review 10/29：以前也不會把 8× 存成 2×）
 }
 $('#fast-btn').addEventListener('click', () => { setSpeed(speed > 1 ? 1 : 2); Sound.play('tap'); });
 if (SD.prefs.speed === 2) setSpeed(2);
@@ -1554,7 +1554,7 @@ function trackNightEnd(result) {
 }
 function setAnalytics(on) { SD.prefs.analytics = !!on; SAVE.save(); window['ga-disable-' + GA_ID] = !on; if (on) gaInit(); syncSettingsUI(); }
 gaInit();
-// 同一支瀏覽器開兩個分頁：別的分頁寫了存檔，這邊沒在打的話就重新載入拿最新的，免得等一下用舊的蓋回去（code review 10/30；打到一半不動，這一局打完存的會以這邊為準）
+// 同一支瀏覽器開兩個分頁：別的分頁寫了存檔，這邊沒在打的話就重新載入拿最新的，免得等一下用舊的蓋回去（code review 10/29；打到一半不動，這一局打完存的會以這邊為準）
 window.addEventListener('storage', ev => { if (ev.key === SAVE.KEY && ev.newValue && (!G || G.over) && $('#settings').hidden && $('#changelog').hidden) location.reload(); });
 
 // ====== 設定頁（首頁左上 ⚙️）：存檔碼匯出／匯入、匿名統計開關、版本 ======

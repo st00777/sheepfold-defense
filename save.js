@@ -1,5 +1,5 @@
 // 羊圈守夜 · 存檔。整支手機的紀錄放在一份結構裡（版本欄、遷移鏈、匯出匯入），純邏輯、無 DOM，node 測試也能跑。
-// 2026-10-30 期 0 之前是十幾個散放的 localStorage key（progress-v3、每關一份 checkpoint、loadout、seen-*、diff、speed、bigtext、lite、sound），
+// 2026-10-29 期 0 之前是十幾個散放的 localStorage key（progress-v3、每關一份 checkpoint、loadout、seen-*、diff、speed、bigtext、lite、sound），
 // 第一次開新版會全部搬進 `sheepfold-save`，搬成功才刪舊 key。
 // 用法：const SAVE = Save.open(Save.localStore(), { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS), trialIds: TRIALS.map(t => t.id) });
 //       SAVE.data.progress.cleared …改完叫 SAVE.save()（回傳有沒有真的寫進去）；Save.encode(SAVE.data) 出存檔碼；Save.decode(code, opts) 讀回來
@@ -139,7 +139,7 @@
     let raw = null; try { raw = st.get(KEY); } catch (e) { raw = null; }
     let d = null, status = 'fresh', problems = [], bumped = false;
     if (raw !== null && raw !== undefined) {
-      // 存檔來自更新的版本（這支瀏覽器快取到舊版遊戲）：不碰它、不寫任何東西，這一次當作唯讀的全新局（code review 10/30）
+      // 存檔來自更新的版本（這支瀏覽器快取到舊版遊戲）：不碰它、不寫任何東西，這一次當作唯讀的全新局（code review 10/29）
       let peek = null; try { peek = JSON.parse(raw); } catch (e) {}
       if (isObj(peek) && Number.isFinite(peek.version) && peek.version > VERSION) {
         const api = { data: empty(now), status: 'newer', problems: [`這支手機的存檔來自更新的版本（v${peek.version}），這個版本的遊戲讀不懂；請重新整理拿新版，這次玩的不會存`], KEY, save: () => false, replace: () => false };
@@ -159,7 +159,7 @@
       if (d) { const r = validate(d, opts); d = r.data; problems = r.problems; status = 'migrated'; }
     }
     if (!d) d = empty(now);
-    // 主檔已經有了、但舊 key 還在（例：第一次開到的是快取裡的舊版遊戲，它寫了一份空的新檔，之後就沒人去搬舊紀錄——10/30 James 真機）：把舊紀錄併進來，併成功才刪舊 key
+    // 主檔已經有了、但舊 key 還在（例：第一次開到的是快取裡的舊版遊戲，它寫了一份空的新檔，之後就沒人去搬舊紀錄——10/29 James 真機）：把舊紀錄併進來，併成功才刪舊 key
     if (status === 'ok' || status === 'restored') {
       let leg = null; try { leg = fromLegacy(st, now); } catch (e) { leg = null; }
       if (leg) { const r = validate(leg, opts); if (r.data) { mergeLegacy(d, r.data); problems = [...problems, ...r.problems, '找回了這支手機原本的紀錄，已併進新存檔']; status = 'migrated'; } }
@@ -219,7 +219,7 @@
 
   // ====== 儲存介面：瀏覽器 localStorage；測試用記憶體版 ======
   function localStore() {
-    const ls = () => globalThis.localStorage; // 工廠函式裡沒有 root，用 globalThis（10/30 真機抓到：舊 key 一個都沒搬，因為這裡丟了 ReferenceError 被 open 吞掉）
+    const ls = () => globalThis.localStorage; // 工廠函式裡沒有 root，用 globalThis（10/29 真機抓到：舊 key 一個都沒搬，因為這裡丟了 ReferenceError 被 open 吞掉）
     return { get: k => ls().getItem(k), set: (k, v) => ls().setItem(k, v), remove: k => ls().removeItem(k), keys: () => { const a = []; for (let i = 0; i < ls().length; i++) a.push(ls().key(i)); return a; } };
   }
   function memoryStore(init = {}) {

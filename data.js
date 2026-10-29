@@ -690,9 +690,9 @@ const LEVELS = [
   },
 ];
 
-// ====== 守夜試煉（期 2，2026-10-30）：一題＝某一夜的地圖＋一組修飾詞（engine.js normalizeMods），難度固定、不乘三檔 ======
+// ====== 守夜試煉（期 2，2026-10-29）：一題＝某一夜的地圖＋一組修飾詞（engine.js normalizeMods），難度固定、不乘三檔 ======
 // kind：puzzle 排陣解謎／conveyor 送卡護羊／budget 一筆糧。解鎖＝那一夜所在的章守過最後一夜（任一難度），規則在 Engine.isTrialUnlocked
-// 勝率是 sim/simulate.js good 玩家 100 局（docs/phase-2-trials-draft-2026-10-30.md）；改 mods 要重跑：SIM_MODS='{…}' node sim/simulate.js <levelId> calm 100
+// 勝率是 sim/simulate.js good 玩家 100 局（docs/phase-2-trials-draft-2026-10-29.md）；改 mods 要重跑：SIM_MODS='{…}' node sim/simulate.js <levelId> calm 100
 // lose＝輸了之後結算頁那一句（依口味，不依題）
 const TRIAL_KINDS = {
   puzzle: { name: '排陣解謎', ico: '🧩', desc: '卡和糧都固定，佈好陣再開打；輸了換一種擺法', lose: '擺法不對就換一種。糧是固定的，想想哪一排先漏。' },
