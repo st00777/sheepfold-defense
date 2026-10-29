@@ -8,7 +8,7 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.Save = factory();
 })(typeof window !== 'undefined' ? window : globalThis, function () {
-  const VERSION = 4;                  // 存檔結構版本。v1 best-v2（只有第一關）、v2 progress-v3、v3 檢查點每關一份：都是舊的散放 key；v4 起單一結構
+  const VERSION = 5;                  // 存檔結構版本。v1 best-v2（只有第一關）、v2 progress-v3、v3 檢查點每關一份：都是舊的散放 key；v4 起單一結構；v5 加 trials（守夜試煉，期 2）
   const KEY = 'sheepfold-save', BAK = KEY + '-bak', BROKEN = KEY + '-broken';
   const CP_RE = /^sheepfold-checkpoint-(\d+)$/;
   const LEGACY = ['sheepfold-progress-v3', 'sheepfold-best-v2', 'sheepfold-checkpoint', 'sheepfold-loadout', 'sheepfold-intro-seen', 'sheepfold-seen-cards', 'sheepfold-seen-enemies', 'sheepfold-tutorial-done', 'sheepfold-diff', 'sheepfold-speed', 'sheepfold-bigtext', 'sheepfold-lite', 'sheepfold-sound'];
@@ -17,6 +17,7 @@
   const isObj = x => !!x && typeof x === 'object' && !Array.isArray(x);
   const strArr = a => (Array.isArray(a) ? a.filter(x => typeof x === 'string') : []);
 
+  const emptyTrials = () => ({ cleared: {}, best: {}, checkpoints: {}, loadouts: {} });
   // 全新一份
   function empty(now) {
     return {
@@ -27,6 +28,7 @@
       seen: { intro: [], cards: [], enemies: [] },       // 開場頁介紹過的、新卡閃光點過的、弱點提示跳過的
       tutorial: false,
       prefs: { diff: 'calm', speed: 1, big: false, lite: null, sound: { sfx: true, amb: false, vol: 1 }, analytics: true }, // lite null＝沒設過，由電腦是不是軟體繪圖決定
+      trials: emptyTrials(),                             // 守夜試煉（v5）：cleared[題 id]=true、best[題 id]={wave,cleared,food}、checkpoints[題 id]=快照、loadouts[題 id]=帶的卡；跟故事模式分開，試煉打到一半不會蓋掉那一夜的檢查點
       announced: '',                                     // 看過哪一版的更新公告
       playerKind: '',                                    // 第一次接統計時：有通關紀錄＝returning、沒有＝new（之後不變）
     };
@@ -73,6 +75,7 @@
 
   // ====== 遷移鏈：STEPS[n] 把第 n 版改成第 n+1 版。v4 是第一個單一結構，之後改欄位就在這裡加一步 ======
   const STEPS = {};
+  STEPS[4] = d => { if (!isObj(d.trials)) d.trials = emptyTrials(); }; // v4 → v5：多一欄 trials，其餘不動
   function migrate(d) { while (d.version < VERSION && STEPS[d.version]) { STEPS[d.version](d); d.version++; } return d; }
 
   // ====== 檢查與補齊：缺的欄位補預設、型別不對的丟掉；檢查點交給 opts.check（Engine.checkSnapshot）驗，壞的只丟那一份 ======
@@ -97,6 +100,18 @@
       d.checkpoints[id] = c;
     }
     if (isObj(input.loadouts)) for (const id in input.loadouts) if (Array.isArray(input.loadouts[id])) d.loadouts[id] = strArr(input.loadouts[id]);
+    if (isObj(input.trials)) { // 試煉：壞的檢查點只丟那一份；快照要指到合法的夜（opts.check 用它自己寫的 levelId 驗，是不是這一題的夜由遊戲開局時再對）
+      const T = input.trials;
+      if (isObj(T.cleared)) for (const id in T.cleared) if (T.cleared[id]) d.trials.cleared[id] = true;
+      if (isObj(T.best)) for (const id in T.best) { const b = T.best[id]; if (isObj(b) && Number.isFinite(b.wave)) d.trials.best[id] = { wave: b.wave, cleared: !!b.cleared, ...(Number.isFinite(b.food) ? { food: b.food } : {}) }; }
+      if (isObj(T.checkpoints)) for (const id in T.checkpoints) {
+        const c = T.checkpoints[id];
+        if (!isObj(c) || !Number.isInteger(c.levelId)) continue;
+        if (typeof opts.check === 'function' && !opts.check(c, c.levelId)) { problems.push(`試煉 ${id} 的檢查點讀不出來，已丟掉（那一題要從頭打）`); continue; }
+        d.trials.checkpoints[id] = c;
+      }
+      if (isObj(T.loadouts)) for (const id in T.loadouts) if (Array.isArray(T.loadouts[id])) d.trials.loadouts[id] = strArr(T.loadouts[id]);
+    }
     if (isObj(input.seen)) for (const f of ['intro', 'cards', 'enemies']) d.seen[f] = strArr(input.seen[f]);
     d.tutorial = !!input.tutorial;
     const pr = isObj(input.prefs) ? input.prefs : {}, diffs = Array.isArray(opts.diffs) ? opts.diffs : DIFFS_DEFAULT;
@@ -121,7 +136,7 @@
     const now = typeof opts.now === 'string' ? opts.now : new Date().toISOString();
     const nowFn = typeof opts.nowFn === 'function' ? opts.nowFn : () => new Date().toISOString();
     let raw = null; try { raw = st.get(KEY); } catch (e) { raw = null; }
-    let d = null, status = 'fresh', problems = [], readOnly = false;
+    let d = null, status = 'fresh', problems = [], bumped = false;
     if (raw !== null && raw !== undefined) {
       // 存檔來自更新的版本（這支瀏覽器快取到舊版遊戲）：不碰它、不寫任何東西，這一次當作唯讀的全新局（code review 10/30）
       let peek = null; try { peek = JSON.parse(raw); } catch (e) {}
@@ -130,7 +145,7 @@
         return api;
       }
       const r = parse(raw, opts);
-      if (r.data) { d = r.data; status = 'ok'; problems = r.problems; }
+      if (r.data) { d = r.data; status = 'ok'; problems = r.problems; bumped = isObj(peek) && Number.isFinite(peek.version) && peek.version < VERSION; } // 舊版結構：讀進來就升好，等一下寫回去
       else {
         try { st.set(BROKEN, raw); } catch (e) {} // 原文留著，之後還有機會救
         let bak = null; try { bak = st.get(BAK); } catch (e) {}
@@ -164,7 +179,7 @@
       return false;
     };
     if (status === 'migrated') { if (api.save()) removeLegacy(st); }            // 搬成功才刪舊 key
-    else if (status === 'restored' || status === 'broken') api.save();
+    else if (status === 'restored' || status === 'broken' || bumped) api.save(); // 接回、從頭、或結構升了版：立刻寫回主檔
     if (status === 'ok' || status === 'restored') { try { st.set(BAK, JSON.stringify(d)); } catch (e) {} } // 每次開頁抄一份「上次好的」當備份，不是每次寫都抄
     return api;
   }
@@ -194,10 +209,11 @@
     if (!r.data) return { error: r.problems[0] || '存檔碼解不開' };
     return r;
   }
-  // 給匯入前的預覽：守過幾夜、幾份檢查點、最後更新
+  // 給匯入前的預覽：守過幾夜、幾份檢查點、過了幾題試煉、最後更新
   function summary(d) {
     const nights = Object.keys(d.progress.cleared).filter(id => Object.keys(d.progress.cleared[id]).length).length;
-    return { nights, checkpoints: Object.keys(d.checkpoints).length, updated: d.updated, created: d.created };
+    const t = isObj(d.trials) ? d.trials : emptyTrials();
+    return { nights, checkpoints: Object.keys(d.checkpoints).length, trials: Object.keys(t.cleared || {}).length, trialCheckpoints: Object.keys(t.checkpoints || {}).length, updated: d.updated, created: d.created };
   }
 
   // ====== 儲存介面：瀏覽器 localStorage；測試用記憶體版 ======

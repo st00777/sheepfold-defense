@@ -91,7 +91,7 @@ test('主檔壞掉、有備份：用備份接回來，壞檔留在 -broken', () 
   assert.deepStrictEqual(S.data.progress.cleared[1], { calm: true, windy: true });
   assert.strictEqual(st.get(Save.BROKEN), '{"version":4,"progress":{garbage');
   assert.ok(S.problems[0].includes('備份'));
-  assert.ok(st.get(Save.KEY).startsWith('{"version":4'), '接回來的立刻寫回主檔');
+  assert.ok(st.get(Save.KEY).startsWith('{"version":5'), '接回來的立刻寫回主檔（升到現在的版本）');
 });
 
 test('主檔壞掉、沒備份：從頭開始、status broken、壞檔留著', () => {
@@ -144,7 +144,7 @@ test('存檔碼來回：中文、檢查點都在，格式純 ASCII，貼進去�
   const S = Save.open(st, OPTS);
   S.data.loadouts[7] = ['牧人測試']; // 存檔裡出現中文也要能來回
   const code = Save.encode(S.data);
-  assert.match(code, /^SF4\.[A-Za-z0-9_-]+\.[0-9a-f]{8}$/);
+  assert.match(code, /^SF5\.[A-Za-z0-9_-]+\.[0-9a-f]{8}$/);
   const r = Save.decode(code.slice(0, 40) + '\n  ' + code.slice(40) + ' \n', OPTS);
   assert.ok(r.data, r.error);
   assert.deepStrictEqual(r.data.loadouts[7], ['牧人測試']);
@@ -156,11 +156,11 @@ test('存檔碼少字、改字、不是存檔碼、未來版本：各給一句�
   const S = Save.open(legacyStore(), OPTS);
   const code = Save.encode(S.data);
   assert.match(Save.decode(code.slice(0, 20) + code.slice(24), OPTS).error, /少了字|改過/);
-  const tampered = code.replace(/^SF4\.(.)/, (m, c) => 'SF4.' + (c === 'A' ? 'B' : 'A'));
+  const tampered = code.replace(/^SF5\.(.)/, (m, c) => 'SF5.' + (c === 'A' ? 'B' : 'A'));
   assert.match(Save.decode(tampered, OPTS).error, /少了字|改過/);
   assert.match(Save.decode('hello world', OPTS).error, /不是羊圈守夜/);
   assert.match(Save.decode('', OPTS).error, /還沒貼/);
-  assert.match(Save.decode(code.replace(/^SF4/, 'SF9'), OPTS).error, /更新/);
+  assert.match(Save.decode(code.replace(/^SF5/, 'SF9'), OPTS).error, /更新/);
 });
 
 test('replace 整份覆蓋後寫入；summary 算得出守過幾夜', () => {
@@ -169,7 +169,7 @@ test('replace 整份覆蓋後寫入；summary 算得出守過幾夜', () => {
   const other = Save.open(legacyStore(), OPTS).data;
   assert.ok(S.replace(other));
   assert.deepStrictEqual(S.data.progress.cleared[2], { calm: true });
-  assert.deepStrictEqual(Save.summary(S.data), { nights: 2, checkpoints: 1, updated: '2026-10-30T01:00:00.000Z', created: '2026-10-30T00:00:00.000Z' });
+  assert.deepStrictEqual(Save.summary(S.data), { nights: 2, checkpoints: 1, trials: 0, trialCheckpoints: 0, updated: '2026-10-30T01:00:00.000Z', created: '2026-10-30T00:00:00.000Z' });
   assert.strictEqual(S.replace('garbage'), false);
 });
 
@@ -221,4 +221,43 @@ test('主檔已有進度、舊 key 也有：取聯集、最高紀錄取高分、
   assert.strictEqual(S.data.progress.best['2:calm'].score, 9);
   assert.strictEqual(S.data.prefs.sound.vol, 0);
   assert.strictEqual(S.data.playerKind, 'new');
+});
+
+// ====== v5：守夜試煉（期 2，2026-10-30）======
+test('v4 主檔升到 v5：多出 trials 四格，其餘原樣；SF4 存檔碼也讀得進來', () => {
+  const v4 = { version: 4, created: '2026-10-29T00:00:00.000Z', updated: '2026-10-29T00:00:00.000Z', progress: { cleared: { 7: { calm: true } }, best: {}, stars: {} }, checkpoints: {}, loadouts: {}, seen: { intro: [], cards: [], enemies: [] }, tutorial: true, prefs: { diff: 'windy' }, announced: 'x', playerKind: 'returning' };
+  const st = Save.memoryStore({ [Save.KEY]: JSON.stringify(v4) });
+  const S = Save.open(st, OPTS);
+  assert.strictEqual(S.status, 'ok'); assert.strictEqual(S.data.version, 5);
+  assert.deepStrictEqual(S.data.trials, { cleared: {}, best: {}, checkpoints: {}, loadouts: {} });
+  assert.deepStrictEqual(S.data.progress.cleared, { 7: { calm: true } }); assert.strictEqual(S.data.prefs.diff, 'windy');
+  assert.ok(st.get(Save.KEY).startsWith('{"version":5'));
+  // 舊版遊戲匯出的 SF4 碼：版本不比現在新，照收
+  const body = Buffer.from(JSON.stringify(v4), 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const fnv = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); };
+  const r = Save.decode(`SF4.${body}.${fnv(body)}`, OPTS);
+  assert.ok(r.data, r.error); assert.strictEqual(r.data.version, 5); assert.deepStrictEqual(r.data.trials.cleared, {});
+});
+
+test('trials 欄位：過關、紀錄、檢查點、隊伍都存得回來；壞的試煉檢查點只丟那一份並說一聲；垃圾型別丟掉', () => {
+  const st = Save.memoryStore();
+  const S = Save.open(st, OPTS);
+  const T = D.TRIALS[0], G = E.create(T.levelId, T.diff, () => 0.5, T.mods); assert.ok(E.place(G, 2, 1, 'slinger').ok); G.wave = 1;
+  const snap = JSON.parse(JSON.stringify(E.snapshot(G)));
+  S.data.trials.cleared.t5 = true; S.data.trials.best.t5 = { wave: 4, cleared: true, food: 230 }; S.data.trials.best.t2 = { wave: 2, cleared: false };
+  S.data.trials.checkpoints[T.id] = snap; S.data.trials.checkpoints.t9 = { levelId: 2, diff: 'calm', wave: 'bad' }; S.data.trials.checkpoints.t8 = 'junk';
+  S.data.trials.loadouts.t6 = ['slinger', 'wall', 7];
+  assert.ok(S.save());
+  const S2 = Save.open(st, OPTS);
+  assert.deepStrictEqual(S2.data.trials.cleared, { t5: true });
+  assert.deepStrictEqual(S2.data.trials.best, { t5: { wave: 4, cleared: true, food: 230 }, t2: { wave: 2, cleared: false } });
+  assert.deepStrictEqual(Object.keys(S2.data.trials.checkpoints), [T.id]);
+  assert.deepStrictEqual(S2.data.trials.checkpoints[T.id].mods, snap.mods, '修飾詞跟著檢查點存');
+  assert.ok(S2.problems.some(p => p.includes('試煉 t9')), S2.problems.join('；'));
+  assert.deepStrictEqual(S2.data.trials.loadouts.t6, ['slinger', 'wall']);
+  assert.deepStrictEqual(Save.summary(S2.data), { nights: 0, checkpoints: 0, trials: 1, trialCheckpoints: 1, updated: S2.data.updated, created: S2.data.created });
+  // 存檔碼來回也帶著
+  const r = Save.decode(Save.encode(S2.data), OPTS); assert.ok(r.data); assert.deepStrictEqual(r.data.trials.cleared, { t5: true });
+  // trials 不是物件：當沒有
+  const r2 = Save.validate({ version: 5, trials: 'nope' }, OPTS); assert.deepStrictEqual(r2.data.trials, { cleared: {}, best: {}, checkpoints: {}, loadouts: {} });
 });

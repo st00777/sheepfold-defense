@@ -690,5 +690,36 @@ const LEVELS = [
   },
 ];
 
-const DATA = { THICK_MUL, REPAIR_HINT, SPEED_FAST, SPEED_SLOW, HILL_SLOW, HILL_EDGE, HILL_DROP, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
+// ====== 守夜試煉（期 2，2026-10-30）：一題＝某一夜的地圖＋一組修飾詞（engine.js normalizeMods），難度固定、不乘三檔 ======
+// kind：puzzle 排陣解謎／conveyor 送卡護羊／budget 一筆糧。解鎖＝那一夜所在的章守過最後一夜（任一難度），規則在 Engine.isTrialUnlocked
+// 勝率是 sim/simulate.js good 玩家 100 局（docs/phase-2-trials-draft-2026-10-30.md）；改 mods 要重跑：SIM_MODS='{…}' node sim/simulate.js <levelId> calm 100
+const TRIAL_KINDS = { puzzle: { name: '排陣解謎', ico: '🧩', desc: '卡和糧都固定，佈好陣再開打；輸了換一種擺法' }, conveyor: { name: '送卡護羊', ico: '📦', desc: '沒有糧也沒有牧人，卡定時送到手上，送什麼用什麼' }, budget: { name: '一筆糧', ico: '🌾', desc: '沒有牧人，開局那一筆糧用到天亮，每一塊都要算' } };
+const TRIALS = [
+  { id: 't1', kind: 'puzzle', levelId: 1, diff: 'calm', title: '雅各的第一夜，沒有牧人',
+    mods: { units: ['slinger', 'wall'], oneBudget: true, startFood: 600, waves: 3, gates: 0 },
+    text: '同一片草地、同一群狼，但今晚沒有牧人送糧、門口也沒有看門的。手上就 600 糧、兩種卡。五個射手加兩道牆剛好——牆要擋哪兩排？',
+    win: '六百糧一塊沒浪費。雅各說：「你知道哪一排最要緊。」' },
+  { id: 't2', kind: 'puzzle', levelId: 9, diff: 'calm', title: '拉結的燈',
+    mods: { units: ['slinger', 'wall', 'lamp', 'staff'], oneBudget: true, startFood: 950, waves: 4 },
+    text: '無月的夜，950 糧一次給完。射手、牆、油燈、牧人杖四種卡。兩盞燈放哪兩排才五排全亮？杖要擺在邊排把狼趕進中間。野豬第 3 波就來。',
+    win: '燈沒有白點。拉結把燈芯剪短了一截，說省下的油留給明晚。' },
+  { id: 't3', kind: 'conveyor', levelId: 4, diff: 'calm', title: '何烈山下，送什麼用什麼',
+    mods: { conveyor: { every: 12, start: ['slinger', 'wall', 'archer'] }, units: ['slinger', 'wall', 'archer', 'thorns'] },
+    text: '十二秒才送一張，只有四種卡。蝗群只有弓箭手打得掉，野狗要在牠冒出來的那格鋪荊棘。送來的卡不合用，先留在手上別亂放。',
+    win: '手上沒有一張卡放錯地方。摩西說：「你在等的時候也沒閒著。」' },
+  { id: 't4', kind: 'conveyor', levelId: 23, diff: 'calm', title: '野羊的磐石',
+    mods: { conveyor: { every: 8, start: ['lobber', 'wall', 'slinger'] }, units: ['slinger', 'lobber', 'wall', 'cairn', 'pit', 'dog', 'sling'] },
+    text: '山坡上的夜用送卡打。拋石手要在坡下、牆退到坡緣、坑留給母熊、石堆擠滿了才推。手上滿六張就不送了，要捨得放。',
+    win: '母熊沒越過坡緣。大衛說：「石頭是現成的，看你拿不拿。」' },
+  { id: 't5', kind: 'budget', levelId: 6, diff: 'calm', title: '基甸的三百人',
+    mods: { oneBudget: true, startFood: 1600 },
+    text: '三萬二千人只留三百。今晚沒有牧人，1600 糧打四波：領頭狼三隻、蝗群兩波。人多無用，買什麼、不買什麼，想清楚再放。',
+    win: '剩的糧不多，但夠。基甸說：「不是靠人多。」' },
+  { id: 't6', kind: 'budget', levelId: 14, diff: 'calm', title: '合成一群',
+    mods: { oneBudget: true, startFood: 2000 },
+    text: '第二章的最後一夜，五波、兩隻豹，2000 糧一次給完。前面每省一塊，都是最後一波的一道牆。',
+    win: '兩群羊合成一群，一隻沒少。牧人把空了的糧袋摺好收起來。' },
+];
+
+const DATA = { THICK_MUL, REPAIR_HINT, SPEED_FAST, SPEED_SLOW, HILL_SLOW, HILL_EDGE, HILL_DROP, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, TRIALS, TRIAL_KINDS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };
 if (typeof module !== 'undefined') module.exports = DATA; else window.DATA = DATA;
