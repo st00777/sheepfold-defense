@@ -55,6 +55,13 @@ test('講定工價：獅子吼只讓他僵住，不會嚇跑', () => {
   assert.strictEqual(fled, 0);
 });
 
+test('倒了的雇工（hp 0、還沒被收走）點一下不能升級、不扣糧', () => {
+  const G = E.create(16, 'calm', rng, { startFood: 500 });
+  E.place(G, 2, 1, 'hireling'); unitAt(G, 2, 1).hp = 0;
+  const f = G.food, r = E.tapUnit(G, 2, 1);
+  assert.strictEqual(r.ok, false); assert.strictEqual(G.food, f); assert.strictEqual(unitAt(G, 2, 1).upgraded, undefined);
+});
+
 test('講定工價：鏟掉退糧連工價一起算（(25+25)×0.5）', () => {
   const G = E.create(16, 'calm', rng, { startFood: 500 });
   E.place(G, 2, 1, 'hireling'); E.tapUnit(G, 2, 1);

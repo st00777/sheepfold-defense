@@ -504,7 +504,7 @@
 <script src="save.js?v=5"></script>
 <script src="sound.js?v=8"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=24"></script>
+<script src="render.js?v=25"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS、TRIALS、TRIAL_KINDS 由 data.js 直接提供
@@ -572,7 +572,7 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來', 3: '羊圈在山上，斜坡上的敵人直射打不到：要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛' };
-const HOME_UPDATE = '最近更新 10/29：首頁多了「守夜試煉」——6 道固定題目（排陣解謎、送卡護羊、一筆糧各 2），守過一章最後一夜就開那一章的題；每天推薦一題';
+const HOME_UPDATE = '最近更新 10/30：雇工、火盆、油燈學會新招——放下後再點一下升級（講定工價、壇上的火、燈臺）；守夜試煉 6 題仍在首頁';
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
@@ -1297,7 +1297,7 @@ function unitNums(k) {
   if (u.light !== undefined) s.push(`不攻擊；照亮自己這排和上下 ${u.light} 排：光裡的敵人不會自己換排（豺狼不繞路、豹不跳排、夜鴞不飄，牧人杖照樣趕得動），無月夜裡那幾排的腳印預告也會回來`);
   if (u.kind === 'patrol') s.push(`在本排與上下鄰排巡邏（每排 ${u.walk} 秒）；空閒時優先走向近戰範圍內最靠近羊圈的地面敵人，接敵後留在那排。前方 ${u.reach} 格內可攻擊，每 ${u.every} 秒傷害 ${u.dmg}。他站在哪一排，就擋那排的狼、也只在那排被咬；鄰排他這一欄已經有東西就走不進去`);
   if (u.cradle) s.push(`不攻擊；接應本排與上下鄰排，迷羊走到他所在的那一欄就立刻回圈（羊數 +1、糧 +${STRAY.reward}），不必走到最左邊`);
-  if (u.upgrade) { const p = u.upgrade; s.push(`第 ${p.from} 夜起再點一下花 ${p.cost} 糧升級「${p.name}」：${p.desc}${p.poison ? `；中毒 ${STATUS.poison.t} 秒、每秒 ${STATUS.poison.dps}、攻擊 ×${STATUS.poison.biteMul}，同一隻只中一次` : ''}${p.all ? `；每 ${u.every} 秒一次，飛的不受影響` : ''}`); }
+  if (u.upgrade) { const p = u.upgrade; s.push(`第 ${p.from} 夜起再點一下花 ${p.cost} 糧升級「${p.name}」：${p.desc}${p.poison ? `；中毒 ${STATUS.poison.t} 秒、每秒 ${STATUS.poison.dps}、攻擊 ×${STATUS.poison.biteMul}，同一隻只中一次` : ''}${p.all ? `；每 ${u.every} 秒一次，飛的不受影響` : ''}${p.hp ? `；血量 ${u.hp}→${p.hp}` : ''}${p.flees === 0 ? '；不再逃跑，獅子吼只僵住' : ''}${p.light !== undefined ? `；照亮上下各 ${p.light} 排` : ''}${p.lanes ? `；上下各 ${p.lanes} 排穿過的也點燃` : ''}`); }
   return s.join('・');
 }
 function enemyNums(k) {

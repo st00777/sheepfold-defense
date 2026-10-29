@@ -300,7 +300,7 @@ const Board = (() => {
       if (up !== v.upText) { v.upText = up; if (v.up) { v.up.destroy({ children: true }); v.up = null; }
         if (up) { const t = makeText(up, Math.max(10, ch * .17), 0x2b2a26, false); t.style.stroke = null; const b = new PIXI.Container(); b.addChild(new PIXI.Graphics().roundRect(-t.width / 2 - 4, -t.height / 2 - 1, t.width + 8, t.height + 2, 8).fill(GOLD)); b.addChild(t); b.x = v.cont.x - cw * .5 + 2 + t.width / 2 + 4; v.upBase = u.r === 0 ? -ch * .5 + (t.height + 2) / 2 + 4 : -ch * .42; b.y = v.cont.y + v.upBase; L.hints.addChild(b); v.up = b; v.upT = 0; } } // 靠格子左緣對齊，第 0 欄不會被切掉；掛在 hints 層（敵人之上）咬牆的狼才蓋不住「修補」；第 0 排往下挪免得貼頂被裁（美術總監 2026-10-23）
       if (v.up && !reduce()) { v.upT = (v.upT || 0) + (paused ? 0 : dt); v.up.y = v.cont.y + v.upBase - (v.upT < 2.8 ? 3 * Math.abs(Math.sin(v.upT / .7 * Math.PI)) : 0); }
-      if (v.def.light !== undefined && keepDark()) ensureHole(k, v.cont.x, v.cont.y, v.def.light); else removeHole(k);
+      if (v.def.light !== undefined && keepDark()) ensureHole(k, v.cont.x, v.cont.y, Engine.effOf(u, v.def).light); else removeHole(k); // 燈臺（升級）light 2：黑暗遮罩要跟引擎的 rowLit 一樣擦亮五排（小居 10/30 審查）
     }
     for (const k of rebuild) renderUnit(...unkey(k));
   }

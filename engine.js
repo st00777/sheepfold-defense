@@ -426,6 +426,7 @@
     // 通用升級排在修補前：目前荊棘（撒蠍子）與纏裹的牧人（膏油）有 upgrade；日後若牆也能升級，受傷時要先修補再升級，這裡要調順序
     if (def.upgrade && !u.upgraded) {
       const up = def.upgrade;
+      if (u.hp <= 0) return { ok: false, msg: `${def.name}已經倒了` }; // 倒了等著被收走的那一幀點到，不能花糧把他救回來（code-review 10/30）
       if (posOf(G.level.id) < up.from) return { ok: false, msg: `第 ${up.from} 夜起才學會${up.name}` }; // from 是夜的位置，不是 id
       if (G.food < up.cost) return { ok: false, msg: `${up.name}要 ${up.cost} 糧` };
       G.food -= up.cost; u.upgraded = true;
@@ -793,7 +794,7 @@
         if (u.timer <= 0) { u.timer = (u.type === 'shepherd' ? shepherdEvery(G) : def.every) * (u.elder ? ELDER_MUL : 1); G.food += def.gives; ev(G, { t: 'pop', r: u.r, c: u.c, text: `+${def.gives}` }); }
       } else if (def.kind === 'shooter') {
         // 雇工：狼靠近就逃走，該排的狼追牠停三秒
-        const flees = effOf(u, def).flees; // 講定工價後是 0＝不逃
+        const flees = u.upgraded && def.upgrade ? def.upgrade.flees : def.flees; // 講定工價後是 0＝不逃（不走 effOf，每幀每個射手都要算，省一次物件展開）
         if (flees && inRow.some(e => !ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && e.x - u.c < flees && e.x > u.c - 0.5)) {
           for (const e of inRow) if (!ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && e.x > u.c - 0.5) { e.st.distract = 3; release(G, e); } // 野牛不會為了追雇工停下來（只有陷坑困得住牠）
           ev(G, { t: 'toast', msg: '雇工看見狼來，撇下羊逃走了' });
@@ -1040,7 +1041,7 @@
       const prev = s.x;
       s.x += SHOT_SPEED[s.kind] * dt;
       // 穿過火盆就著火
-      for (const k in G.units) { const u = G.units[k]; if (!UNITS[u.type].ignite) continue; const lanes = effOf(u, UNITS[u.type]).lanes || 0; if (Math.abs(u.r - s.r) <= lanes && prev < u.c + 0.5 && s.x >= u.c + 0.5) s.burn = true; } // 壇上的火（升級）lanes 1：上下排的石子箭矢也點燃
+      for (const k in G.units) { const u = G.units[k]; if (!UNITS[u.type].ignite) continue; const lanes = (u.upgraded && UNITS[u.type].upgrade && UNITS[u.type].upgrade.lanes) || 0; if (Math.abs(u.r - s.r) <= lanes && prev < u.c + 0.5 && s.x >= u.c + 0.5) s.burn = true; } // 壇上的火（升級）lanes 1：上下排的石子箭矢也點燃
       for (const e of G.enemies) {
         if (e.r !== s.r || !targetable(e) || s.hit.has(e.id) || e.high) continue; // 飛得高的大鷹，什麼投射物都打不到
         if (Math.abs(e.x + 0.5 - s.x) >= 0.35) continue;
