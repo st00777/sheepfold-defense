@@ -46,13 +46,24 @@ test('解鎖：那一夜所在的章守過最後一夜（任一難度）才開�
   assert.ok(!E.isTrialUnlocked({ [ch1]: {} }, t1), '空的難度表不算守過');
 });
 
-test('今日推薦：同一天同一題、隔天換下一題、六天輪一圈；不隨機', () => {
+test('今日推薦：只在已開的題裡輪，同一天同一題、隔天換、輪一圈回頭；一題都沒開就沒有推薦；不隨機', () => {
   const day = d => new Date(`2026-11-${String(d).padStart(2, '0')}T12:00:00`);
-  const a = E.dailyTrial(day(1)), b = E.dailyTrial(new Date('2026-11-01T23:30:00'));
+  const all = Object.fromEntries(LEVELS.map(l => [l.id, { calm: true }]));
+  const a = E.dailyTrial(day(1), all), b = E.dailyTrial(new Date('2026-11-01T23:30:00'), all);
   assert.ok(a && a === b, '同一天不變');
-  const seq = [1, 2, 3, 4, 5, 6].map(d => E.dailyTrial(day(d)).id);
-  assert.deepStrictEqual([...new Set(seq)].length, 6, '六天各不同：' + seq.join(' '));
-  assert.strictEqual(E.dailyTrial(day(7)).id, seq[0], '第七天回到第一題');
+  const seq = [1, 2, 3, 4, 5, 6].map(d => E.dailyTrial(day(d), all).id);
+  assert.strictEqual(new Set(seq).size, 6, '六天各不同：' + seq.join(' '));
+  assert.strictEqual(E.dailyTrial(day(7), all).id, seq[0], '第七天回到第一題');
+  const ch1 = { [lastOf(1).id]: { calm: true } }, ids1 = TRIALS.filter(t => chapterOf(E.levelById(t.levelId)) === 1).map(t => t.id);
+  for (let d = 1; d <= 6; d++) assert.ok(ids1.includes(E.dailyTrial(day(d), ch1).id), '只有第一章開：只推第一章的題');
+  assert.strictEqual(E.dailyTrial(day(1), {}), null); assert.strictEqual(E.dailyTrial(day(1), null), null);
+});
+
+test('trialGate：回那一題要守過的夜（該章最後一夜）；題目指到不存在的夜回 null、isTrialUnlocked 回 false 不丟例外；每種口味都有輸局那句', () => {
+  assert.strictEqual(E.trialGate(E.trialById('t1')).id, lastOf(1).id); assert.strictEqual(E.trialGate(E.trialById('t6')).id, lastOf(2).id); assert.strictEqual(E.trialGate(E.trialById('t4')).id, lastOf(3).id);
+  assert.strictEqual(E.trialGate({ id: 'x', levelId: 999 }), null); assert.strictEqual(E.isTrialUnlocked({ 7: { calm: true } }, { id: 'x', levelId: 999 }), false); assert.strictEqual(E.trialGate(null), null);
+  for (const k in TRIAL_KINDS) assert.ok(typeof TRIAL_KINDS[k].lose === 'string' && TRIAL_KINDS[k].lose.length >= 3, k);
+  assert.ok(E.sameMods(null, undefined) && E.sameMods({ a: 1 }, { a: 1 }) && !E.sameMods({ a: 1 }, { a: 2 }));
 });
 
 test('每題用模擬器的 good 玩家跑 10 局都能建局、打得完（不卡在超時），一筆糧與解謎的局沒有牧人、送卡的局沒有糧', () => {

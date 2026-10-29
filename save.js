@@ -1,7 +1,7 @@
 // 羊圈守夜 · 存檔。整支手機的紀錄放在一份結構裡（版本欄、遷移鏈、匯出匯入），純邏輯、無 DOM，node 測試也能跑。
 // 2026-10-30 期 0 之前是十幾個散放的 localStorage key（progress-v3、每關一份 checkpoint、loadout、seen-*、diff、speed、bigtext、lite、sound），
 // 第一次開新版會全部搬進 `sheepfold-save`，搬成功才刪舊 key。
-// 用法：const SAVE = Save.open(Save.localStore(), { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS) });
+// 用法：const SAVE = Save.open(Save.localStore(), { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS), trialIds: TRIALS.map(t => t.id) });
 //       SAVE.data.progress.cleared …改完叫 SAVE.save()（回傳有沒有真的寫進去）；Save.encode(SAVE.data) 出存檔碼；Save.decode(code, opts) 讀回來
 'use strict';
 (function (root, factory) {
@@ -101,16 +101,17 @@
     }
     if (isObj(input.loadouts)) for (const id in input.loadouts) if (Array.isArray(input.loadouts[id])) d.loadouts[id] = strArr(input.loadouts[id]);
     if (isObj(input.trials)) { // 試煉：壞的檢查點只丟那一份；快照要指到合法的夜（opts.check 用它自己寫的 levelId 驗，是不是這一題的夜由遊戲開局時再對）
-      const T = input.trials;
-      if (isObj(T.cleared)) for (const id in T.cleared) if (T.cleared[id]) d.trials.cleared[id] = true;
-      if (isObj(T.best)) for (const id in T.best) { const b = T.best[id]; if (isObj(b) && Number.isFinite(b.wave)) d.trials.best[id] = { wave: b.wave, cleared: !!b.cleared, ...(Number.isFinite(b.food) ? { food: b.food } : {}) }; }
+      // opts.trialIds（有給的話）＝認得的題目 id：不認得的格子直接丟，不然匯入的怪 id 會算進「試煉過了幾題」
+      const T = input.trials, known = Array.isArray(opts.trialIds) ? new Set(opts.trialIds) : null, ok = id => !known || known.has(id);
+      if (isObj(T.cleared)) for (const id in T.cleared) if (T.cleared[id] && ok(id)) d.trials.cleared[id] = true;
+      if (isObj(T.best)) for (const id in T.best) { const b = T.best[id]; if (ok(id) && isObj(b) && Number.isInteger(b.wave) && b.wave >= 0 && b.wave <= 99) d.trials.best[id] = { wave: b.wave, cleared: !!b.cleared, ...(Number.isInteger(b.food) && b.food >= 0 ? { food: b.food } : {}) }; }
       if (isObj(T.checkpoints)) for (const id in T.checkpoints) {
         const c = T.checkpoints[id];
-        if (!isObj(c) || !Number.isInteger(c.levelId)) continue;
+        if (!ok(id) || !isObj(c) || !Number.isInteger(c.levelId)) continue;
         if (typeof opts.check === 'function' && !opts.check(c, c.levelId)) { problems.push(`試煉 ${id} 的檢查點讀不出來，已丟掉（那一題要從頭打）`); continue; }
         d.trials.checkpoints[id] = c;
       }
-      if (isObj(T.loadouts)) for (const id in T.loadouts) if (Array.isArray(T.loadouts[id])) d.trials.loadouts[id] = strArr(T.loadouts[id]);
+      if (isObj(T.loadouts)) for (const id in T.loadouts) if (ok(id) && Array.isArray(T.loadouts[id])) d.trials.loadouts[id] = strArr(T.loadouts[id]);
     }
     if (isObj(input.seen)) for (const f of ['intro', 'cards', 'enemies']) d.seen[f] = strArr(input.seen[f]);
     d.tutorial = !!input.tutorial;
@@ -145,7 +146,7 @@
         return api;
       }
       const r = parse(raw, opts);
-      if (r.data) { d = r.data; status = 'ok'; problems = r.problems; bumped = isObj(peek) && Number.isFinite(peek.version) && peek.version < VERSION; } // 舊版結構：讀進來就升好，等一下寫回去
+      if (r.data) { d = r.data; status = 'ok'; problems = r.problems; bumped = isObj(peek) && Number.isFinite(peek.version) && peek.version < VERSION; if (bumped) { try { st.set(BAK, raw); } catch (e) {} } } // 舊版結構：讀進來就升好、等一下寫回去；升版前的原文先抄進備份，升版那一步要是有 bug 還救得回來
       else {
         try { st.set(BROKEN, raw); } catch (e) {} // 原文留著，之後還有機會救
         let bak = null; try { bak = st.get(BAK); } catch (e) {}
@@ -180,7 +181,7 @@
     };
     if (status === 'migrated') { if (api.save()) removeLegacy(st); }            // 搬成功才刪舊 key
     else if (status === 'restored' || status === 'broken' || bumped) api.save(); // 接回、從頭、或結構升了版：立刻寫回主檔
-    if (status === 'ok' || status === 'restored') { try { st.set(BAK, JSON.stringify(d)); } catch (e) {} } // 每次開頁抄一份「上次好的」當備份，不是每次寫都抄
+    if ((status === 'ok' && !bumped) || status === 'restored') { try { st.set(BAK, JSON.stringify(d)); } catch (e) {} } // 每次開頁抄一份「上次好的」當備份，不是每次寫都抄；剛升版這一次備份留著舊版原文
     return api;
   }
 

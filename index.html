@@ -188,9 +188,10 @@
   .dialog .verse { background: #0004; border-left: 3px solid var(--gold); padding: 8px 10px; border-radius: 4px; }
   #diffs { display: flex; gap: 6px; margin: 10px 0 4px; }
   #diffs[hidden] { display: none; }
-  .trial-kind { display: inline-block; font-size: 11px; color: var(--gold); border: 1px solid #e6b84a66; border-radius: 5px; padding: 0 5px; margin-right: 4px; vertical-align: 1px; }
+  .trial-tag { display: inline-block; font-size: 12px; color: var(--gold); border: 1px solid #e6b84a66; border-radius: 5px; padding: 0 5px; }
   #trial-daily { margin: 4px 0 6px; }
-  .lv .s .cp { color: var(--muted); font-size: 11px; }
+  .lv .s .cp { color: var(--muted); font-size: 12px; }
+  html.big .trial-tag, html.big .lv .s .cp { font-size: 14px; }
   #gate-preview { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 6px 0; font-size: 13px; }
   #gate-preview span { padding: 4px 0; border-radius: 5px; background: #0003; color: var(--muted); }
   #gate-preview .protected { background: #e6b84a25; color: var(--gold); outline: 1px solid #e6b84a66; }
@@ -216,7 +217,7 @@
   .dialog.home .ref { margin-bottom: 8px; }
   #continue-btn { margin-top: 2px; padding: 11px 22px; font-size: 16px; }
   .btn.small { margin-top: 6px; padding: 6px 14px; font-size: 13px; }
-  .home-btns { display: flex; gap: 6px; justify-content: center; }
+  .home-btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
   #ch-tabs { margin: 10px 0 4px; }
   #ch-tabs .tab { padding: 7px 0; font-size: 14px; }
   #ch-tabs .tab.locked { opacity: .4; }
@@ -520,7 +521,7 @@ if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(fitBo
 else window.addEventListener('resize', fitBoard);
 fitBoard();
 let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf = 0;
-let trial = null; // 現在在打的試煉題（data.js TRIALS）；null＝故事模式。試煉的進度、檢查點、隊伍都存在 SD.trials，不碰故事那一夜的格子
+let trial = null; const backLabel = () => (trial ? '回試煉冊' : '回關卡'); // 現在在打的試煉題（data.js TRIALS）；null＝故事模式。試煉的進度、檢查點、隊伍都存在 SD.trials，不碰故事那一夜的格子
 let hintMap = new Map(); // 現在亮著提示框的格子：key → 'hint'（空地）／'swap'（可直接換）／'sell'（鏟子）；畫在 render.js，這裡留一份給範圍預覽查
 const gateEls = []; // 每排門口的看門的（跟著 G.gates 顯示／隱藏）
 const GATE_TIP = '🧍 看門的：第一隻摸到門口的地面敵人，會被他連同整排一起趕出去；用過一次他就走了，那排再漏就守不住。飛的不經過門。寧靜夜每排一位、起風夜中間三排、暴風夜第 2、4 排';
@@ -535,7 +536,8 @@ const CP_BROKEN = '上次的存檔讀不出來，這一夜要從頭守。';
 // ====== 存檔（只存在這支手機）======
 // 2026-10-30 期 0：整支手機的紀錄放在一份 `sheepfold-save`（save.js，v4）——進度、星、每關檢查點、隊伍、看過的介紹、教學、設定。
 // 以前十幾個散放的 key 第一次開新版會自動搬進來、搬成功才刪；主檔讀不出來會先試上次開頁抄的備份、再不行才從頭，原文留在 -broken，首頁會說一聲
-const SAVE = Save.open(Save.localStore(), { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS) });
+const SAVE_OPTS = { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS), trialIds: TRIALS.map(t => t.id) }; // 匯入時也用同一組
+const SAVE = Save.open(Save.localStore(), SAVE_OPTS);
 const SD = SAVE.data;
 Sound.attach(SD.prefs.sound, () => SAVE.save()); // 音效設定也住在存檔裡
 let P = SD.progress;
@@ -685,16 +687,16 @@ function openIntro(L, T) {
   $('#diffs').hidden = !!trial; // 試煉難度固定，不給選
   applyDiff(trial ? trial.diff : savedDiff(), !trial); // 回開場頁一律用平常的預設難度（續玩那一局可能臨時換過）；試煉用題目的難度、不寫進偏好
   if (trial) $('#diff-hint').textContent = gateAdvice(L, diff);
-  $('#intro-back').textContent = trial ? '回試煉冊' : '回關卡';
+  $('#intro-back').textContent = backLabel();
   showBest();
   const lo = pickedFor(L);
   const extra = unlockedUnits().length - L.units.length; // 玩家手上比這一夜多出幾張卡
   $('#intro-loadout').innerHTML = L.conveyor
-    ? `今晚可能送來：${L.units.map(k => icoImg(UNITS[k].ico)).join(' ')}　<span class="new">沒有糧也沒有牧人，卡片定時送到手上，送來什麼就用什麼</span>`
+    ? `今晚可能送來：${L.units.map(k => icoImg(UNITS[k].ico)).join(' ')}${trial ? '' : '　<span class="new">沒有糧也沒有牧人，卡片定時送到手上，送來什麼就用什麼</span>'}`
     : lo
     ? `今晚上場：${lo.map(k => icoImg(UNITS[k].ico)).join(' ')}　<span class="new">${L.units.length} 張卡只能帶 ${MAX_CARDS} 張，點「隊伍」可換</span>`
     : `今晚上場：${L.units.map(k => icoImg(UNITS[k].ico)).join(' ')}${extra > 0 && !trial ? `　<span class="new">這一夜只有這 ${L.units.length} 位，後來認識的夥伴要到後面的夜才會同行，不能帶回來</span>` : ''}`;
-  if (L.noShepherd) $('#intro-loadout').innerHTML += trial ? `　<span class="new">🌾 開局 ${L.startFood} 糧，今晚不會再來：沒有牧人，糧也不會自己滴</span>` : `　<span class="new">🌾 開局 ${L.startFood} 糧（起風夜 ×${DIFFS.windy.budgetMul}、暴風夜 ×${DIFFS.storm.budgetMul}），今晚不會再來：沒有牧人，糧也不會自己滴</span>`; // 第 25 夜一筆糧；難度在這頁可以換，所以三個數一起講；試煉糧寫死不乘難度
+  if (L.noShepherd) $('#intro-loadout').innerHTML += trial ? `　<span class="new">🌾 就這些糧：開局 ${L.startFood}，今晚不會再來；沒有牧人，糧也不會自己滴</span>` : `　<span class="new">🌾 開局 ${L.startFood} 糧（起風夜 ×${DIFFS.windy.budgetMul}、暴風夜 ×${DIFFS.storm.budgetMul}），今晚不會再來：沒有牧人，糧也不會自己滴</span>`; // 第 25 夜一筆糧；難度在這頁可以換，所以三個數一起講；試煉糧寫死不乘難度
   $('#intro-roster').textContent = lo ? '隊伍' : '圖鑑';
   const cp = loadCheckpoint(), mine = !!cp, hasCp = mine && validCp(cp);
   if (mine && !hasCp) clearCheckpoint(); // 壞掉或舊版的存檔：清掉，並告訴玩家
@@ -738,19 +740,17 @@ function showIntroNew(L, quiet) {
   };
 }
 function savedDiff() { return DIFFS[SD.prefs.diff] ? SD.prefs.diff : diff; }
-// 試煉開場頁：把修飾詞翻成人話（白名單→卡在「今晚上場」那行已經列了；看門的在難度提示那行）
+// 試煉開場頁：把修飾詞翻成人話
 function modsText(T, L) {
   const m = T.mods, out = [];
   if (L.conveyor) out.push(`📦 卡每 ${L.conveyor.every} 秒送一張，手上最多 ${L.conveyor.max} 張，滿了就不送${Array.isArray(L.conveyor.start) && L.conveyor.start.length ? `；開局先給 ${L.conveyor.start.map(k => UNITS[k] ? UNITS[k].name : k).join('、')}` : ''}`);
-  if (m.units) out.push(`🃏 只有這 ${L.units.length} 種卡，別的夜認識的夥伴今晚不來`);
   if (m.waves !== undefined) out.push(`🌙 只打 ${L.waves.length} 波就天亮`);
-  if (L.gates === false) out.push('🧍 今晚沒有看門的，任何一排漏了就是漏了');
-  return out;
+  return out; // 看門的幾位在難度提示那行（gateAdvice）與五格預覽；哪幾張卡在「今晚上場」那行——不重講（審查 10/30：同一件事講三次）
 }
 // 試煉的修飾詞整理成引擎認得的那一組（檢查點對帳用）
 const trialMods = T => Engine.normalizeMods(Engine.levelById(T.levelId), T.mods).mods;
 // 這份檢查點能不能接現在這一夜／這一題：長相要對、試煉還要是同一組修飾詞打出來的
-function validCp(cp) { if (!cp || !Engine.checkSnapshot(cp, level.id)) return false; return trial ? JSON.stringify(cp.mods || null) === JSON.stringify(trialMods(trial)) : true; }
+function validCp(cp) { if (!cp || !Engine.checkSnapshot(cp, level.id)) return false; return trial ? Engine.sameMods(cp.mods, trialMods(trial)) : true; }
 function gateAdvice(L, key) {
   const rows = Engine.gateRows(L, key);
   if (!rows.length) return '今晚沒有看門的，任何一排都不能漏。';
@@ -990,11 +990,13 @@ function endGame(title, text) {
   $('#result').hidden = false;
 }
 function recordBest(cleared) {
-  if (trial) { // 試煉：自己的格子，不碰故事那一夜的進度與星
+  if (trial) { // 試煉：自己的格子，不碰故事那一夜的進度與星；開著開發者面板那局整個不記（不然「過了」與 ✅ 會對不上）
+    if (devUsed) return true;
     const T = SD.trials, old = T.best[trial.id] || {}, food = Math.floor(G.food);
-    const better = cleared ? (!old.cleared || !(old.food >= food)) : (!old.cleared && !(old.wave >= G.wave));
+    // 贏：第一次贏、或一筆糧的題剩糧更多才改寫；輸：沒贏過且撐得更久才改寫
+    const better = cleared ? (!old.cleared || (level.noShepherd && !(old.food >= food))) : (!old.cleared && !(old.wave >= G.wave));
     if (better) T.best[trial.id] = { wave: G.wave, cleared, ...(cleared && level.noShepherd ? { food } : {}) };
-    if (cleared && !devUsed) T.cleared[trial.id] = true;
+    if (cleared) T.cleared[trial.id] = true;
     return saveProgress();
   }
   const k = level.id + ':' + diff;
@@ -1054,12 +1056,11 @@ function onLose(reason, by) {
   trackNightEnd('lose');
   const who = by && ENEMIES[by] ? ENEMIES[by].name : null; // 標題寫闖進來的那一隻的名字：夜鴞就是夜鴞、母熊就是母熊，不再一律翻成狼／鷙鳥
   const titles = { wolf: `${who || '狼'}闖進羊圈了`, bird: `${who || '鷙鳥'}飛進羊圈了`, sheep: '羊被偷光了' };
-  const text = trial ? TRIAL_LOSE[trial.kind] : (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
+  const text = trial ? TRIAL_KINDS[trial.kind].lose : (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
   nightfall();
   setTimeout(() => { endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`); $('#next').hidden = true; $('#retry').textContent = trial ? '再打這一題' : '再守一夜'; }, REDUCE_MOTION.matches ? 0 : 900);
 }
 
-const TRIAL_LOSE = { puzzle: '擺法不對就換一種。糧是固定的，想想哪一排先漏。', conveyor: '送來的卡不合用可以先留著，別為了清手牌亂放。', budget: '回頭數一數：哪一筆糧花了沒派上用場？' };
 // ====== 開始／重來 ======
 function clearBoard() {
   cancelAnimationFrame(raf);
@@ -1088,7 +1089,7 @@ function startGame(fromCp) {
   // 重新開始「同一關」才丟掉舊檢查點（每關各一份，別關不動）；開著開發者面板這局不會存，舊檔一併清掉免得之後重打
   if (!resumed || devUsed) clearCheckpoint();
   buildCards();
-  $('#back').textContent = trial ? '回試煉冊' : '回關卡';
+  $('#back').textContent = $('#pause-back').textContent = backLabel(); // 結算頁與暫停面板的回去鍵：試煉回試煉冊
   $('#sheep').hidden = !level.sheep; $('#sheep-n').textContent = G.sheep;
   Board.newGame(G, { diff, speed, resumed }); // 石頭格、場上單位、入夜暖橘（續玩不做）
   for (let i = G.events.length - 1; i >= 0; i--) if (G.events[i].t === 'unit') G.events.splice(i, 1); // 單位已直接畫了，其餘事件留給第一幀
@@ -1100,7 +1101,7 @@ function startGame(fromCp) {
   raf = requestAnimationFrame(tick);
   Sound.ambient(true);
   nightStat = devUsed ? null : { placed: {}, t0: Date.now(), resumed }; // 開著開發者面板的那局整局不記
-  if (nightStat) track('night_start', { night: Engine.posOf(level.id), level_id: level.id, diff, resumed: resumed ? 1 : 0, ...(trial ? { trial_id: trial.id } : {}) });
+  if (nightStat) track('night_start', { night: Engine.posOf(level.id), level_id: level.id, diff, resumed: resumed ? 1 : 0, mode: trial ? 'trial' : 'story', ...(trial ? { trial_id: trial.id } : {}) }); // mode：報表照夜分組時先濾掉試煉，才不會把試煉算成那一夜的故事局
 }
 function backToLevels() {
   clearBoard(); Sound.ambient(false);
@@ -1117,20 +1118,23 @@ function backToLevels() {
 const trialUnlocked = T => unlockAll || Engine.isTrialUnlocked(P.cleared, T);
 function buildTrials() {
   const list = $('#trial-list'); list.innerHTML = '';
-  const daily = Engine.dailyTrial();
-  $('#trial-daily').textContent = daily ? `今日推薦：${daily.title}${trialUnlocked(daily) ? '' : '（還沒開）'}` : '';
+  const daily = Engine.dailyTrial(new Date(), unlockAll ? Object.fromEntries(LEVELS.map(l => [l.id, { calm: true }])) : P.cleared);
+  $('#trial-daily').textContent = daily ? `今日推薦：${daily.title}` : '守過第一章的最後一夜，試煉就開了';
   for (const T of TRIALS) {
     const base = Engine.levelById(T.levelId), kind = TRIAL_KINDS[T.kind], ok = trialUnlocked(T);
-    const ch = base.chapter || 1, last = LEVELS.filter(l => (l.chapter || 1) === ch).pop();
+    const last = Engine.trialGate(T); // 要守過哪一夜才開（規則只在引擎一份）
     const b = SD.trials.best[T.id], done = SD.trials.cleared[T.id];
     const cp = SD.trials.checkpoints[T.id];
     const d = document.createElement('div');
     d.className = 'lv' + (ok ? '' : ' locked') + (daily && daily.id === T.id ? ' next' : '');
-    d.innerHTML = `<div class="n">${ok ? kind.ico : '🔒'}</div><div class="t"><b>${daily && daily.id === T.id ? '<span class="trial-kind">今日</span>' : ''}${T.title}</b><span>${kind.name}・第 ${Engine.posOf(base.id)} 夜 ${base.name}${ok ? '' : `・守過第 ${Engine.posOf(last.id)} 夜就會開`}</span></div><div class="s">${done ? '✅' : b ? `第 ${b.wave} 波` : ''}${cp && !done ? '<div class="cp">有存檔</div>' : ''}</div>`;
-    if (ok) d.addEventListener('click', () => openIntro(Engine.trialLevel(T), T));
+    // 副標一行放不下兩件事（手機 360px 約 200px 可用）：開了的寫口味與取自哪一夜，鎖著的只寫怎麼開
+    const isDaily = daily && daily.id === T.id;
+    d.innerHTML = `<div class="n">${ok ? kind.ico : '🔒'}</div><div class="t"><b>${T.title}</b><span>${ok ? `${kind.name}・第 ${Engine.posOf(base.id)} 夜 ${base.name}` : last ? `守過第 ${Engine.posOf(last.id)} 夜「${last.name}」就會開` : '這一題的夜不在了'}</span></div><div class="s">${isDaily ? '<span class="trial-tag">今日</span> ' : ''}${done ? '✅' : b ? `第 ${b.wave} 波` : ''}${cp && !done ? '<div class="cp">有存檔</div>' : ''}</div>`;
+    if (ok) d.addEventListener('click', () => openTrial(T));
     list.appendChild(d);
   }
 }
+const openTrial = T => openIntro(Engine.trialLevel(T), T); // 開一題：開場頁用套好修飾詞的夜
 function openTrials() {
   trial = null; buildTrials();
   $('#levels').hidden = true; $('#intro').hidden = true; $('#result').hidden = true; $('#trials').hidden = false;
@@ -1145,10 +1149,10 @@ const sessionPick = {};   // 這次開著的頁面裡各關選好的名單；loc
 const GROUP = { producer: 0, shooter: 1, dog: 1, blocker: 2, floor: 3, instant: 4, support: 4 }; // 卡片固定分組
 const sortUnits = keys => [...keys].sort((a, b) => GROUP[UNITS[a].kind] - GROUP[UNITS[b].kind] || keys.indexOf(a) - keys.indexOf(b));
 // 隊伍存哪一格：故事模式照夜 id；試煉照題 id（SD.trials.loadouts），同一夜的故事隊伍不受影響
-const loKey = L => (trial ? 'trial:' + trial.id : String(L.id));
-function loadLoadouts() { return trial ? SD.trials.loadouts : SD.loadouts; }
-function saveLoadout(L, keys) { sessionPick[loKey(L)] = keys; loadLoadouts()[trial ? trial.id : L.id] = keys; SAVE.save(); }
-const storedPick = L => sessionPick[loKey(L)] || loadLoadouts()[trial ? trial.id : L.id];
+const loSlot = () => (trial ? SD.trials.loadouts : SD.loadouts), loId = L => (trial ? trial.id : L.id);
+const loKey = L => (trial ? 'trial:' : '') + loId(L); // sessionPick 兩邊共用一張表，加前綴免得題 id 撞夜 id
+function saveLoadout(L, keys) { sessionPick[loKey(L)] = keys; loSlot()[loId(L)] = keys; SAVE.save(); }
+const storedPick = L => sessionPick[loKey(L)] || loSlot()[loId(L)];
 // 這一關實際上場的卡；卡不超過上限就回 null（全帶）
 function pickedFor(L) {
   if (L.conveyor || L.units.length <= MAX_CARDS) return null; // 送卡模式沒得選，卡是送來的
@@ -1518,8 +1522,8 @@ function gaInit() {
 function track(name, params) { if (!gaOn || SD.prefs.analytics === false) return; try { window.gtag('event', name, Object.assign({ game: 'sheepfold', ver: APP_VERSION }, params)); } catch (e) {} }
 function trackNightEnd(result) {
   if (!nightStat || devUsed) { nightStat = null; return; }
-  const st = (G.result && G.result.stars) || {}, stars = (result === 'win' ? 1 : 0) + (st.noLoss ? 1 : 0) + (st.gates ? 1 : 0);
-  const base = { night: Engine.posOf(level.id), level_id: level.id, diff, ...(trial ? { trial_id: trial.id } : {}) };
+  const st = (G.result && G.result.stars) || {}, stars = trial ? 0 : (result === 'win' ? 1 : 0) + (st.noLoss ? 1 : 0) + (st.gates ? 1 : 0); // 試煉不記星，統計也送 0
+  const base = { night: Engine.posOf(level.id), level_id: level.id, diff, mode: trial ? 'trial' : 'story', ...(trial ? { trial_id: trial.id } : {}) };
   track('night_end', Object.assign({ result, wave: G.wave, stars, sheep_lost: G.sheepLost || 0, seconds: Math.round((Date.now() - nightStat.t0) / 1000), resumed: nightStat.resumed ? 1 : 0 }, base));
   for (const k in nightStat.placed) track('card_used', Object.assign({ card: k, count: nightStat.placed[k], result }, base)); // 續玩那局只算續玩後放的（檢查點不存次數），看趨勢夠用
   nightStat = null;
@@ -1556,7 +1560,7 @@ $('#set-copy').addEventListener('click', async () => {
 });
 $('#set-import').addEventListener('click', () => { $('#set-import-box').hidden = false; $('#set-export-box').hidden = true; $('#set-import-code').value = ''; $('#set-import-preview').textContent = ''; $('#set-import-go').hidden = true; importPending = null; Sound.play('tap'); });
 $('#set-import-read').addEventListener('click', () => {
-  const r = Save.decode($('#set-import-code').value, { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS) });
+  const r = Save.decode($('#set-import-code').value, SAVE_OPTS);
   if (r.error) { importPending = null; $('#set-import-preview').textContent = r.error; $('#set-import-go').hidden = true; Sound.play('tap'); return; }
   importPending = r.data;
   const sm = Save.summary(r.data), mine = Save.summary(SD);

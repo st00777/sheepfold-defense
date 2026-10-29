@@ -57,26 +57,35 @@
   }
 
   // ====== 守夜試煉（期 2）：題目在 data.js TRIALS；解鎖＝那一夜所在的章守過最後一夜（任一難度，不看星）======
-  const TRIALS = D.TRIALS || [];
+  const TRIALS = D.TRIALS;
   const chapterOf = L => L.chapter || 1;
   function trialById(id) { return TRIALS.find(t => t.id === id) || null; }
+  // 這一題要守過哪一夜才開：那一夜所在的章的最後一夜；題目指到不存在的夜就回 null（鎖著，不讓畫面炸）
+  function trialGate(trial) {
+    if (!trial) return null;
+    const base = LEVELS.find(l => l.id === trial.levelId); if (!base) return null;
+    const ch = chapterOf(base);
+    return LEVELS.filter(l => chapterOf(l) === ch).pop() || null;
+  }
   function isTrialUnlocked(cleared, trial) {
-    if (!trial) return false;
-    const ch = chapterOf(levelById(trial.levelId));
-    const last = LEVELS.filter(l => chapterOf(l) === ch).pop();
-    return !!(last && cleared && cleared[last.id] && Object.keys(cleared[last.id]).length);
+    const gate = trialGate(trial);
+    return !!(gate && cleared && cleared[gate.id] && Object.keys(cleared[gate.id]).length);
   }
   // 這一題實際打的那一夜（套好修飾詞的關卡物件；id 跟原夜一樣，存檔要用 trial.id 另開一格）
   function trialLevel(trial) { const base = levelById(trial.levelId); return applyMods(base, normalizeMods(base, trial.mods).mods); }
-  // 「今日推薦一題」：日期取模，不隨機；全部題目輪，鎖著的也會輪到（顯示鎖）
-  function dailyTrial(now = new Date()) { if (!TRIALS.length) return null; const day = Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000); return TRIALS[((day % TRIALS.length) + TRIALS.length) % TRIALS.length]; }
+  // 「今日推薦一題」：日期取模，不隨機。只在已開的題裡輪（審查 10/30：推薦一題鎖著的沒有用）；一題都沒開就回 null
+  function dailyTrial(now = new Date(), cleared = null) {
+    const pool = TRIALS.filter(t => isTrialUnlocked(cleared, t)); if (!pool.length) return null;
+    const day = Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
+    return pool[((day % pool.length) + pool.length) % pool.length];
+  }
   function validateTrials() {
     const bad = [], seen = new Set();
     for (const t of TRIALS) {
       if (!t.id || seen.has(t.id)) bad.push(`試煉 ${t.id} 的 id 重複或沒有`); seen.add(t.id);
       if (!LEVELS.some(l => l.id === t.levelId)) { bad.push(`試煉 ${t.id} 指到不存在的夜 ${t.levelId}`); continue; }
       if (!DIFFS[t.diff]) bad.push(`試煉 ${t.id} 的難度 ${t.diff} 不認識`);
-      if (!D.TRIAL_KINDS || !D.TRIAL_KINDS[t.kind]) bad.push(`試煉 ${t.id} 的口味 ${t.kind} 不認識`);
+      if (!D.TRIAL_KINDS[t.kind]) bad.push(`試煉 ${t.id} 的口味 ${t.kind} 不認識`);
       for (const p of checkMods(t.levelId, t.mods)) bad.push(`試煉 ${t.id}：${p}`);
     }
     return bad;
@@ -1264,6 +1273,6 @@
   for (const msg of validateLevels()) console.error(msg);
   for (const msg of validateTrials()) console.error(msg);
 
-  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, trialById, isTrialUnlocked, trialLevel, dailyTrial, validateTrials, rowLit, starSlots, validateLevels, onHillCell, dev };
+  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, trialById, trialGate, isTrialUnlocked, trialLevel, dailyTrial, validateTrials, sameMods, rowLit, starSlots, validateLevels, onHillCell, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);

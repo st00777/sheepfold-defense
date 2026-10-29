@@ -232,6 +232,7 @@ test('v4 主檔升到 v5：多出 trials 四格，其餘原樣；SF4 存檔碼�
   assert.deepStrictEqual(S.data.trials, { cleared: {}, best: {}, checkpoints: {}, loadouts: {} });
   assert.deepStrictEqual(S.data.progress.cleared, { 7: { calm: true } }); assert.strictEqual(S.data.prefs.diff, 'windy');
   assert.ok(st.get(Save.KEY).startsWith('{"version":5'));
+  assert.strictEqual(st.get(Save.BAK), JSON.stringify(v4), '升版那一次的備份留著舊版原文');
   // 舊版遊戲匯出的 SF4 碼：版本不比現在新，照收
   const body = Buffer.from(JSON.stringify(v4), 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const fnv = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); };
@@ -258,6 +259,9 @@ test('trials 欄位：過關、紀錄、檢查點、隊伍都存得回來；壞�
   assert.deepStrictEqual(Save.summary(S2.data), { nights: 0, checkpoints: 0, trials: 1, trialCheckpoints: 1, updated: S2.data.updated, created: S2.data.created });
   // 存檔碼來回也帶著
   const r = Save.decode(Save.encode(S2.data), OPTS); assert.ok(r.data); assert.deepStrictEqual(r.data.trials.cleared, { t5: true });
+  // 有給 trialIds：不認得的題 id 四格都丟；wave 要是 0–99 的整數、food 要是非負整數
+  const r3 = Save.validate({ version: 5, trials: { cleared: { t1: true, t99: true }, best: { t1: { wave: -5 }, t2: { wave: 3, cleared: true, food: 12.5 }, t98: { wave: 1 } }, checkpoints: { t97: snap }, loadouts: { t96: ['wall'], t6: ['wall'] } } }, { ...OPTS, trialIds: ['t1', 't2', 't6'] });
+  assert.deepStrictEqual(r3.data.trials, { cleared: { t1: true }, best: { t2: { wave: 3, cleared: true } }, checkpoints: {}, loadouts: { t6: ['wall'] } });
   // trials 不是物件：當沒有
   const r2 = Save.validate({ version: 5, trials: 'nope' }, OPTS); assert.deepStrictEqual(r2.data.trials, { cleared: {}, best: {}, checkpoints: {}, loadouts: {} });
 });
