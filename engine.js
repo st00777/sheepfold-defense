@@ -31,7 +31,8 @@
 
   function levelById(id) { return LEVELS.find(l => l.id === id) || LEVELS[0]; }
   // 這一夜、這個難度哪幾排門口有看門的：關卡 gates: false 一律沒有；否則看難度表（2026-10-20：寧靜五、起風三、暴風二），難度表沒寫就五位都在
-  function gateRows(level, diffKey) { if (level.gates === false) return []; const d = DIFFS[diffKey]; return (d && Array.isArray(d.gates) ? d.gates : Array.from({ length: ROWS }, (_, r) => r)).slice(); }
+  // 關卡 gates 若是陣列（修飾詞指定哪幾排）就照它、不看難度
+  function gateRows(level, diffKey) { if (level.gates === false) return []; if (Array.isArray(level.gates)) return level.gates.slice(); const d = DIFFS[diffKey]; return (d && Array.isArray(d.gates) ? d.gates : Array.from({ length: ROWS }, (_, r) => r)).slice(); }
   const idxOf = id => LEVELS.findIndex(l => l.id === id); // 這一夜在 LEVELS 裡的位置（0 起算；找不到 -1）
   const STRAY_LEAD = 3;                                   // 迷羊進場前幾秒先印 🐑 腳印（跟敵人腳印一樣提前量）
   const restOf = G => G.level.rest ?? WAVE_REST;          // 波間休息秒數，關卡可覆寫（第二章「交託的羊」只歇 3 秒）
@@ -70,6 +71,96 @@
   // 讓這一局只用名單上的卡
   function applyPick(G, keys) { G.level = { ...G.level, units: keys, fresh: G.level.fresh.filter(k => keys.includes(k)) }; }
 
+  // ====== 修飾詞（期 1，2026-10-30）：建局時套在關卡上的一層，試煉冊、今日推薦、模擬器都用這一條 ======
+  // 六個欄位，沒寫的就照關卡原樣：
+  //   units      可用卡白名單（任何卡都行，不限這一夜原本開的；順序＝卡片順序；fresh／must 只留名單上的）
+  //   startFood  開局糧，寫多少就多少（不乘一筆糧的 budgetMul）
+  //   gates      看門的：數字 0–5（照 GATE_SETS 挑排）或排號陣列；0／[] 等於關掉
+  //   waves      只打前幾波（1 到這一夜的波數）
+  //   conveyor   true＝送卡模式（沒有糧、卡定時送；預設 7 秒一張、手上最多 6 張、開局隨機 3 張、權重均等）、物件＝自己給 every／max／start／weights、false＝關掉這一夜的送卡
+  //   oneBudget  true＝一筆糧（糧不滴、沒有牧人）、false＝關掉這一夜的一筆糧
+  // normalizeMods 把它整理成固定形狀（鍵固定順序、值已驗過），壞的欄位丟掉並寫進 problems；整理後的那份存進 G.mods 與檢查點，續玩時必須一模一樣
+  const GATE_SETS = { 0: [], 1: [2], 2: [1, 3], 3: [1, 2, 3], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4] };
+  const isCardList = a => Array.isArray(a) && a.length > 0 && a.every(k => typeof k === 'string');
+  function normalizeMods(level, mods) {
+    const out = {}, problems = [];
+    if (mods === undefined || mods === null) return { mods: null, problems, notes: [] };
+    if (typeof mods !== 'object' || Array.isArray(mods)) return { mods: null, problems: ['修飾詞要是物件'], notes: [] };
+    for (const k of Object.keys(mods)) if (!['units', 'startFood', 'gates', 'waves', 'conveyor', 'oneBudget'].includes(k)) problems.push(`不認識的修飾詞 ${k}，略過`);
+    if (mods.units !== undefined) {
+      if (!isCardList(mods.units)) problems.push('units 要是卡片名稱的陣列，略過');
+      else {
+        const seen = new Set(), list = [];
+        const noHill = level.hill === undefined || level.hill === null;
+        for (const k of mods.units) { if (!UNITS[k]) problems.push(`units 裡有不認識的卡 ${k}，略過`); else if (UNITS[k].hillOnly && noHill) problems.push(`${UNITS[k].name}只能放坡上，這一夜沒有坡，略過`); else if (!seen.has(k)) { seen.add(k); list.push(k); } }
+        if (list.length) out.units = list; else problems.push('units 沒有任何可用的卡，略過');
+      }
+    }
+    if (mods.startFood !== undefined) {
+      if (Number.isFinite(mods.startFood) && mods.startFood >= 0 && mods.startFood <= 99999) out.startFood = Math.floor(mods.startFood);
+      else problems.push('startFood 要是 0 到 99999 的數字，略過');
+    }
+    if (mods.gates !== undefined) {
+      const g = mods.gates === false ? 0 : mods.gates;
+      if (Number.isInteger(g) && GATE_SETS[g]) out.gates = GATE_SETS[g].slice();
+      else if (Array.isArray(g) && g.every(r => Number.isInteger(r) && r >= 0 && r < ROWS) && new Set(g).size === g.length) out.gates = g.slice().sort((a, b) => a - b);
+      else problems.push('gates 要是 0 到 5 的數字或不重複的排號陣列，略過');
+    }
+    if (mods.waves !== undefined) {
+      if (Number.isInteger(mods.waves) && mods.waves >= 1 && mods.waves <= level.waves.length) out.waves = mods.waves;
+      else problems.push(`waves 要是 1 到 ${level.waves.length} 的整數，略過`);
+    }
+    if (mods.conveyor !== undefined) {
+      const cv = mods.conveyor;
+      if (cv === false || cv === true) out.conveyor = cv;
+      else if (cv && typeof cv === 'object' && !Array.isArray(cv)) {
+        const c = {}; let bad = false;
+        if (cv.every !== undefined) { if (Number.isFinite(cv.every) && cv.every > 0 && cv.every <= 60) c.every = cv.every; else bad = true; }
+        if (cv.max !== undefined) { if (Number.isInteger(cv.max) && cv.max >= 1 && cv.max <= 12) c.max = cv.max; else bad = true; }
+        if (cv.start !== undefined) { if ((Number.isInteger(cv.start) && cv.start >= 0 && cv.start <= 12) || (Array.isArray(cv.start) && cv.start.every(k => UNITS[k]))) c.start = Array.isArray(cv.start) ? cv.start.slice() : cv.start; else bad = true; }
+        if (cv.weights !== undefined) { if (cv.weights && typeof cv.weights === 'object' && Object.entries(cv.weights).every(([k, w]) => UNITS[k] && Number.isFinite(w) && w > 0)) c.weights = { ...cv.weights }; else bad = true; }
+        if (bad) problems.push('conveyor 的 every／max／start／weights 有不合規的值，整個略過'); else out.conveyor = c;
+      } else problems.push('conveyor 要是 true／false 或設定物件，略過');
+    }
+    if (mods.oneBudget !== undefined) {
+      if (typeof mods.oneBudget === 'boolean') out.oneBudget = mods.oneBudget; else problems.push('oneBudget 要是 true／false，略過');
+    }
+    // 互相打架的組合只提醒（notes），欄位照留：送卡模式沒有糧，一筆糧與開局糧都沒意義
+    const notes = [];
+    const cvOn = out.conveyor === undefined ? !!level.conveyor : out.conveyor !== false;
+    if (cvOn && out.oneBudget === true) notes.push('送卡模式沒有糧，oneBudget 沒作用');
+    if (cvOn && out.startFood !== undefined) notes.push('送卡模式沒有糧，startFood 沒作用');
+    const budget = out.oneBudget === undefined ? !!level.noTrickle : out.oneBudget;
+    if (!cvOn && budget && out.startFood === undefined && !level.noTrickle) notes.push(`一筆糧的夜糧不會再來，建議給 startFood（現在只有 ${level.startFood ?? START_FOOD}）`);
+    return { mods: Object.keys(out).length ? out : null, problems, notes };
+  }
+  // 把整理好的修飾詞套到關卡上，回傳新的關卡物件（原關卡不動）
+  function applyMods(level, m) {
+    if (!m) return level;
+    const L = { ...level };
+    if (m.units) { L.units = m.units.slice(); L.fresh = (level.fresh || []).filter(k => m.units.includes(k)); L.must = (level.must || []).filter(k => m.units.includes(k)); }
+    if (m.startFood !== undefined) L.startFood = m.startFood;
+    if (m.gates !== undefined) L.gates = m.gates.length ? m.gates.slice() : false;
+    if (m.waves !== undefined) L.waves = level.waves.slice(0, m.waves);
+    if (m.conveyor === false) delete L.conveyor;
+    else if (m.conveyor) {
+      const base = level.conveyor || {};
+      const noShep = L.units.filter(k => k !== 'shepherd'); // 送卡夜沒有糧，牧人沒事做
+      L.units = noShep; L.fresh = (L.fresh || []).filter(k => noShep.includes(k)); L.must = (L.must || []).filter(k => noShep.includes(k));
+      const cv = m.conveyor === true ? { ...base } : { ...base, ...m.conveyor };
+      if (cv.every === undefined) cv.every = 7; if (cv.max === undefined) cv.max = 6; // 跟第 11 夜一樣的節奏
+      if (!cv.weights) { cv.weights = {}; for (const k of noShep) cv.weights[k] = 1; }
+      L.conveyor = cv;
+    }
+    if (m.oneBudget === true && !L.conveyor) {
+      L.noTrickle = true; L.noShepherd = true;
+      L.units = L.units.filter(k => k !== 'shepherd'); L.fresh = (L.fresh || []).filter(k => k !== 'shepherd'); L.must = (L.must || []).filter(k => k !== 'shepherd');
+    } else if (m.oneBudget === false) { delete L.noTrickle; delete L.noShepherd; }
+    return L;
+  }
+  function checkMods(levelId, mods) { const nm = normalizeMods(levelById(levelId), mods); return [...nm.problems, ...nm.notes]; } // 給試煉作者與測試用：空陣列＝乾淨
+  const sameMods = (a, b) => JSON.stringify(a || null) === JSON.stringify(b || null); // normalizeMods 的鍵順序固定，字串相等就是同一組
+
   // 把關卡的波次依難度換算（只動第二波起）
   function scaleWaves(level, diff) {
     const d = DIFFS[diff];
@@ -87,13 +178,18 @@
     });
   }
 
-  function create(levelId, diffKey, rng) {
-    const level = levelById(levelId);
+  // mods：修飾詞（見 normalizeMods），沒給就是原本的那一夜。壞欄位印錯誤後略過，要事先驗就叫 checkMods
+  function create(levelId, diffKey, rng, mods) {
+    const base = levelById(levelId);
+    const nm = normalizeMods(base, mods);
+    for (const p of [...nm.problems, ...nm.notes]) console.error(`第 ${base.id} 夜的修飾詞：${p}`);
+    const level = applyMods(base, nm.mods);
     const waves = scaleWaves(level, diffKey);
     const G = {
-      levelId: level.id, level, diff: diffKey, waves, rng: rng || Math.random,
+      levelId: level.id, level, diff: diffKey, waves, rng: rng || Math.random, mods: nm.mods,
       rocks: new Set((level.rocks || []).map(([r, c]) => r + ',' + c)),
-      food: (level.startFood ?? START_FOOD) * (level.noTrickle ? (DIFFS[diffKey].budgetMul ?? 1) : 1), trickle: 0, // startFood：關卡可覆寫開局糧（歌珊的夜 100）；一筆糧的夜依難度乘 budgetMul
+      // startFood：關卡可覆寫開局糧（歌珊的夜 100）；一筆糧的夜依難度乘 budgetMul；修飾詞給的開局糧寫多少就多少
+      food: nm.mods && nm.mods.startFood !== undefined ? nm.mods.startFood : (level.startFood ?? START_FOOD) * (level.noTrickle ? (DIFFS[diffKey].budgetMul ?? 1) : 1), trickle: 0,
       phase: 'prep', wave: 0, timer: level.prep || PREP_TIME,
       queue: [], spawnTimer: 0, spawnedTotal: 0, killed: 0,
       total: waves.reduce((n, w) => n + w.list.reduce((m, [, k]) => m + k, 0), 0),
@@ -113,7 +209,7 @@
     if (level.conveyor) { // 沒有糧：不教升級修補；開局先給固定幾張（至少有一個射手），之後才抽
       G.food = 0; G.taughtElder = G.taughtRepair = true;
       const st = level.conveyor.start;
-      if (Array.isArray(st)) { for (const k of st) if (UNITS[k]) G.hand.push(k); } else for (let i = 0; i < (st || 3); i++) dealCard(G);
+      if (Array.isArray(st)) { for (const k of st) if (UNITS[k] && level.units.includes(k)) G.hand.push(k); } else for (let i = 0; i < (st || 3); i++) dealCard(G); // 白名單沒有的開局卡不發（期 1）
     }
     return G;
   }
@@ -127,7 +223,7 @@
     return false;
   }
   // 這一波提示點名的卡一定先送到（沒有才補）
-  function dealNamed(G, k) { const cv = G.level.conveyor; if (!cv || !UNITS[k] || G.hand.includes(k)) return; G.hand.push(k); ev(G, { t: 'hand' }); } // 手滿也照送（暫時多一張），不丟玩家手上的卡
+  function dealNamed(G, k) { const cv = G.level.conveyor; if (!cv || !UNITS[k] || !G.level.units.includes(k) || G.hand.includes(k)) return; G.hand.push(k); ev(G, { t: 'hand' }); } // 手滿也照送（暫時多一張），不丟玩家手上的卡；白名單沒有的卡不送（送了也放不下去）
   // 送卡間隔：難度越高送得越慢（之前反過來，難度一高補給也多，三種難度模擬都 100%）
   function conveyorEvery(G) { const cv = G.level.conveyor; return (cv.every || 5.5) * (G.diff === 'calm' ? 1 : G.diff === 'windy' ? 1.1 : 1.2); }
 
@@ -184,6 +280,7 @@
   // ====== 檢查點：每清完一波存一次，只存場上單位與糧，不存敵人，所以永遠從下一波的開頭接 ======
   function snapshot(G) {
     return { levelId: G.levelId, diff: G.diff, wave: G.wave, food: Math.floor(G.food), sheep: G.sheep, sheepLost: G.sheepLost, sheepSaved: G.sheepSaved || 0, unitsLost: G.unitsLost ?? undefined, seen: [...G.seen], hand: G.hand.slice(),
+      ...(G.mods ? { mods: JSON.parse(JSON.stringify(G.mods)) } : {}), // 修飾詞：續玩時要用同一組建局；沒有修飾詞的局不多這一欄（舊檔長相不變）
       gates: G.gates.slice(), // 還在的看門的
       strays: G.strays.filter(s => !s.dead).map(s => ({ r: s.r, x: Math.round(s.x * 10) / 10, ...(s.own ? { own: true } : {}) })), // 還在路上的迷羊（own＝被大鷹抓走又打下來的自己的羊）
       strayQueue: G.strayQueue.map(t => Math.max(0, Math.round((t - G.waveT) * 10) / 10)),       // 還沒出來的迷羊（距現在幾秒）
@@ -199,6 +296,11 @@
     if (!snap || typeof snap !== 'object' || snap.levelId !== levelId) return false;
     const level = LEVELS.find(l => l.id === levelId); if (!level) return false;
     if (!DIFFS[snap.diff] || !isInt(snap.wave, 1, level.waves.length - 1) || !Number.isFinite(snap.food) || snap.food < 0) return false;
+    if (snap.mods !== undefined && snap.mods !== null) { // 修飾詞要整理得過、而且整理前後一樣（存檔被改過就不收）
+      const nm = normalizeMods(level, snap.mods);
+      if (!nm.mods || nm.problems.length || !sameMods(nm.mods, snap.mods)) return false;
+      if (nm.mods.waves !== undefined && snap.wave >= nm.mods.waves) return false;
+    }
     if (snap.sheep !== undefined && !isInt(snap.sheep, 0, 99)) return false;
     if (snap.sheepLost !== undefined && !isInt(snap.sheepLost, 0, 99)) return false;
     if (snap.sheepSaved !== undefined && !isInt(snap.sheepSaved, 0, 99)) return false;
@@ -215,6 +317,7 @@
   }
   function restore(G, snap) {
     if (!checkSnapshot(snap, G.levelId) || snap.diff !== G.diff || snap.wave >= G.waves.length) return false;
+    if (!sameMods(snap.mods, G.mods)) return false; // 檢查點是另一組修飾詞（或沒有修飾詞）打出來的，不能接
     for (const s of snap.units) {
       if (G.units[key(s.r, s.c)] || G.rocks.has(key(s.r, s.c))) continue;
       const def = UNITS[s.type];
@@ -1117,6 +1220,6 @@
   }
   for (const msg of validateLevels()) console.error(msg);
 
-  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, rowLit, starSlots, validateLevels, onHillCell, dev };
+  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, rowLit, starSlots, validateLevels, onHillCell, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);

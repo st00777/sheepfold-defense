@@ -3,6 +3,7 @@
 // 三套打法（2026-10-21 小居第 4 項，同種子比較哪套真的強）：line＝射手守線（每排射手＋牆）、thorns＝荊棘續航（荊棘在牆前、纏裹的牧人在牆後、撒蠍子）、multi＝多排調度（投石隊、巡夜人、牧人杖、油燈顧三排）
 // compare＝四套（good＋三套）用同一批種子各跑一遍，印成一張表，並數「只有某一套贏」的局數
 // 環境變數：SIM_BAN=卡,卡（隊伍裡拿掉）SIM_ADD=卡,卡（硬塞進隊伍，滿了擠掉名單最後一張）SIM_CRADLE_COL=格（抱羊羔的牧人放第幾格，預設 2）SIM_SHOW=1（印出隊伍）
+// SIM_MODS='{…}'：修飾詞 JSON（units／startFood／gates／waves／conveyor／oneBudget，見 engine.js normalizeMods），試煉題用這個跑勝率
 'use strict';
 const path = require('path');
 const D = require(path.join(__dirname, '..', 'data.js'));
@@ -197,8 +198,13 @@ function decideConveyor(G) {
   if (!G.started || G.hand.length >= (G.level.conveyor.max || 6)) { const k = G.hand[0]; if (UNITS[k].kind !== 'instant') for (const r of rows) if (tryPlace(G, r, freeCell(G, r, 1), k)) return; }
 }
 
-function play(levelId, diff, seed, skill) {
-  const G = E.create(levelId, diff, mulberry32(seed));
+// SIM_MODS：修飾詞 JSON（期 1，2026-10-30），直接交給 Engine.create；壞的 JSON 直接停，壞的欄位由引擎印錯誤後略過
+// 例：SIM_MODS='{"units":["shepherd","slinger","wall"],"startFood":300,"gates":2,"waves":3}' node sim/simulate.js 3 calm 50
+const ENV_MODS = (() => { const s = process.env.SIM_MODS; if (!s) return undefined; try { return JSON.parse(s); } catch (e) { console.error('SIM_MODS 不是合法的 JSON：' + e.message); process.exit(1); } })();
+const modsLabel = m => m ? ' 修飾詞 ' + JSON.stringify(m) : '';
+
+function play(levelId, diff, seed, skill, mods = ENV_MODS) {
+  const G = E.create(levelId, diff, mulberry32(seed), mods);
   if (process.env.SIM_FOOD) G.food = Number(process.env.SIM_FOOD); // 試開局糧（第 25 夜一筆糧調預算用）
   if (!G.level.conveyor) { // 跟玩家一樣只帶 8 張；SIM_BAN=卡,卡 拿掉某幾張、SIM_ADD=卡,卡 硬塞進隊伍（滿了就擠掉名單最後一張）
     let pick = G.level.units.length > MAX_CARDS ? E.defaultPick(G.level) : G.level.units.slice();
@@ -224,25 +230,25 @@ function play(levelId, diff, seed, skill) {
   return { win: !!(G.result && G.result.win), wave: G.wave, reason: G.result ? G.result.reason : 'timeout', time: G.time, sheepLost: G.sheepLost, minX };
 }
 
-function run(levelId, diff, n, skill) {
-  const res = []; for (let i = 0; i < n; i++) res.push(play(levelId, diff, 1000 + i, skill));
+function run(levelId, diff, n, skill, mods = ENV_MODS) {
+  const res = []; for (let i = 0; i < n; i++) res.push(play(levelId, diff, 1000 + i, skill, mods));
   const wins = res.filter(r => r.win).length;
   const reasons = {}; for (const r of res) if (!r.win) reasons[r.reason + '@w' + r.wave] = (reasons[r.reason + '@w' + r.wave] || 0) + 1;
   const avgWave = (res.reduce((a, r) => a + r.wave, 0) / n).toFixed(2);
   const sheep = res.reduce((a, r) => a + r.sheepLost, 0) / n;
   const press = res.reduce((a, r) => a + r.minX, 0) / n; // 平均最近距離：越小越驚險
-  console.log(`關 ${levelId} ${D.DIFFS[diff].name} ${skill}：勝率 ${(wins / n * 100).toFixed(0)}%（${n} 局）平均撐到 ${avgWave} 波 最近 ${press.toFixed(2)} 格 ${sheep ? `平均失羊 ${sheep.toFixed(2)} ` : ''}輸法 ${JSON.stringify(reasons)}`);
+  console.log(`關 ${levelId} ${D.DIFFS[diff].name} ${skill}${modsLabel(mods)}：勝率 ${(wins / n * 100).toFixed(0)}%（${n} 局）平均撐到 ${avgWave} 波 最近 ${press.toFixed(2)} 格 ${sheep ? `平均失羊 ${sheep.toFixed(2)} ` : ''}輸法 ${JSON.stringify(reasons)}`);
   return res;
 }
 
 // 同種子比較：四套打法各跑同一批種子（1000 起），一張表看勝率、撐到幾波、最近幾格、失羊；再數每一局誰贏
 // 「只有 X 贏」多＝那套打法在這夜有別人做不到的事；「全輸」多＝這夜對誰都難，該看波表
-function compare(levelId, diff, n) {
+function compare(levelId, diff, n, _skill, mods = ENV_MODS) {
   const keys = ['good', 'line', 'thorns', 'multi'];
   const all = {};
-  console.log(`關 ${levelId} ${D.DIFFS[diff].name} 同種子 ${n} 局：`);
+  console.log(`關 ${levelId} ${D.DIFFS[diff].name} 同種子 ${n} 局${modsLabel(mods)}：`);
   for (const k of keys) {
-    const res = []; for (let i = 0; i < n; i++) res.push(play(levelId, diff, 1000 + i, k));
+    const res = []; for (let i = 0; i < n; i++) res.push(play(levelId, diff, 1000 + i, k, mods));
     all[k] = res;
     const wins = res.filter(r => r.win).length;
     const f = (g, d = 2) => (res.reduce((a, r) => a + g(r), 0) / n).toFixed(d);
