@@ -499,8 +499,8 @@
   </div>
 </div>
 
-<script src="data.js?v=18"></script>
-<script src="engine.js?v=22"></script>
+<script src="data.js?v=19"></script>
+<script src="engine.js?v=23"></script>
 <script src="save.js?v=5"></script>
 <script src="sound.js?v=8"></script>
 <script src="lib/pixi.min.js"></script>
@@ -576,6 +576,10 @@ const HOME_UPDATE = '最近更新 10/29：首頁多了「守夜試煉」——6 
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.10.30', notes: [
+    '三位少用的夥伴學會新招，放下後再點一下升級：雇工第 5 夜起「講定工價」（25 糧）不再逃跑、血量變多；火盆第 9 夜起「壇上的火」（50 糧）連上下兩排的石子箭矢也點燃；油燈第 16 夜起放上「燈臺」（50 糧）照亮上下各兩排',
+    '點棋盤上升級過的火盆、油燈，亮的範圍會照升級後的畫',
+  ] },
   { ver: '2026.10.29.2', notes: [
     '首頁多了「守夜試煉」：6 道固定題目——排陣解謎、送卡護羊、一筆糧各 2 題，難度固定不分三檔',
     '守過一章的最後一夜（任一難度），那一章的題就開；試煉的進度和檢查點另外存，不會動到故事模式',
@@ -601,6 +605,7 @@ const ICON_IMG = {
   '🐺': 'c-wolf', '🐻': 'c-bear', '🦁': 'c-lion', '🥷': 'c-thief', '🧔': 'c-stealer', '🦊': 'c-fox', '🦗': 'c-locust', '🐕‍🦺': 'c-wilddog', '🦅': 'c-eagle',
   '🐗': 'c-boar', '🦉': 'c-owl', '🐆': 'c-leopard', '🐑': 'c-ewe',
   '🪃': 'c-thrower', '🕳️': 'c-pit', '🥛': 'c-waterskin', '⛰️': 'c-stonepile', '🧔‍♂️': 'c-bandit', '🐂': 'c-ox', // 第三章：拋石手、陷坑、水袋、石堆（圖鑑的「山坡」也用它）、強盜、野牛；大鷹用 eagle，鷙鳥 10/28 起有自己的 bird（見下面 img 鍵）
+  '🪙': 'c-wage', '🎇': 'c-altarfire', '🕯️': 'c-lampstand', // 期 3 升級角標（10/30 小居生）：講定工價、壇上的火、燈臺
   '🦴': 'c-kennel', '🪵': 'c-post', '🧍': 'c-gatekeeper', '⛏️': 'c-shovel', '🐾': 'c-paws', '🧑': 'c-farmer', '🐩': 'c-wilddog', // 狗窩、崗位、看門的、鏟子、腳印、組合字備援（拼不出 🧑‍🌾／🐕‍🦺 的手機會把 ico 換成 🧑／🐩，一樣指到牧人與野狗的新圖；10/27 舊 Fluent 圖全刪）
   '🛡': 'c-hide', '↕️': 'c-swap', '🌑': 'c-moonless', '🌾': 'c-ration', // 效果頁專用：厚皮、換排、無月夜、一筆糧（10/27 James：效果頁還有四格是系統 emoji；小居生圖）。費用列的「🌾 50」是純文字，不經 icoImg，不受影響
   fastwolf: 'c-fastwolf', alphawolf: 'c-alphawolf', jackal: 'c-jackal', bird: 'c-bird', // 跟 🐺／🦅 共用 emoji 的敵人各自的圖（data.js 的 img 欄；10/28 小居生）。取圖一律用 icoKey(d)，文字備援仍是 d.ico
@@ -864,7 +869,7 @@ function rangeCells(key, r, c, upgraded) {
   else if (u.cradle) { for (let rr = r - 1; rr <= r + 1; rr++) add(rr, c); }
   else if (u.kind === 'dog') span(r, 0, COLS - 1);
   else if (u.kind === 'instant' || u.heal) { const k = u.kind === 'instant' ? 1 : u.range; for (let rr = r - k; rr <= r + k; rr++) span(rr, c - k, c + k); }
-  else if (u.push || u.ignite) { if (u.all) for (let rr = 0; rr < ROWS; rr++) span(rr, c + 1, COLS - 1); else span(r, c + 1, COLS - 1); } // 銀號（all）五排一起退，黃框也要五排（小居 10/27 審查）
+  else if (u.push || u.ignite) { if (u.all) for (let rr = 0; rr < ROWS; rr++) span(rr, c + 1, COLS - 1); else { const ln = u.lanes || 0; for (let rr = r - ln; rr <= r + ln; rr++) span(rr, c + 1, COLS - 1); } } // 銀號（all）五排一起退，黃框也要五排（小居 10/27 審查）；壇上的火（lanes 1）上下排也亮
   else if (u.light !== undefined) { for (let rr = r - u.light; rr <= r + u.light; rr++) span(rr, 0, COLS - 1); }
   else if (u.deflect) { add(r - 1, c); add(r + 1, c); }
   return out;
@@ -1300,7 +1305,7 @@ function enemyNums(k) {
   const s = [`血量 ${e.hp}`, e.bite ? `每秒傷害 ${e.bite}` : '不攻擊', `移動速度 ${sp}`];
   if (e.thick) s.push(`厚皮：石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%，機弦、投石機、火、毒全額`);
   if (e.howl) s.push(`每 ${e.howl} 秒嚎叫：2 格內的狼速度 ×${STATUS.howl.mul}，持續 ${STATUS.howl.t} 秒`);
-  if (e.roar) s.push(`每 ${e.roar} 秒咆哮：2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走`);
+  if (e.roar) s.push(`每 ${e.roar} 秒咆哮：2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走（講定工價的只僵住）`);
   if (e.wallMul) s.push(`咬牆傷害 ×${e.wallMul}`);
   if (e.enrage) s.push(`血量低於 ${Math.round(e.enrage * 100)}% 狂暴：速度與傷害 ×2`);
   if (e.vaults) s.push('翻過石牆（守望樓翻不過）');
@@ -1328,7 +1333,7 @@ const GLOSSARY = [
   { name: '嚇退', ico: '🏺', text: `往回跑 ${UNITS.jar.panic} 秒，跑的時候不咬人。來源：瓦瓶火把` },
   { name: '咬住', ico: '🐕', text: '牧羊犬咬住的敵人停下不走，改咬狗，直到狗受傷回窩。狗對賊、偷羊人、狐狸、野狗咬得特別痛' },
   { name: '嚎叫', ico: '🐺', text: `領頭狼每 ${ENEMIES.alpha.howl} 秒一次，2 格內的狼速度 ×${STATUS.howl.mul}，持續 ${STATUS.howl.t} 秒。對策：狗咬住牠` },
-  { name: '咆哮', ico: '🦁', text: `獅子每 ${ENEMIES.lion.roar} 秒一次，2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走` },
+  { name: '咆哮', ico: '🦁', text: `獅子每 ${ENEMIES.lion.roar} 秒一次，2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走（講定工價的只僵住）` },
   { name: '狂暴', ico: '🐻', text: `母熊血量低於 ${Math.round(ENEMIES.bear.enrage * 100)}% 時速度與傷害 ×2，直到被打倒` },
   { name: '厚皮', ico: '🛡', text: `石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%；機弦、投石機、火、毒全額。母熊、獅子、豹都是厚皮` },
   { name: '換排', ico: '↕️', text: `敵人從這排換到隔壁排，射手要跟著換。來源：牧人杖（趕的）、豺狼碰到牆繞路、豹每 ${ENEMIES.leopard.shiftEvery} 秒自己換、夜鴞在三排之間飄。油燈照到的排，敵人不會自己換排（杖還是趕得動）` },

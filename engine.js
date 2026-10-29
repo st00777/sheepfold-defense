@@ -384,7 +384,7 @@
           u.cdLen = Math.min(def.every, Math.max(u.timer, full));
         }
       } // 舊檔沒計時器＝剛放下的第一輪冷卻
-      if (s.upgraded && def.upgrade) u.upgraded = true;
+      if (s.upgraded && def.upgrade) { u.upgraded = true; if (def.upgrade.hp && def.upgrade.hp > u.maxHp) u.maxHp = def.upgrade.hp; } // 升級過的血量上限（講定工價 60）要先補上，下一行的 hp 才不會被壓回 40
       if (typeof s.cd === 'number' && s.cd > 0) u.repairAt = G.time + s.cd;
       if (def.kind === 'dog' && typeof s.rest === 'number' && s.rest > 0) { u.resting = true; u.restT = Math.min(def.rest, s.rest); } // 存檔時狗在休息，續玩接著休息，不會帶著低血直接出動
       u.hp = Math.min(u.maxHp, Math.max(1, Number.isFinite(s.hp) ? s.hp : u.maxHp));
@@ -430,6 +430,7 @@
       if (G.food < up.cost) return { ok: false, msg: `${up.name}要 ${up.cost} 糧` };
       G.food -= up.cost; u.upgraded = true;
       if (up.every && u.timer > up.every) u.timer = up.every; // 升級後裝填變快（巧匠的機器），正在數的冷卻也跟著縮
+      if (up.hp && up.hp > u.maxHp) { u.hp += up.hp - u.maxHp; u.maxHp = up.hp; } // 升級後血量上限變高（講定工價 40→60），多出來的那段直接補上
       ev(G, { t: 'unit', r, c }); ev(G, { t: 'pop', r, c, text: up.name });
       return { ok: true, msg: `${up.name}好了，${up.desc}` };
     }
@@ -555,7 +556,7 @@
 
   // 無月夜：這一波起腳印預告看不見，除非那排在油燈照得到的範圍
   function rowLit(G, r) {
-    for (const k in G.units) { const u = G.units[k], d = UNITS[u.type]; if (d.light !== undefined && u.hp > 0 && Math.abs(u.r - r) <= d.light) return true; }
+    for (const k in G.units) { const u = G.units[k], d = effOf(u, UNITS[u.type]); if (d.light !== undefined && u.hp > 0 && Math.abs(u.r - r) <= d.light) return true; } // 燈臺（升級）light 2
     return false;
   }
   function markerVisible(G, i, r) { const m = G.level.moonless; return !m || i + 1 < m || rowLit(G, r); }
@@ -792,7 +793,8 @@
         if (u.timer <= 0) { u.timer = (u.type === 'shepherd' ? shepherdEvery(G) : def.every) * (u.elder ? ELDER_MUL : 1); G.food += def.gives; ev(G, { t: 'pop', r: u.r, c: u.c, text: `+${def.gives}` }); }
       } else if (def.kind === 'shooter') {
         // 雇工：狼靠近就逃走，該排的狼追牠停三秒
-        if (def.flees && inRow.some(e => !ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && e.x - u.c < def.flees && e.x > u.c - 0.5)) {
+        const flees = effOf(u, def).flees; // 講定工價後是 0＝不逃
+        if (flees && inRow.some(e => !ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && e.x - u.c < flees && e.x > u.c - 0.5)) {
           for (const e of inRow) if (!ENEMIES[e.type].flying && !ENEMIES[e.type].heavy && e.x > u.c - 0.5) { e.st.distract = 3; release(G, e); } // 野牛不會為了追雇工停下來（只有陷坑困得住牠）
           ev(G, { t: 'toast', msg: '雇工看見狼來，撇下羊逃走了' });
           ev(G, { t: 'fx', kind: 'flee', r: u.r, x: u.c });
@@ -1038,7 +1040,7 @@
       const prev = s.x;
       s.x += SHOT_SPEED[s.kind] * dt;
       // 穿過火盆就著火
-      for (const k in G.units) { const u = G.units[k]; if (u.r === s.r && UNITS[u.type].ignite && prev < u.c + 0.5 && s.x >= u.c + 0.5) s.burn = true; }
+      for (const k in G.units) { const u = G.units[k]; if (!UNITS[u.type].ignite) continue; const lanes = effOf(u, UNITS[u.type]).lanes || 0; if (Math.abs(u.r - s.r) <= lanes && prev < u.c + 0.5 && s.x >= u.c + 0.5) s.burn = true; } // 壇上的火（升級）lanes 1：上下排的石子箭矢也點燃
       for (const e of G.enemies) {
         if (e.r !== s.r || !targetable(e) || s.hit.has(e.id) || e.high) continue; // 飛得高的大鷹，什麼投射物都打不到
         if (Math.abs(e.x + 0.5 - s.x) >= 0.35) continue;
@@ -1100,7 +1102,7 @@
             ev(G, { t: 'fx', kind: 'howl', r: e.r, x: e.x }); ev(G, { t: 'toast', msg: '領頭狼嚎叫，狼群衝過來了' });
           } else {
             let fled = 0; // 被吼跑的雇工數：要讓玩家看得出他是嚇跑的，不是被咬死的（10/29 James）
-            for (const k in G.units) { const u = G.units[k]; const d = Math.hypot(u.c - e.x, u.r - e.r); if (d <= 2 && !['floor', 'blocker', 'dog'].includes(UNITS[u.type].kind) && !UNITS[u.type].brave) { u.fear = STATUS.fear.t; if (UNITS[u.type].flees) { u.hp = 0; fled++; ev(G, { t: 'fx', kind: 'flee', r: u.r, x: u.c }); } } }
+            for (const k in G.units) { const u = G.units[k]; const d = Math.hypot(u.c - e.x, u.r - e.r); if (d <= 2 && !['floor', 'blocker', 'dog'].includes(UNITS[u.type].kind) && !UNITS[u.type].brave) { u.fear = STATUS.fear.t; if (effOf(u, UNITS[u.type]).flees) { u.hp = 0; fled++; ev(G, { t: 'fx', kind: 'flee', r: u.r, x: u.c }); } } }
             ev(G, { t: 'fx', kind: 'roar', r: e.r, x: e.x }); ev(G, { t: 'toast', msg: fled ? '獅子吼叫，附近的人都僵住了，雇工嚇得撇下羊逃走' : '獅子吼叫，附近的人都僵住了' });
           }
         }
@@ -1273,6 +1275,6 @@
   for (const msg of validateLevels()) console.error(msg);
   for (const msg of validateTrials()) console.error(msg);
 
-  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, trialById, trialGate, isTrialUnlocked, trialLevel, dailyTrial, validateTrials, sameMods, rowLit, starSlots, validateLevels, onHillCell, dev };
+  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, trialById, trialGate, isTrialUnlocked, trialLevel, dailyTrial, validateTrials, sameMods, rowLit, starSlots, validateLevels, onHillCell, dev, effOf };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
