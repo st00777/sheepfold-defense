@@ -301,6 +301,9 @@
   .set-box .btn.small { margin-top: 6px; }
   .set-note { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.5; text-align: left; }
   .set-notes { font-size: 14px; text-align: left; line-height: 1.7; margin: 8px 0 4px; }
+  .clog { text-align: left; margin: 4px 0 12px; }
+  .clog h2 { font-size: 15px; color: var(--gold); margin: 12px 0 2px; }
+  .clog .set-notes { margin: 0; }
   .snd-row small { display: block; font-size: 12px; color: var(--muted); }
   .btn.warn { background: #b85c3a; color: #fff; }
 </style>
@@ -472,7 +475,18 @@
     </div>
     <div class="set-note" id="set-version"></div>
     <div class="set-notes" id="set-notes"></div>
+    <button class="btn small" id="set-changelog">歷次更新紀錄</button>
     <button class="btn alt" id="set-back">回首頁</button>
+  </div>
+</div>
+<!-- 更新紀錄：設定頁進來，列出歷次玩家看得到的改動（CHANGELOG） -->
+<div class="overlay" id="changelog" hidden>
+  <div class="dialog">
+    <h1>更新紀錄</h1>
+    <div class="ref">只列玩起來有差的改動；純整理程式的小進版不列。</div>
+    <div class="clog" id="changelog-list"></div>
+    <div class="ref">2026.10.30 以前的改動（第二、三章、新圖、動畫）當時沒留版本號，不另外補。</div>
+    <button class="btn alt" id="changelog-back">回設定</button>
   </div>
 </div>
 <!-- 更新公告：版本變了、已經有存檔的玩家開頁時彈一次 -->
@@ -559,13 +573,23 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來', 3: '羊圈在山上，斜坡上的敵人直射打不到：要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛' };
 const HOME_UPDATE = '最近更新 10/31：首頁多了「守夜試煉」——6 道固定題目（排陣解謎、送卡護羊、一筆糧各 2），守過一章最後一夜就開那一章的題；每天推薦一題';
-// 版本變了彈一次的三行摘要（只給已經有存檔的玩家看；看過記在存檔 announced）
-const APP_VERSION = '2026.10.31';
-const UPDATE_NOTES = [
-  '首頁多了「守夜試煉」：6 道固定題目——排陣解謎、送卡護羊、一筆糧各 2 題，難度固定不分三檔',
-  '守過一章的最後一夜（任一難度），那一章的題就開；試煉的進度和檢查點另外存，不會動到故事模式',
-  '試煉冊每天推薦一題，輪著來、不隨機',
+// 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
+// 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
+const CHANGELOG = [
+  { ver: '2026.10.31', notes: [
+    '首頁多了「守夜試煉」：6 道固定題目——排陣解謎、送卡護羊、一筆糧各 2 題，難度固定不分三檔',
+    '守過一章的最後一夜（任一難度），那一章的題就開；試煉的進度和檢查點另外存，不會動到故事模式',
+    '試煉冊每天推薦一題，輪著來、不隨機',
+    '設定頁多了「更新紀錄」，歷次改了什麼都查得到',
+  ] },
+  { ver: '2026.10.30', notes: [
+    '首頁左上多了 ⚙️ 設定：可以把全部紀錄匯出成一串存檔碼，換手機時貼回去就接著玩',
+    '存檔整理成一份、有版本號：讀不出來會先用備份接回、再不行才從頭，而且會說一聲，不會默默清掉',
+    '加了匿名統計，只記玩到第幾夜、用了哪些卡，不記姓名帳號；不想被記就在設定裡關掉',
+  ] },
 ];
+const APP_VERSION = CHANGELOG[0].ver;
+const UPDATE_NOTES = CHANGELOG[0].notes;
 
 // ====== 圖示：ChatGPT 生的 3D 黏土風圖（圖在 img/ico/，256px WebP；原圖 PNG 不進 git、備份在 ~/glc-work/sheepfold-char-src/；做法見 docs/art-asset-plan-2026-10-26.md）======
 // 2026-10-27 起舊的 Microsoft Fluent Emoji 圖全部刪掉，授權文件一併移除。
@@ -1531,10 +1555,18 @@ function trackNightEnd(result) {
 function setAnalytics(on) { SD.prefs.analytics = !!on; SAVE.save(); window['ga-disable-' + GA_ID] = !on; if (on) gaInit(); syncSettingsUI(); }
 gaInit();
 // 同一支瀏覽器開兩個分頁：別的分頁寫了存檔，這邊沒在打的話就重新載入拿最新的，免得等一下用舊的蓋回去（code review 10/30；打到一半不動，這一局打完存的會以這邊為準）
-window.addEventListener('storage', ev => { if (ev.key === SAVE.KEY && ev.newValue && (!G || G.over) && $('#settings').hidden) location.reload(); });
+window.addEventListener('storage', ev => { if (ev.key === SAVE.KEY && ev.newValue && (!G || G.over) && $('#settings').hidden && $('#changelog').hidden) location.reload(); });
 
 // ====== 設定頁（首頁左上 ⚙️）：存檔碼匯出／匯入、匿名統計開關、版本 ======
-const fillNotes = box => { box.textContent = ''; for (const x of UPDATE_NOTES) { const d = document.createElement('div'); d.textContent = '・' + x; box.appendChild(d); } }; // 不走 innerHTML，之後就算文案來自存檔也不會變成程式
+const fillNotes = (box, notes = UPDATE_NOTES) => { box.textContent = ''; for (const x of notes) { const d = document.createElement('div'); d.textContent = '・' + x; box.appendChild(d); } }; // 不走 innerHTML，之後就算文案來自存檔也不會變成程式
+// 更新紀錄頁：每個版本一個小標＋幾行；目前這版標「目前」
+function fillChangelog(box) {
+  box.textContent = '';
+  for (const c of CHANGELOG) {
+    const h = document.createElement('h2'); h.textContent = `版本 ${c.ver}${c.ver === APP_VERSION ? '（目前）' : ''}`; box.appendChild(h);
+    const n = document.createElement('div'); n.className = 'set-notes'; fillNotes(n, c.notes); box.appendChild(n);
+  }
+}
 const fmtDate = iso => { const d = new Date(iso); return isNaN(d) ? '不明' : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; };
 let importPending = null; // 讀取過、等按「確定匯入」的那份
 function syncSettingsUI() {
@@ -1551,6 +1583,8 @@ function openSettings() {
 }
 $('#settings-btn').addEventListener('click', () => { openSettings(); Sound.play('tap'); });
 $('#set-back').addEventListener('click', () => { $('#settings').hidden = true; $('#levels').hidden = false; Sound.play('tap'); });
+$('#set-changelog').addEventListener('click', () => { fillChangelog($('#changelog-list')); $('#settings').hidden = true; $('#changelog').hidden = false; Sound.play('tap'); });
+$('#changelog-back').addEventListener('click', () => { $('#changelog').hidden = true; $('#settings').hidden = false; Sound.play('tap'); });
 $('#set-export').addEventListener('click', () => { $('#set-export-code').value = Save.encode(SD); $('#set-export-box').hidden = false; $('#set-import-box').hidden = true; $('#set-copy-note').textContent = '這一串就是這支手機的全部紀錄。貼到 LINE 或備忘錄留著，換手機時在設定頁按「匯入」貼回來。'; Sound.play('tap'); });
 $('#set-copy').addEventListener('click', async () => {
   const ta = $('#set-export-code'); let ok = false;
