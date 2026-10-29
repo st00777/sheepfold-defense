@@ -195,7 +195,7 @@ function decideConveyor(G) {
     }
   }
   // 手滿了（或還沒開局）還沒地方放：隨便找個空位放，別讓卡卡住
-  if (!G.started || G.hand.length >= (G.level.conveyor.max || 6)) { const k = G.hand[0]; if (UNITS[k].kind !== 'instant') for (const r of rows) if (tryPlace(G, r, freeCell(G, r, 1), k)) return; }
+  if (G.hand.length && (!G.started || G.hand.length >= (G.level.conveyor.max || 6))) { const k = G.hand[0]; if (UNITS[k].kind !== 'instant') for (const r of rows) if (tryPlace(G, r, freeCell(G, r, 1), k)) return; }
 }
 
 // SIM_MODS：修飾詞 JSON（期 1，2026-10-30），直接交給 Engine.create；壞的 JSON 直接停，壞的欄位由引擎印錯誤後略過
@@ -203,8 +203,16 @@ function decideConveyor(G) {
 const ENV_MODS = (() => { const s = process.env.SIM_MODS; if (!s) return undefined; try { return JSON.parse(s); } catch (e) { console.error('SIM_MODS 不是合法的 JSON：' + e.message); process.exit(1); } })();
 const modsLabel = m => m ? ' 修飾詞 ' + JSON.stringify(m) : '';
 
+// 修飾詞的問題每個「夜＋難度」只印一次（不然 100 局 × 30 夜洗版），建局時把引擎的錯誤壓掉
+const MODS_TOLD = new Set();
+function createQuiet(levelId, diff, seed, mods) {
+  if (mods) { const k = levelId + '/' + diff + '/' + JSON.stringify(mods); if (!MODS_TOLD.has(k)) { MODS_TOLD.add(k); for (const p of E.checkMods(levelId, mods)) console.error(`關 ${levelId} ${D.DIFFS[diff].name} 的修飾詞：${p}`); } }
+  const err = console.error, warn = console.warn; console.error = console.warn = () => {};
+  try { return E.create(levelId, diff, mulberry32(seed), mods); } finally { console.error = err; console.warn = warn; }
+}
+
 function play(levelId, diff, seed, skill, mods = ENV_MODS) {
-  const G = E.create(levelId, diff, mulberry32(seed), mods);
+  const G = createQuiet(levelId, diff, seed, mods);
   if (process.env.SIM_FOOD) G.food = Number(process.env.SIM_FOOD); // 試開局糧（第 25 夜一筆糧調預算用）
   if (!G.level.conveyor) { // 跟玩家一樣只帶 8 張；SIM_BAN=卡,卡 拿掉某幾張、SIM_ADD=卡,卡 硬塞進隊伍（滿了就擠掉名單最後一張）
     let pick = G.level.units.length > MAX_CARDS ? E.defaultPick(G.level) : G.level.units.slice();
@@ -243,7 +251,7 @@ function run(levelId, diff, n, skill, mods = ENV_MODS) {
 
 // 同種子比較：四套打法各跑同一批種子（1000 起），一張表看勝率、撐到幾波、最近幾格、失羊；再數每一局誰贏
 // 「只有 X 贏」多＝那套打法在這夜有別人做不到的事；「全輸」多＝這夜對誰都難，該看波表
-function compare(levelId, diff, n, _skill, mods = ENV_MODS) {
+function compare(levelId, diff, n, mods = ENV_MODS) { // 跟 run 不同：沒有 skill 參數（四套都跑），第四個就是修飾詞
   const keys = ['good', 'line', 'thorns', 'multi'];
   const all = {};
   console.log(`關 ${levelId} ${D.DIFFS[diff].name} 同種子 ${n} 局${modsLabel(mods)}：`);
@@ -270,5 +278,5 @@ if (require.main === module) {
   if (SK !== 'compare' && !STRATS[SK]) { console.error(`不認識的玩家／打法：${SK}（可用 ${Object.keys(STRATS).join(' ')} compare）`); process.exit(1); }
   const levels = L === 'all' ? LEVELS.map(l => l.id) : [Number(L)];
   const diffs = DF === 'all' ? Object.keys(D.DIFFS) : [DF];
-  for (const l of levels) for (const d of diffs) (SK === 'compare' ? compare : run)(l, d, Number(N), SK);
+  for (const l of levels) for (const d of diffs) SK === 'compare' ? compare(l, d, Number(N)) : run(l, d, Number(N), SK);
 }

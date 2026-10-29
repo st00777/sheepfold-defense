@@ -122,7 +122,38 @@ test('修飾詞不認識的欄位、壞值：印錯誤後略過，其餘照套',
   assert.strictEqual(E.normalizeMods(E.levelById(3), { startFood: 'abc' }).mods, null, '全壞就等於沒有修飾詞');
 });
 
-test('模擬器：play 帶修飾詞能打完一局，白名單真的只用那幾張', () => {
+test('code-review 修正：start 0 張、權重表與白名單沒交集改均等、只剩牧人的白名單擋掉、原型鏈卡名不收、oneBudget:false 連大額開局糧一起關、權重鍵順序不影響同組', () => {
+  assert.strictEqual(E.create(3, 'calm', rng, { conveyor: { start: 0 } }).hand.length, 1, 'start: 0 不再被當 3 張；手上空著開不了局，所以補抽一張');
+  assert.strictEqual(E.create(3, 'calm', rng, { conveyor: { start: 2 } }).hand.length, 2);
+  const [W, errs] = quiet(() => E.create(11, 'calm', rng, { units: ['lobber', 'slinger'] }));
+  assert.deepStrictEqual(W.level.conveyor.weights, { slinger: 22 }, '第 11 夜自己的權重表只留白名單上的');
+  const [W2] = quiet(() => E.create(11, 'calm', rng, { units: ['lobber'] }));
+  assert.deepStrictEqual(W2.level.conveyor.weights, { lobber: 1 }, '沒交集就均等'); assert.ok(E.checkMods(11, { units: ['lobber'] }).some(m => m.includes('沒有交集')));
+  W2.started = true; run(W2, 7.5); assert.ok(W2.hand.includes('lobber'), '抽得到卡');
+  assert.ok(E.checkMods(5, { conveyor: true, units: ['shepherd'] }).some(m => m.includes('拿掉牧人後沒有卡')));
+  const [S] = quiet(() => E.create(5, 'calm', rng, { conveyor: true, units: ['shepherd'] }));
+  assert.ok(S.level.units.length > 1 && !S.mods.units, 'units 略過、其餘照套');
+  assert.ok(E.checkMods(3, { oneBudget: true, startFood: 500, units: ['shepherd'] }).some(m => m.includes('拿掉牧人後沒有卡')));
+  assert.deepStrictEqual(E.checkMods(3, { units: ['constructor', 'slinger'] }), ['units 裡有不認識的卡 constructor，略過']);
+  assert.ok(E.checkMods(3, { conveyor: { start: ['toString'] } })[0].startsWith('conveyor'));
+  assert.ok(E.checkMods(3, { conveyor: { weights: { hasOwnProperty: 1 } } })[0].startsWith('conveyor'));
+  const F = E.create(25, 'calm', rng, { oneBudget: false });
+  assert.strictEqual(F.food, D.START_FOOD, '一筆糧關掉，1600 也跟著回預設'); assert.ok(E.checkMods(25, { oneBudget: false }).some(m => m.includes('沒有牧人')));
+  assert.strictEqual(E.create(25, 'calm', rng, { oneBudget: false, startFood: 700 }).food, 700);
+  assert.deepStrictEqual(E.checkMods(25, { oneBudget: false, units: ['shepherd', 'slinger', 'wall'] }), []);
+  const a = E.normalizeMods(E.levelById(3), { conveyor: { weights: { wall: 1, dog: 2 } } }).mods, b = E.normalizeMods(E.levelById(3), { conveyor: { weights: { dog: 2, wall: 1 } } }).mods;
+  assert.strictEqual(JSON.stringify(a), JSON.stringify(b), '權重鍵照字母排');
+  // 有修飾詞的局：檢查點裡白名單外的卡不還原；故事模式照舊
+  const M = E.create(3, 'calm', rng, { units: ['shepherd', 'slinger'] }); assert.ok(E.place(M, 2, 1, 'slinger').ok); M.wave = 1;
+  const snap = JSON.parse(JSON.stringify(E.snapshot(M))); snap.units.push({ type: 'wall', r: 2, c: 4, hp: 300 });
+  const M2 = E.create(3, 'calm', rng, { units: ['shepherd', 'slinger'] }); assert.ok(E.restore(M2, snap)); assert.ok(!M2.units['2,4'] && M2.units['2,1']);
+});
+
+test('模擬器：play 帶修飾詞能打完一局，白名單真的只用那幾張；compare 第四個參數就是修飾詞', () => {
+  assert.strictEqual(SIM.compare.length, 3, 'compare(levelId, diff, n, mods=ENV)：沒有 skill 佔位');
+  const logs = []; const orig = console.log; console.log = m => logs.push(String(m));
+  try { SIM.compare(1, 'calm', 1, { waves: 1 }); } finally { console.log = orig; }
+  assert.ok(logs[0].includes('修飾詞') && logs[0].includes('"waves":1'));
   const r = SIM.play(1, 'calm', 1000, 'good', { waves: 1, units: ['shepherd', 'slinger', 'wall'] });
   assert.ok(r.wave <= 1 && (r.win || r.reason !== 'timeout'));
   const r2 = SIM.play(3, 'calm', 1001, 'good', { oneBudget: true, startFood: 900, gates: 0 });

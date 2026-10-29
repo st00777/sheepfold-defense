@@ -81,18 +81,19 @@
   //   oneBudget  true＝一筆糧（糧不滴、沒有牧人）、false＝關掉這一夜的一筆糧
   // normalizeMods 把它整理成固定形狀（鍵固定順序、值已驗過），壞的欄位丟掉並寫進 problems；整理後的那份存進 G.mods 與檢查點，續玩時必須一模一樣
   const GATE_SETS = { 0: [], 1: [2], 2: [1, 3], 3: [1, 2, 3], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4] };
+  const isCard = k => typeof k === 'string' && Object.prototype.hasOwnProperty.call(UNITS, k); // 不能用 UNITS[k] 真假判斷：'constructor' 這種原型鏈上的名字會混進來
   const isCardList = a => Array.isArray(a) && a.length > 0 && a.every(k => typeof k === 'string');
   function normalizeMods(level, mods) {
-    const out = {}, problems = [];
-    if (mods === undefined || mods === null) return { mods: null, problems, notes: [] };
-    if (typeof mods !== 'object' || Array.isArray(mods)) return { mods: null, problems: ['修飾詞要是物件'], notes: [] };
+    const out = {}, problems = [], notes = [];
+    if (mods === undefined || mods === null) return { mods: null, problems, notes };
+    if (typeof mods !== 'object' || Array.isArray(mods)) return { mods: null, problems: ['修飾詞要是物件'], notes };
     for (const k of Object.keys(mods)) if (!['units', 'startFood', 'gates', 'waves', 'conveyor', 'oneBudget'].includes(k)) problems.push(`不認識的修飾詞 ${k}，略過`);
     if (mods.units !== undefined) {
       if (!isCardList(mods.units)) problems.push('units 要是卡片名稱的陣列，略過');
       else {
         const seen = new Set(), list = [];
         const noHill = level.hill === undefined || level.hill === null;
-        for (const k of mods.units) { if (!UNITS[k]) problems.push(`units 裡有不認識的卡 ${k}，略過`); else if (UNITS[k].hillOnly && noHill) problems.push(`${UNITS[k].name}只能放坡上，這一夜沒有坡，略過`); else if (!seen.has(k)) { seen.add(k); list.push(k); } }
+        for (const k of mods.units) { if (!isCard(k)) problems.push(`units 裡有不認識的卡 ${k}，略過`); else if (UNITS[k].hillOnly && noHill) problems.push(`${UNITS[k].name}只能放坡上，這一夜沒有坡，略過`); else if (!seen.has(k)) { seen.add(k); list.push(k); } }
         if (list.length) out.units = list; else problems.push('units 沒有任何可用的卡，略過');
       }
     }
@@ -117,8 +118,11 @@
         const c = {}; let bad = false;
         if (cv.every !== undefined) { if (Number.isFinite(cv.every) && cv.every > 0 && cv.every <= 60) c.every = cv.every; else bad = true; }
         if (cv.max !== undefined) { if (Number.isInteger(cv.max) && cv.max >= 1 && cv.max <= 12) c.max = cv.max; else bad = true; }
-        if (cv.start !== undefined) { if ((Number.isInteger(cv.start) && cv.start >= 0 && cv.start <= 12) || (Array.isArray(cv.start) && cv.start.every(k => UNITS[k]))) c.start = Array.isArray(cv.start) ? cv.start.slice() : cv.start; else bad = true; }
-        if (cv.weights !== undefined) { if (cv.weights && typeof cv.weights === 'object' && Object.entries(cv.weights).every(([k, w]) => UNITS[k] && Number.isFinite(w) && w > 0)) c.weights = { ...cv.weights }; else bad = true; }
+        if (cv.start !== undefined) { if ((Number.isInteger(cv.start) && cv.start >= 0 && cv.start <= 12) || (Array.isArray(cv.start) && cv.start.every(isCard))) c.start = Array.isArray(cv.start) ? cv.start.slice() : cv.start; else bad = true; }
+        if (cv.weights !== undefined) { // 鍵照字母排，同一張表不同寫法才會是同一組（sameMods 比字串）
+          if (cv.weights && typeof cv.weights === 'object' && !Array.isArray(cv.weights) && Object.entries(cv.weights).every(([k, w]) => isCard(k) && Number.isFinite(w) && w > 0)) { c.weights = {}; for (const k of Object.keys(cv.weights).sort()) c.weights[k] = cv.weights[k]; }
+          else bad = true;
+        }
         if (bad) problems.push('conveyor 的 every／max／start／weights 有不合規的值，整個略過'); else out.conveyor = c;
       } else problems.push('conveyor 要是 true／false 或設定物件，略過');
     }
@@ -126,36 +130,46 @@
       if (typeof mods.oneBudget === 'boolean') out.oneBudget = mods.oneBudget; else problems.push('oneBudget 要是 true／false，略過');
     }
     // 互相打架的組合只提醒（notes），欄位照留：送卡模式沒有糧，一筆糧與開局糧都沒意義
-    const notes = [];
     const cvOn = out.conveyor === undefined ? !!level.conveyor : out.conveyor !== false;
     if (cvOn && out.oneBudget === true) notes.push('送卡模式沒有糧，oneBudget 沒作用');
     if (cvOn && out.startFood !== undefined) notes.push('送卡模式沒有糧，startFood 沒作用');
     const budget = out.oneBudget === undefined ? !!level.noTrickle : out.oneBudget;
     if (!cvOn && budget && out.startFood === undefined && !level.noTrickle) notes.push(`一筆糧的夜糧不會再來，建議給 startFood（現在只有 ${level.startFood ?? START_FOOD}）`);
+    if (out.oneBudget === false && level.noTrickle && !(out.units || []).includes('shepherd')) notes.push('關掉一筆糧後這一夜還是沒有牧人這張卡，要用 units 補');
+    // 送卡夜與一筆糧的夜都沒有牧人的事：白名單只剩牧人就等於沒有卡
+    if (out.units && (cvOn || budget) && !out.units.some(k => k !== 'shepherd')) { problems.push('白名單拿掉牧人後沒有卡（送卡夜與一筆糧的夜用不到牧人），units 略過'); delete out.units; }
+    // 送卡的權重表要跟白名單有交集，不然一張都抽不到（第 11 夜自己的權重表也算）
+    if (cvOn && out.conveyor !== false) {
+      const w = (out.conveyor && out.conveyor.weights) || (level.conveyor && level.conveyor.weights);
+      const u = out.units || level.units;
+      if (w && !Object.keys(w).some(k => u.includes(k) && k !== 'shepherd')) notes.push('送卡權重表跟白名單沒有交集，改成白名單均等抽');
+    }
     return { mods: Object.keys(out).length ? out : null, problems, notes };
   }
+  // 關卡的卡表只留 allow 說可以的（units／fresh／must 三欄一起）
+  const restrict = (L, allow) => ({ ...L, units: L.units.filter(allow), fresh: (L.fresh || []).filter(allow), must: (L.must || []).filter(allow) });
   // 把整理好的修飾詞套到關卡上，回傳新的關卡物件（原關卡不動）
   function applyMods(level, m) {
     if (!m) return level;
-    const L = { ...level };
-    if (m.units) { L.units = m.units.slice(); L.fresh = (level.fresh || []).filter(k => m.units.includes(k)); L.must = (level.must || []).filter(k => m.units.includes(k)); }
+    let L = { ...level };
+    if (m.units) L = { ...L, units: m.units.slice(), fresh: (level.fresh || []).filter(k => m.units.includes(k)), must: (level.must || []).filter(k => m.units.includes(k)) };
     if (m.startFood !== undefined) L.startFood = m.startFood;
     if (m.gates !== undefined) L.gates = m.gates.length ? m.gates.slice() : false;
     if (m.waves !== undefined) L.waves = level.waves.slice(0, m.waves);
     if (m.conveyor === false) delete L.conveyor;
     else if (m.conveyor) {
-      const base = level.conveyor || {};
-      const noShep = L.units.filter(k => k !== 'shepherd'); // 送卡夜沒有糧，牧人沒事做
-      L.units = noShep; L.fresh = (L.fresh || []).filter(k => noShep.includes(k)); L.must = (L.must || []).filter(k => noShep.includes(k));
-      const cv = m.conveyor === true ? { ...base } : { ...base, ...m.conveyor };
+      L = restrict(L, k => k !== 'shepherd'); // 送卡夜沒有糧，牧人沒事做
+      const cv = m.conveyor === true ? { ...(level.conveyor || {}) } : { ...(level.conveyor || {}), ...m.conveyor };
       if (cv.every === undefined) cv.every = 7; if (cv.max === undefined) cv.max = 6; // 跟第 11 夜一樣的節奏
-      if (!cv.weights) { cv.weights = {}; for (const k of noShep) cv.weights[k] = 1; }
       L.conveyor = cv;
     }
-    if (m.oneBudget === true && !L.conveyor) {
-      L.noTrickle = true; L.noShepherd = true;
-      L.units = L.units.filter(k => k !== 'shepherd'); L.fresh = (L.fresh || []).filter(k => k !== 'shepherd'); L.must = (L.must || []).filter(k => k !== 'shepherd');
-    } else if (m.oneBudget === false) { delete L.noTrickle; delete L.noShepherd; }
+    if (L.conveyor) { // 權重表只留白名單上的（第 11 夜自己的表也一樣）；沒給或沒交集就白名單均等抽
+      const w = {}; for (const k of Object.keys(L.conveyor.weights || {})) if (L.units.includes(k)) w[k] = L.conveyor.weights[k];
+      if (!Object.keys(w).length) for (const k of L.units) w[k] = 1;
+      L.conveyor = { ...L.conveyor, weights: w };
+    }
+    if (m.oneBudget === true && !L.conveyor) { L = restrict(L, k => k !== 'shepherd'); L.noTrickle = true; L.noShepherd = true; }
+    else if (m.oneBudget === false) { delete L.noTrickle; delete L.noShepherd; if (m.startFood === undefined) delete L.startFood; } // 一筆糧關掉，那一夜為一筆糧配的大額開局糧也不算，回到預設
     return L;
   }
   function checkMods(levelId, mods) { const nm = normalizeMods(levelById(levelId), mods); return [...nm.problems, ...nm.notes]; } // 給試煉作者與測試用：空陣列＝乾淨
@@ -182,7 +196,8 @@
   function create(levelId, diffKey, rng, mods) {
     const base = levelById(levelId);
     const nm = normalizeMods(base, mods);
-    for (const p of [...nm.problems, ...nm.notes]) console.error(`第 ${base.id} 夜的修飾詞：${p}`);
+    for (const p of nm.problems) console.error(`第 ${base.id} 夜的修飾詞：${p}`);
+    for (const p of nm.notes) console.warn(`第 ${base.id} 夜的修飾詞：${p}`); // 提醒不是錯誤，壓低一級
     const level = applyMods(base, nm.mods);
     const waves = scaleWaves(level, diffKey);
     const G = {
@@ -209,7 +224,8 @@
     if (level.conveyor) { // 沒有糧：不教升級修補；開局先給固定幾張（至少有一個射手），之後才抽
       G.food = 0; G.taughtElder = G.taughtRepair = true;
       const st = level.conveyor.start;
-      if (Array.isArray(st)) { for (const k of st) if (UNITS[k] && level.units.includes(k)) G.hand.push(k); } else for (let i = 0; i < (st || 3); i++) dealCard(G); // 白名單沒有的開局卡不發（期 1）
+      if (Array.isArray(st)) { for (const k of st) if (UNITS[k] && level.units.includes(k)) G.hand.push(k); } else for (let i = 0; i < (st ?? 3); i++) dealCard(G); // 白名單沒有的開局卡不發（期 1）
+      if (!G.hand.length) dealCard(G); // 手上一張都沒有就開不了局（放下第一張才開始送卡），至少抽一張；start: 0 或開局卡全被白名單濾掉都走這條
     }
     return G;
   }
@@ -320,6 +336,7 @@
     if (!sameMods(snap.mods, G.mods)) return false; // 檢查點是另一組修飾詞（或沒有修飾詞）打出來的，不能接
     for (const s of snap.units) {
       if (G.units[key(s.r, s.c)] || G.rocks.has(key(s.r, s.c))) continue;
+      if (G.mods && !G.level.units.includes(s.type)) continue; // 有修飾詞的局：白名單外的卡不還原（被改過的存檔）；故事模式照舊，玩家換過隊伍的舊檢查點不能丟
       const def = UNITS[s.type];
       const u = makeUnit(G, s.r, s.c, s.type);
       if (s.elder && def.every) { u.elder = true; u.timer = Math.min(u.timer, def.every * ELDER_MUL); }

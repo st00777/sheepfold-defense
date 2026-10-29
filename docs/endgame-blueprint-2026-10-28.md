@@ -88,7 +88,7 @@ v1 事實錯誤已修（小居指出、CC 對過程式碼）：星級按夜存�
 | 期 | 內容 | 前提 | 粗估 |
 |---|---|---|---|
 | 0 地基 | 存檔統一結構＋遷移鏈＋匯出匯入；背景暫停／減少動態／中斷恢復驗收；更新公告；匿名統計 GA4（半天） | ~~James 的 27–30 夜回饋~~ 已結案（10/29 難度「還可以」，不調） | 2–3 天 |
-| 1 修飾詞介面 | **做完（feat/phase-1，10/30）**：`Engine.create` 第四個參數 `mods`（units／startFood／gates／waves／conveyor／oneBudget），`checkMods` 先驗、檢查點帶修飾詞、`SIM_MODS` 跑模擬；9 項測試；紀錄在 phase-1-plan | 期 0 | 3 天 |
+| 1 修飾詞介面 | **做完（feat/phase-1，10/30）**：`Engine.create` 第四個參數 `mods`（units／startFood／gates／waves／conveyor／oneBudget），`checkMods` 先驗、檢查點帶修飾詞、`SIM_MODS` 跑模擬；10 項測試；紀錄在 phase-1-plan | 期 0 | 3 天 |
 | 2 試煉冊首批 | 6 題（解謎 2、送卡 2、一筆糧 2）各過模擬器與一位真人；試煉頁；「今日推薦」 | 期 1 | 4 天 |
 | 3 升級試作 | 3 張少用卡各一條；先寫決策缺口再做 | 期 0 | 3 天 |
 | 4 收藏與尾聲 | 成就 8–10 條＋全螢幕解鎖；全作尾聲畫面；boss 登場演出 | 期 2 | 4 天 |
