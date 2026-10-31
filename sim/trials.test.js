@@ -80,10 +80,19 @@ test('修飾詞 waveOverride 帶 strays／give（期 2c）：合規的留到關�
   const ok = E.normalizeMods(E.levelById(sheepNight), { gates: 0, maxSheepLost: 0, waveOverride: [{ list: [['wolf', 2]], gap: 2, rows: [0, 1, 2, 3, 4], strays: [3, 9] }] });
   assert.deepStrictEqual(ok.problems, []); assert.deepStrictEqual(ok.mods.waveOverride[0].strays, [3, 9]);
   const G = E.create(sheepNight, 'storm', rng, ok.mods); assert.deepStrictEqual(G.waves[0].strays, [3, 9]);
-  E.dev.nextWave(G); run(G, 2); // 直接開第 1 波，這一波的迷羊秒數進佇列（3 秒那隻可能已經在場上）
-  assert.ok(G.strays.length + G.strayQueue.length >= 1, '迷羊排進佇列或已進場');
+  E.dev.nextWave(G); run(G, 1); // 直接開第 1 波：兩隻都還在佇列（3 秒、9 秒）
+  assert.strictEqual(G.strays.length + G.strayQueue.length, 2, '兩隻迷羊都排進去');
+  run(G, 4); assert.ok(G.strays.length >= 1 && G.strays.length + G.strayQueue.length === 2, '5 秒時 3 秒那隻已進場、9 秒那隻還在排');
   const gv = E.normalizeMods(E.levelById(giveNight), { gates: 0, waveOverride: [{ list: [['wolf', 2]], gap: 2, rows: [0, 1, 2, 3, 4], give: 'dog' }] });
   assert.deepStrictEqual(gv.problems, []); assert.strictEqual(gv.mods.waveOverride[0].give, 'dog');
+  const C = E.create(giveNight, 'storm', rng, gv.mods); assert.ok(!C.hand.includes('dog'), '開局手上沒有狗'); E.dev.nextWave(C); run(C, 1); assert.ok(C.hand.includes('dog'), '第 1 波開打就送到狗');
+  // validateTrials 補的兩條：沒羊的夜寫 strays、不是送卡夜寫 give，都要被抓
+  const noSheep = LEVELS.find(l => !l.sheep && !l.conveyor && l.chapter === 2).id;
+  const keep = TRIALS.splice(0, TRIALS.length,
+    { id: 'w' + noSheep, kind: 'watch', levelId: noSheep, diff: 'storm', title: 'x', text: 'x', win: 'x', mods: { gates: 0, waveOverride: LEVELS.find(l => l.id === noSheep).waves.map(() => ({ list: [['wolf', 2]], gap: 2, rows: [0, 1, 2, 3, 4], strays: [5], give: 'dog' })) } });
+  const bad = E.validateTrials(); TRIALS.splice(0, TRIALS.length, ...keep);
+  assert.ok(bad.some(m => m.includes('不該寫 strays')) && bad.some(m => m.includes('不該寫 give')), bad.join('；'));
+  assert.deepStrictEqual(E.validateTrials(), [], '還原後乾淨');
   for (const bad of [{ strays: 'x' }, { strays: [-1] }, { strays: [700] }, { give: 'nope' }, { give: 3 }]) {
     const r = E.normalizeMods(E.levelById(sheepNight), { gates: 0, maxSheepLost: 0, waveOverride: [{ list: [['wolf', 2]], gap: 2, rows: [0, 1, 2, 3, 4], ...bad }] });
     assert.ok(r.problems.some(m => m.includes('waveOverride')) && r.mods.waveOverride === undefined, JSON.stringify(bad));

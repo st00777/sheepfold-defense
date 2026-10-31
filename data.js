@@ -873,7 +873,7 @@ const TRIALS = [
       { list: [['jackal', 8], ['wolf', 14], ['fast', 6]], gap: 1, rows: ALL, hpMul: 2.6, say: '最後一波' },
     ] },
     text: '月亮下山得更早：第一波就五排都有，豺狼跟在狼後面繞牆，第三波連翻牆的賊也來了。沒有看門的，杖要把狼趕進有射手的那排。',
-    win: '井邊一夜無事。西坡拉說：「那個人在哪裏？請他來吃飯。」今晚也請你。' },
+    win: '井邊一夜無事。父親說：「那個人在哪裏？請他來吃飯。」今晚也請你。' },
   { id: 'f8', kind: 'fire', levelId: 8, diff: 'storm', title: '井邊的夜・烈火',
     mods: { units: ['slinger', 'wall', 'sling', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult'], oneBudget: true, startFood: 1200, gates: 0, waveOverride: [
       { list: [['jackal', 8], ['wolf', 34], ['fast', 9]], gap: 1.15, rows: ALL, hpMul: 1.5, ordered: true },
@@ -901,10 +901,10 @@ const TRIALS = [
     mods: { gates: 0, maxSheepLost: 0, waveOverride: [
       { list: [['wolf', 8]], gap: 2, rows: ALL, hpMul: 1.5, strays: [12], say: '第 1 波，羊已經在路上' },
       { list: [['wolf', 10], ['fast', 4]], gap: 1.4, rows: ALL, hpMul: 1.9, strays: [8, 20], say: '又有羊下來' },
-      { list: [['rustler', 2], ['wolf', 12], ['jackal', 3]], gap: 1.3, rows: ALL, hpMul: 2.2, ordered: true, strays: [15], say: '抱羊的人也來了' },
+      { list: [['rustler', 2], ['wolf', 12], ['jackal', 3]], gap: 1.3, rows: ALL, hpMul: 2.2, ordered: true, strays: [15], say: '偷羊人也來了' },
       { list: [['boar', 1], ['jackal', 5], ['wolf', 14], ['fast', 5]], gap: 1, rows: ALL, hpMul: 2.5, strays: [6, 24], say: '最後一波' },
     ] },
-    text: '迷羊更早下來、更多隻，第三波混進兩個抱羊的人。沒有看門的，失一隻羊就輸。',
+    text: '迷羊更早下來、更多隻，第三波混進兩個偷羊人。沒有看門的，失一隻羊就輸。',
     win: '「我們未曾失落甚麼。」（撒上 25:15）今晚也是。' },
   { id: 'f10', kind: 'fire', levelId: 10, diff: 'storm', title: '迦密的夜・烈火',
     mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'lamp'], oneBudget: true, startFood: 1200, gates: 0, maxSheepLost: 0, waveOverride: [
@@ -968,8 +968,8 @@ const TRIALS = [
       { list: [['boar', 2], ['jackal', 3], ['owl', 2], ['wolf', 7]], gap: 1.3, rows: ALL, hpMul: 2.07, ordered: true, say: '又兩頭野豬' },
       { list: [['boar', 2], ['jackal', 5], ['wolf', 13], ['fast', 5]], gap: 1, rows: ALL, hpMul: 2.34, ordered: true, say: '最後一波' },
     ] },
-    text: '波與波之間只歇三秒，野豬每一波都有，第一波就打頭陣。沒有看門的，牆和射手要在開打前擺好。',
-    win: '天亮了，照數交還。看守的人說：「他回來就會知道。」' },
+    text: '波與波之間只歇三秒，野豬第一波就打頭陣，第三、四波各來兩頭。沒有看門的，牆和射手要在開打前擺好。',
+    win: '天亮了。看守的人說：「等他回來，照數交還他。」' },
   { id: 'f19', kind: 'fire', levelId: 19, diff: 'storm', title: '交託的羊・烈火',
     mods: { units: ['slinger', 'wall', 'dog', 'hireling', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley'], oneBudget: true, startFood: 1500, gates: 0, waveOverride: [
       { list: [['boar', 3], ['jackal', 11], ['owl', 1], ['wolf', 26], ['fast', 11]], gap: 1.15, rows: ALL, hpMul: 1.4, ordered: true },
@@ -1023,7 +1023,7 @@ const TRIALS = [
     mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'cradle'], oneBudget: true, startFood: 1900, gates: 0, maxSheepLost: 0, waveOverride: [
       { list: [['leopard', 2], ['alpha', 1], ['boar', 2], ['owl', 9], ['bird', 2], ['jackal', 10], ['wolf', 50], ['fast', 11]], gap: 1.15, rows: ALL, hpMul: 1.4, ordered: true, strays: [20, 45] },
     ] },
-    text: '沒有吹角手、沒有投石隊。第二章所有敵人一波來，八十七隻，兩隻豹帶頭，兩隻迷羊半路下來；1900 糧，失一隻羊就輸。',
+    text: '沒有吹角手、沒有投石隊。第二章的狼、豺狼、野豬、夜鴞、鷙鳥、領頭狼、豹一波來，八十七隻，兩隻豹帶頭，兩隻迷羊半路下來；1900 糧，失一隻羊就輸。',
     win: '一夜，一筆糧，另外的羊也進了圈。「找著了，就歡歡喜喜地扛在肩上。」（路 15:5）' },
 ];
 

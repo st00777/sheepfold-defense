@@ -105,6 +105,8 @@
       else {
         const seen = enemiesSeenBy(t.levelId);
         for (const w of m.waveOverride) for (const [k] of w.list) if (!seen.has(k)) bad.push(`試煉 ${t.id} 的敵人 ${k} 到那一夜還沒出現過`);
+        // 期 2c：迷羊只在有羊的夜有意義、送卡只在送卡夜有意義（code-review 10/31：normalizeMods 只驗型別，寫錯夜會靜靜沒效果）
+        for (const w of m.waveOverride) { if (w.strays && !base.sheep) bad.push(`試煉 ${t.id} 的夜沒有羊，波表不該寫 strays`); if (w.give && !(base.conveyor && m.conveyor !== false)) bad.push(`試煉 ${t.id} 不是送卡夜，波表不該寫 give`); }
         if (t.kind === 'watch' && m.waveOverride.length !== base.waves.length) bad.push(`守望 ${t.id} 的波數要跟原夜一樣（${base.waves.length} 波）`);
         if (t.kind === 'fire' && m.waveOverride.length !== 1) bad.push(`烈火 ${t.id} 只能一波`);
       }
