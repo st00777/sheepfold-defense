@@ -700,36 +700,175 @@ const LEVELS = [
 // kind：puzzle 排陣解謎／conveyor 送卡護羊／budget 一筆糧。解鎖＝那一夜所在的章守過最後一夜（任一難度），規則在 Engine.isTrialUnlocked
 // 勝率是 sim/simulate.js good 玩家 100 局（docs/phase-2-trials-draft-2026-10-29.md）；改 mods 要重跑：SIM_MODS='{…}' node sim/simulate.js <levelId> calm 100
 // lose＝輸了之後結算頁那一句（依口味，不依題）
+// 守夜試煉（新期 2，2026-10-31，James 10/31 定案；設計與勝率在 docs/phase-2b-plan-2026-10-31.md）：每夜兩題
+//   守望試煉 w<夜 id>：同一夜、同一批敵人、同樣波數，但敵人表另寫（更密、五排、順序不同）、沒有看門的、有羊的夜失一隻即輸。難度要高於暴風夜
+//   烈火試煉 f<夜 id>：一大波、一筆糧（沒有牧人）、限卡（拿掉那一夜的新卡與主答案）、沒有看門的、失羊即輸。旋鈕是開局糧
+// 兩題都只用到那一夜為止玩家見過的敵人與學過的卡（引擎 validateTrials 會驗）。難度一律 storm（產糧較慢），waveOverride 寫的是最終數字、不再乘倍率
+const ALL = [0, 1, 2, 3, 4];
 const TRIAL_KINDS = {
-  puzzle: { name: '排陣解謎', ico: '🧩', desc: '卡和糧都固定，佈好陣再開打；輸了換一種擺法', lose: '擺法不對就換一種。糧是固定的，想想哪一排先漏。' },
-  conveyor: { name: '送卡護羊', ico: '📦', desc: '沒有糧也沒有牧人，卡定時送到手上，送什麼用什麼', lose: '送來的卡不合用可以先留著，別為了清手牌亂放。' },
-  budget: { name: '一筆糧', ico: '🌾', desc: '沒有牧人，開局那一筆糧用到天亮，每一塊都要算', lose: '回頭數一數：哪一筆糧花了沒派上用場？' },
+  watch: { name: '守望試煉', ico: '🕯️', short: '敵人更密、沒有看門的', desc: '同一夜的敵人另排一張表：更密、五排一起來、沒有看門的；有羊的夜失一隻就輸', lose: '這一夜沒有人替你擋。回頭看哪一排先破，那一排要多一道牆或一個射手。' },
+  fire: { name: '烈火試煉', ico: '🔥', short: '一大波、一筆糧、限卡', desc: '整夜的敵人一波來；沒有牧人，開局那一筆糧用到天亮；少了幾張慣用的卡，沒有看門的', lose: '一筆糧沒有第二次。先數這一波有幾隻、哪幾種，再想每一排要幾個人。' },
 };
 const TRIALS = [
-  { id: 't1', kind: 'puzzle', levelId: 1, diff: 'calm', title: '雅各的第一夜，沒有牧人',
-    mods: { units: ['slinger', 'wall'], oneBudget: true, startFood: 600, waves: 3, gates: 0 },
-    text: '同一片草地、同一群狼，但今晚沒有牧人送糧、門口也沒有看門的。手上就 600 糧、兩種卡。五個射手加兩道牆剛好——牆要擋哪兩排？',
-    win: '六百糧一塊沒浪費。雅各說：「你知道哪一排最要緊。」' },
-  { id: 't2', kind: 'puzzle', levelId: 9, diff: 'calm', title: '拉結的燈',
-    mods: { units: ['slinger', 'wall', 'lamp', 'staff'], oneBudget: true, startFood: 950, waves: 4 },
-    text: '無月的夜，950 糧一次給完。射手、牆、油燈、牧人杖四種卡。兩盞燈放哪兩排才五排全亮？杖要擺在邊排把狼趕進中間。野豬第 3 波就來。',
-    win: '燈沒有白點。拉結把燈芯剪短了一截，說省下的油留給明晚。' },
-  { id: 't3', kind: 'conveyor', levelId: 4, diff: 'calm', title: '何烈山下，送什麼用什麼',
-    mods: { conveyor: { every: 12, start: ['slinger', 'wall', 'archer'] }, units: ['slinger', 'wall', 'archer', 'thorns'] },
-    text: '十二秒才送一張，只有四種卡。蝗群只有弓箭手打得掉，野狗要在牠冒出來的那格鋪荊棘。送來的卡不合用，先留在手上別亂放。',
-    win: '手上沒有一張卡放錯地方。摩西說：「你在等的時候也沒閒著。」' },
-  { id: 't4', kind: 'conveyor', levelId: 23, diff: 'calm', title: '野羊的磐石',
-    mods: { conveyor: { every: 8, start: ['lobber', 'wall', 'slinger'] }, units: ['slinger', 'lobber', 'wall', 'cairn', 'pit', 'dog', 'sling'] },
-    text: '山坡上的夜用送卡打。拋石手要在坡下、牆退到坡緣、坑留給母熊、石堆擠滿了才推。手上滿六張就不送了，要捨得放。',
-    win: '母熊沒越過坡緣。大衛說：「石頭是現成的，看你拿不拿。」' },
-  { id: 't5', kind: 'budget', levelId: 6, diff: 'calm', title: '基甸的三百人',
-    mods: { oneBudget: true, startFood: 1600 },
-    text: '三萬二千人只留三百。今晚沒有牧人，1600 糧打四波：領頭狼三隻、蝗群兩波。人多無用，買什麼、不買什麼，想清楚再放。',
-    win: '剩的糧不多，但夠。基甸說：「不是靠人多。」' },
-  { id: 't6', kind: 'budget', levelId: 14, diff: 'calm', title: '合成一群',
-    mods: { oneBudget: true, startFood: 2000 },
-    text: '第二章的最後一夜，五波、兩隻豹，2000 糧一次給完。前面每省一塊，都是最後一波的一道牆。',
-    win: '兩群羊合成一群，一隻沒少。牧人把空了的糧袋摺好收起來。' },
+  // ── 第 1 夜 雅各的夜 ──
+  { id: 'w1', kind: 'watch', levelId: 1, diff: 'storm', title: '雅各的夜・守望',
+    mods: { gates: 0, waveOverride: [
+      { list: [['wolf', 6]], gap: 2.32, rows: ALL, hpMul: 1.66, say: '第 1 波，五排都有狼' },
+      { list: [['fast', 6], ['wolf', 9]], gap: 1.16, rows: ALL, hpMul: 2.21, say: '快狼先到' },
+      { list: [['wolf', 15], ['fast', 10]], gap: 0.8, rows: ALL, hpMul: 2.98, say: '最後一波，整群一起來' },
+    ] },
+    text: '同一片草地，但今晚門口沒有看門的。狼第一波就從五排來，比暴風夜更密、更壯。石牆要擋在每一排射手前面。',
+    win: '沒有人替你擋，你也沒讓一隻進來。雅各說：「這二十年我就是這樣守的。」' },
+  { id: 'f1', kind: 'fire', levelId: 1, diff: 'storm', title: '雅各的夜・烈火',
+    mods: { units: ['slinger', 'wall'], oneBudget: true, startFood: 900, gates: 0, waveOverride: [
+      { list: [['wolf', 21], ['fast', 9]], gap: 1.2, rows: ALL, hpMul: 2.0 },
+    ] },
+    text: '整夜的狼一波來：三十隻，沒有牧人、沒有看門的。手上 900 糧、兩種卡，開打前就要擺好。',
+    win: '一筆糧擋下了一整夜。雅各把水袋遞給你，什麼也沒說。' },
+  // ── 第 2 夜 哈蘭的第二夜 ──
+  { id: 'w15', kind: 'watch', levelId: 15, diff: 'storm', title: '哈蘭的第二夜・守望',
+    mods: { gates: 0, waveOverride: [
+      { list: [['wolf', 9]], gap: 1.88, rows: ALL, hpMul: 1.9, say: '第 1 波' },
+      { list: [['fast', 13], ['wolf', 8]], gap: 0.94, rows: ALL, hpMul: 2.5, ordered: true, say: '快狼成群衝過來' },
+      { list: [['wolf', 17], ['fast', 14]], gap: 0.81, rows: ALL, hpMul: 3.47, say: '最後一波' },
+    ] },
+    text: '狼比昨夜多一倍，快狼成群先到。沒有看門的，狗撲住一隻的時候，其餘的還在跑。',
+    win: '狗累得趴下，羊一隻不少。雅各說：「你所有的很少，現今卻發大眾多。」' },
+  { id: 'f15', kind: 'fire', levelId: 15, diff: 'storm', title: '哈蘭的第二夜・烈火',
+    mods: { units: ['slinger', 'wall'], oneBudget: true, startFood: 500, gates: 0, waveOverride: [
+      { list: [['wolf', 18], ['fast', 12]], gap: 1.2, rows: ALL, hpMul: 1.6 },
+    ] },
+    text: '今晚沒有狗。三十隻狼一波來，500 糧、投石手和石牆，沒有牧人。快狼一半，牆要先放。',
+    win: '沒有狗也守住了。雅各點點頭：「狗是幫手，不是倚靠。」' },
+  // ── 第 3 夜 大衛的曠野 ──
+  { id: 'w2', kind: 'watch', levelId: 2, diff: 'storm', title: '大衛的曠野・守望',
+    mods: { gates: 0, waveOverride: [
+      { list: [['wolf', 7], ['fast', 3]], gap: 2.3, rows: ALL, hpMul: 1.65, say: '第 1 波' },
+      { list: [['alpha', 2], ['wolf', 8], ['fast', 4]], gap: 1.22, rows: ALL, hpMul: 2.04, ordered: true, say: '兩隻領頭狼' },
+      { list: [['bear', 2], ['wolf', 7], ['fast', 4]], gap: 1.49, rows: ALL, hpMul: 2.17, ordered: true, say: '兩隻熊' },
+      { list: [['lion', 2], ['alpha', 1], ['wolf', 10], ['fast', 7]], gap: 1.08, rows: ALL, hpMul: 2.56, ordered: true, say: '獅子，兩隻' },
+    ] },
+    text: '領頭狼兩隻、熊兩隻、獅子兩隻，沒有看門的。機弦手要在獅子到牆前就開始打。',
+    win: '獅子和熊都倒在牆前。大衛說：「我追上去打牠，救出羊羔來。」' },
+  { id: 'f2', kind: 'fire', levelId: 2, diff: 'storm', title: '大衛的曠野・烈火',
+    mods: { units: ['slinger', 'wall', 'dog'], oneBudget: true, startFood: 1300, gates: 0, waveOverride: [
+      { list: [['lion', 1], ['bear', 1], ['alpha', 1], ['wolf', 24], ['fast', 6]], gap: 1.2, rows: ALL, hpMul: 1.5, ordered: true },
+    ] },
+    text: '沒有機弦。獅子、熊、領頭狼和二十四隻狼一波來，只有投石手、石牆和狗。1300 糧，狗拖住，石子慢慢磨。',
+    win: '沒有機弦也打倒了獅子。大衛說：「不是靠那把機弦。」' },
+  // ── 第 4 夜 雇工與賊（羊 3）──
+  { id: 'w3', kind: 'watch', levelId: 3, diff: 'storm', title: '雇工與賊・守望',
+    mods: { gates: 0, maxSheepLost: 0, waveOverride: [
+      { list: [['wolf', 9]], gap: 1.88, rows: ALL, hpMul: 1.9, say: '第 1 波' },
+      { list: [['wolf', 14], ['fast', 8]], gap: 1, rows: ALL, hpMul: 2.5, say: '狼群' },
+      { list: [['thief', 4], ['wolf', 11], ['thief', 4]], gap: 1.13, rows: ALL, hpMul: 2.8, ordered: true, say: '賊混在狼裡' },
+      { list: [['rustler', 3], ['fox', 8], ['wolf', 12], ['rustler', 3], ['fox', 8]], gap: 0.88, rows: ALL, hpMul: 3.25, ordered: true, say: '偷羊人來了，一隻都不能被抱走' },
+    ] },
+    text: '賊和偷羊人更多，沒有看門的，一隻羊被抱走就算輸。守望樓要看得到五排。',
+    win: '羊一隻沒少，賊一個沒進來。「我是好牧人，好牧人為羊捨命。」' },
+  { id: 'f3', kind: 'fire', levelId: 3, diff: 'storm', title: '雇工與賊・烈火',
+    mods: { units: ['slinger', 'wall', 'sling', 'dog'], oneBudget: true, startFood: 900, gates: 0, maxSheepLost: 0, waveOverride: [
+      { list: [['rustler', 3], ['thief', 3], ['wolf', 23], ['fast', 3], ['fox', 6]], gap: 1.2, rows: ALL, hpMul: 1.6, ordered: true },
+    ] },
+    text: '沒有雇工、沒有守望樓。偷羊人先到，狼群跟在後面，一波三十八隻。900 糧，失一隻羊就輸。',
+    win: '偷羊人空手逃了。雇工不在，你在。' },
+  // ── 第 5 夜 葡萄園的小狐狸（羊 5）──
+  { id: 'w16', kind: 'watch', levelId: 16, diff: 'storm', title: '葡萄園的小狐狸・守望',
+    mods: { gates: 0, maxSheepLost: 0, waveOverride: [
+      { list: [['fox', 8]], gap: 1.45, rows: ALL, hpMul: 2.1, say: '狐狸，五排都來' },
+      { list: [['thief', 2], ['fox', 11]], gap: 0.94, rows: ALL, hpMul: 2.32, ordered: true, say: '賊帶著狐狸' },
+      { list: [['rustler', 3], ['fox', 9], ['wolf', 6]], gap: 0.87, rows: ALL, hpMul: 2.54, ordered: true, say: '偷羊人，六個' },
+      { list: [['rustler', 5], ['fox', 15], ['thief', 4]], gap: 0.73, rows: ALL, hpMul: 2.87, ordered: true, say: '最後一波，偷羊人最多' },
+    ] },
+    text: '小狐狸一波比一波多，偷羊人五個排在最後。沒有看門的，失一隻羊就輸。狗要放在偷羊人會走的排。',
+    win: '葡萄園一粒沒少，羊也一隻沒少。「要給我們擒拿狐狸，就是毀壞葡萄園的小狐狸。」' },
+  { id: 'f16', kind: 'fire', levelId: 16, diff: 'storm', title: '葡萄園的小狐狸・烈火',
+    mods: { units: ['slinger', 'wall', 'hireling'], oneBudget: true, startFood: 850, gates: 0, maxSheepLost: 0, waveOverride: [
+      { list: [['rustler', 5], ['fox', 23], ['thief', 3], ['wolf', 3]], gap: 1.2, rows: ALL, hpMul: 1.5, ordered: true },
+    ] },
+    text: '今晚沒有狗。狐狸二十三隻、偷羊人五個一波來，只有投石手、石牆和雇工。850 糧，雇工會跑，石牆不會。',
+    win: '沒有狗，狐狸也沒進葡萄園。雇工這次沒跑。' },
+  // ── 第 6 夜 何烈山下 ──
+  { id: 'w4', kind: 'watch', levelId: 4, diff: 'storm', title: '何烈山下・守望',
+    mods: { gates: 0, waveOverride: [
+      { list: [['wolf', 7]], gap: 3.07, rows: ALL, hpMul: 1.49, say: '第 1 波' },
+      { list: [['locust', 30]], gap: 0.47, rows: [0, 2, 4], hpMul: 1.49, say: '蝗群，從邊排和中排來' },
+      { list: [['digger', 2], ['wolf', 8], ['digger', 2]], gap: 1.89, rows: ALL, hpMul: 2.15, ordered: true, say: '野狗從地底冒出來' },
+      { list: [['locust', 25], ['wolf', 9], ['digger', 3], ['fast', 6]], gap: 0.94, rows: ALL, hpMul: 2.97, say: '最後一波，什麼都來' },
+    ] },
+    text: '蝗群換了排走，野狗更多，沒有看門的。石堆佔住的格子還在，弓箭手和荊棘的位置要先想好。',
+    win: '蝗群過去了，草還在。摩西說：「你站的地方是聖地。」' },
+  { id: 'f4', kind: 'fire', levelId: 4, diff: 'storm', title: '何烈山下・烈火',
+    mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower'], oneBudget: true, startFood: 850, gates: 0, waveOverride: [
+      { list: [['locust', 38], ['wolf', 18], ['digger', 6], ['fast', 4]], gap: 1.2, rows: ALL, hpMul: 1.4 },
+    ] },
+    text: '沒有弓箭手、沒有荊棘。蝗群三十八隻、野狗六隻和狼一波來，850 糧。石子一次只打一隻，想想怎麼補。',
+    win: '沒有弓箭也擋下了蝗群。「我必與你同在。」' },
+  // ── 第 7 夜 提哥亞的牧人 ──
+  { id: 'w5', kind: 'watch', levelId: 5, diff: 'storm', title: '提哥亞的牧人・守望',
+    mods: { gates: 0, waveOverride: [
+      { list: [['wolf', 10]], gap: 1.88, rows: ALL, hpMul: 1.75, say: '第 1 波' },
+      { list: [['bird', 3], ['wolf', 10], ['bird', 4]], gap: 1.25, rows: ALL, hpMul: 2.5, ordered: true, say: '鷙鳥飛過牆' },
+      { list: [['wolf', 20], ['fast', 7]], gap: 0.63, rows: [1, 3], hpMul: 2.65, say: '兩排擠滿了狼' },
+      { list: [['bear', 2], ['wolf', 14], ['bird', 7], ['bear', 2]], gap: 1, rows: ALL, hpMul: 3.1, ordered: true, say: '四隻熊' },
+    ] },
+    text: '鷙鳥十四隻、熊四隻，狼擠在第 2、4 排。沒有看門的。火盆的位置決定這一夜。',
+    win: '熊在火前停住了。阿摩司說：「獅子吼叫，誰不懼怕呢？」' },
+  { id: 'f5', kind: 'fire', levelId: 5, diff: 'storm', title: '提哥亞的牧人・烈火',
+    mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer'], oneBudget: true, startFood: 1700, gates: 0, waveOverride: [
+      { list: [['bear', 2], ['bird', 5], ['wolf', 32], ['fast', 4]], gap: 1.2, rows: ALL, hpMul: 1.7, ordered: true },
+    ] },
+    text: '沒有火盆、沒有荊棘。兩隻熊帶頭，鷙鳥五隻飛過牆，狼三十二隻。1700 糧，弓箭手顧天上、機弦顧熊。',
+    win: '沒有火，熊也沒過牆。阿摩司收起牧杖：「我原是牧人。」' },
+  // ── 第 8 夜 基甸的三百人 ──
+  { id: 'w6', kind: 'watch', levelId: 6, diff: 'storm', title: '基甸的三百人・守望',
+    mods: { gates: 0, waveOverride: [
+      { list: [['wolf', 7]], gap: 0.9, rows: [1, 2, 3], hpMul: 1.36, say: '狼從中間三排湧進來' },
+      { list: [['wolf', 9], ['fast', 5]], gap: 0.9, rows: [0, 2, 4], hpMul: 1.7, say: '換邊排了' },
+      { list: [['alpha', 3], ['locust', 20], ['wolf', 7]], gap: 0.83, rows: ALL, hpMul: 1.99, say: '三隻領頭狼' },
+      { list: [['alpha', 4], ['wolf', 14], ['fast', 7], ['locust', 20]], gap: 0.65, rows: ALL, hpMul: 2.41, say: '最後一波，四隻領頭狼' },
+    ] },
+    text: '狼先湧中間三排、再換邊排；領頭狼七隻。準備時間一樣短，沒有看門的。',
+    win: '三百人夠了。基甸說：「不是靠人多。」' },
+  { id: 'f6', kind: 'fire', levelId: 6, diff: 'storm', title: '基甸的三百人・烈火',
+    mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'thorns', 'brazier'], oneBudget: true, startFood: 1500, gates: 0, waveOverride: [
+      { list: [['alpha', 4], ['wolf', 32], ['fast', 14], ['locust', 40]], gap: 1.0, rows: ALL, hpMul: 1.6, ordered: true },
+    ] },
+    text: '沒有瓦瓶、沒有角、沒有弓箭手。領頭狼四隻帶著九十隻一波來，1500 糧。蝗群要靠荊棘和火盆。',
+    win: '沒有瓦瓶也嚇退了他們。「耶和華和基甸的刀！」' },
+  // ── 第 9 夜 烏西雅的牧場 ──
+  { id: 'w17', kind: 'watch', levelId: 17, diff: 'storm', title: '烏西雅的牧場・守望',
+    mods: { gates: 0, waveOverride: [
+      { list: [['wolf', 9]], gap: 1.93, rows: ALL, hpMul: 1.84, say: '第 1 波' },
+      { list: [['wolf', 14], ['fast', 5]], gap: 0.84, rows: ALL, hpMul: 2.54, say: '狼群' },
+      { list: [['wolf', 19], ['locust', 23]], gap: 0.41, rows: [1, 3], hpMul: 2.83, say: '兩排擠滿了' },
+      { list: [['bear', 2], ['alpha', 2], ['bird', 5], ['wolf', 14], ['fast', 5]], gap: 0.96, rows: ALL, hpMul: 3.32, ordered: true, say: '熊、領頭狼、鷙鳥，一起來' },
+    ] },
+    text: '第 3 波四十來隻擠進第 2、4 排，最後一波熊和領頭狼一起。沒有看門的，投石機要早放。',
+    win: '牧場一夜無事。烏西雅說：「我喜愛農事。」' },
+  { id: 'f17', kind: 'fire', levelId: 17, diff: 'storm', title: '烏西雅的牧場・烈火',
+    mods: { units: ['slinger', 'wall', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn'], oneBudget: true, startFood: 1300, gates: 0, waveOverride: [
+      { list: [['bear', 1], ['alpha', 1], ['bird', 4], ['wolf', 32], ['fast', 6], ['locust', 12]], gap: 1.2, rows: ALL, hpMul: 1.6, ordered: true },
+    ] },
+    text: '沒有投石機、沒有機弦、沒有包紮的人。熊和領頭狼帶頭，五十六隻一波來，1300 糧。火盆和荊棘是你的機弦。',
+    win: '沒有投石機也守住了牧場。' },
+  // ── 第 10 夜 尋找我的羊（羊 3）──
+  { id: 'w7', kind: 'watch', levelId: 7, diff: 'storm', title: '尋找我的羊・守望',
+    mods: { gates: 0, maxSheepLost: 0, waveOverride: [
+      { list: [['wolf', 7], ['fast', 2]], gap: 2.25, rows: ALL, hpMul: 1.9, say: '第 1 波' },
+      { list: [['wolf', 14], ['locust', 17]], gap: 0.75, rows: ALL, hpMul: 2.2, say: '蝗群和狼' },
+      { list: [['thief', 3], ['rustler', 2], ['fox', 5], ['digger', 3]], gap: 1.5, rows: ALL, hpMul: 2.35, say: '賊、偷羊人、狐狸、野狗' },
+      { list: [['bear', 3], ['alpha', 3], ['bird', 5], ['wolf', 11]], gap: 1.38, rows: ALL, hpMul: 2.65, ordered: true, say: '三隻熊、三隻領頭狼' },
+      { list: [['lion', 2], ['wolf', 11], ['lion', 1], ['fast', 9], ['locust', 23]], gap: 1.13, rows: ALL, hpMul: 2.95, ordered: true, say: '最後一波，三隻獅子' },
+    ] },
+    text: '第一章的最後一夜，五波全部更密，獅子三隻。沒有看門的，失一隻羊就輸。',
+    win: '找到了，一隻也沒少。「我的羊，我必親自尋找。」' },
+  { id: 'f7', kind: 'fire', levelId: 7, diff: 'storm', title: '尋找我的羊・烈火',
+    mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'thorns', 'brazier', 'jar', 'horn'], oneBudget: true, startFood: 2000, gates: 0, maxSheepLost: 0, waveOverride: [
+      { list: [['lion', 1], ['bear', 1], ['alpha', 1], ['rustler', 2], ['thief', 2], ['wolf', 30], ['fast', 8], ['fox', 4], ['digger', 3], ['bird', 3], ['locust', 25]], gap: 1.1, rows: ALL, hpMul: 1.7, ordered: true },
+    ] },
+    text: '沒有弓箭手、投石機、包紮的人。第一章所有敵人一波來，八十隻，2000 糧。失一隻羊就輸。',
+    win: '一夜，一筆糧，一隻不少。「失喪的，我必尋找；被逐的，我必領回。」' },
 ];
 
 const DATA = { THICK_MUL, REPAIR_HINT, SPEED_FAST, SPEED_SLOW, HILL_SLOW, HILL_EDGE, HILL_DROP, ROWS, COLS, UNITS, ENEMIES, STRAY, STATUS, DIFFS, LEVELS, TRIALS, TRIAL_KINDS, ELDER_MUL, ELDER_COST, REPAIR_COST, REPAIR_HP, REPAIR_CD, MAX_CARDS, MIN_CARDS, SELL_RATE, SWAP_KINDS, PICK_ORDER, PREP_TIME, WAVE_REST, FORESHADOW_LEAD, START_FOOD, TRICKLE };

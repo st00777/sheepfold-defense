@@ -75,7 +75,6 @@
   .snd-row.off { opacity: .4; pointer-events: none; } /* 音效關著時，蟲鳴與音量先壓暗 */
   .snd-note { font-size: 13px; color: var(--muted); margin-top: 6px; text-align: left; }
   /* 開場頁右上角的喇叭：第一次進來就看得到，聲音響起前就能關 */
-  #levels .dialog { position: relative; }
   .corner { position: absolute; right: 12px; top: 12px; font: inherit; font-size: 18px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 3px 9px; cursor: pointer; }
   #resume-line { margin-top: 10px; }
   #resume-line[hidden] { display: none; }
@@ -189,9 +188,13 @@
   #diffs { display: flex; gap: 6px; margin: 10px 0 4px; }
   #diffs[hidden] { display: none; }
   .trial-tag { display: inline-block; font-size: 12px; color: var(--gold); border: 1px solid #e6b84a66; border-radius: 5px; padding: 0 5px; }
-  #trial-daily { margin: 4px 0 6px; }
   .lv .s .cp { color: var(--muted); font-size: 12px; }
+  .lv .s .tm { color: var(--text); font-size: 13px; } /* 試煉選夜：右邊兩個標記（🕯️✅ 🔥3波） */
+  #lv-note { margin-top: 10px; }
   html.big .trial-tag, html.big .lv .s .cp { font-size: 14px; }
+  /* 試煉開場頁：守望／烈火切換，放在故事模式選難度的同一個位置 */
+  #kinds { display: flex; gap: 6px; margin: 10px 0 4px; }
+  #kinds[hidden], .diff[hidden] { display: none; }
   #gate-preview { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 6px 0; font-size: 13px; }
   #gate-preview span { padding: 4px 0; border-radius: 5px; background: #0003; color: var(--muted); }
   #gate-preview .protected { background: #e6b84a25; color: var(--gold); outline: 1px solid #e6b84a66; }
@@ -211,17 +214,26 @@
   .tips .new { color: var(--new); }
   #best { font-size: 13px; color: var(--muted); margin-top: 8px; white-space: pre-line; }
 
-  /* 首頁：一次只看一章，十夜塞進一屏不用捲（2026-10-17 James：選關要往下拉、圖鑑太下面；2026-10-18 補到十夜後列高再縮一點） */
-  .dialog.home { padding: 18px 16px 14px; }
+  /* 選單三屏（主畫面／選章／選夜）共用 .dialog.home；選夜十列塞進一屏不用捲（2026-10-17 James：選關要往下拉；2026-10-18 補到十夜後列高再縮一點） */
+  .dialog.home { padding: 18px 16px 14px; position: relative; }
   .dialog.home h1 { font-size: 22px; }
   .dialog.home .ref { margin-bottom: 8px; }
   #continue-btn { margin-top: 2px; padding: 11px 22px; font-size: 16px; }
   .btn.small { margin-top: 6px; padding: 6px 14px; font-size: 13px; }
-  .home-btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-  #ch-tabs { margin: 10px 0 4px; }
-  #ch-tabs .tab { padding: 7px 0; font-size: 14px; }
-  #ch-tabs .tab.locked { opacity: .4; }
+  .home-btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 6px; }
+  .corner.back { font-size: 14px; padding: 6px 10px; } /* 選章／選夜左上角的「‹ 回上一層」 */
+  /* 主畫面封面橫幅（img/cover-home.webp，2026-10-31 小居重畫的無字版，裁 2:1）：滿版貼到對話框邊，角落的 ⚙️ 🔊 壓在圖上 */
+  .cover { display: block; width: calc(100% + 32px); margin: -18px -16px 12px; aspect-ratio: 2 / 1; object-fit: cover; border-radius: 14px 14px 0 0; background: #0d1230; }
+  .corner { z-index: 1; }
   .ch-sub { font-size: 13px; min-height: 16px; }
+  /* 主畫面的模式入口與選章的章卡：比夜列高、字大，一屏兩三張 */
+  #modes { margin-top: 12px; }
+  .lv.big { padding: 12px 12px; margin-top: 8px; }
+  .lv.big .n { font-size: 28px; width: 40px; }
+  .lv.big .t b { font-size: 17px; }
+  .lv.big .t span { white-space: normal; line-height: 1.4; }
+  .lv .s .chev { font-size: 22px; color: var(--muted); line-height: 1; }
+  .lv.full { box-shadow: inset 0 0 0 1px var(--gold); } /* 本章滿星：金邊 */
   .lv { display: flex; align-items: center; gap: 8px; background: var(--card); border-radius: 9px; padding: 5px 10px; margin-top: 4px; text-align: left; cursor: pointer; }
   .lv.locked { opacity: .45; cursor: default; }
   .lv.next { outline: 2px solid var(--gold); outline-offset: -2px; }
@@ -340,32 +352,41 @@
   </div>
 </div></div>
 
-<!-- 關卡選單 -->
+<!-- 主畫面：只放「接著守」和兩個模式入口（守夜／守夜試煉）；選章、選夜各自一屏（2026-10-31 James：一屏塞太多，試煉看起來像附屬按鈕） -->
 <div class="overlay" id="levels">
   <div class="dialog home">
     <button class="corner snd-btn" id="snd-btn-levels" title="聲音">🔊</button>
     <button class="corner left" id="settings-btn" title="設定：存檔碼、統計">⚙️</button>
+    <img class="cover" src="img/cover-home.webp" alt="" onerror="this.remove()">
     <h1>羊圈守夜</h1>
     <div class="ref">受託守夜的無名牧人。每一夜都取材自聖經裡牧人的故事。</div>
     <div id="save-note" hidden></div>
     <button class="btn" id="continue-btn" hidden></button>
-    <div class="home-btns"><button class="btn alt small" id="levels-codex">📖 圖鑑</button><button class="btn alt small" id="levels-trials">🏔️ 守夜試煉</button></div>
-    <div class="tabs" id="ch-tabs"></div>
-    <div class="ref ch-sub" id="ch-sub"></div>
-    <div id="lv-list"></div>
+    <div id="modes"></div>
+    <div class="home-btns"><button class="btn alt small" id="levels-codex">📖 圖鑑</button></div>
     <div class="upd" id="home-upd"></div>
     <div class="ref credit">人物、道具與場景圖由 ChatGPT 生成（2026 年 10 月）</div>
   </div>
 </div>
 
-<!-- 守夜試煉（期 2）：固定題目、固定難度；守過一章最後一夜就開那一章的題 -->
-<div class="overlay" id="trials" hidden>
+<!-- 選章：故事模式與試煉共用這一屏，標題與副標照模式換 -->
+<div class="overlay" id="chapters" hidden>
   <div class="dialog home">
-    <h1>守夜試煉</h1>
-    <div class="ref">同一片草地，換一套規矩。固定題目、固定難度；守過一章的最後一夜，那一章的題就開。</div>
-    <div class="ref" id="trial-daily"></div>
-    <div id="trial-list"></div>
-    <button class="btn alt" id="trials-back">回首頁</button>
+    <button class="corner left back" id="chapters-back">‹ 首頁</button>
+    <h1 id="chapters-title"></h1>
+    <div class="ref" id="chapters-sub"></div>
+    <div id="ch-list"></div>
+  </div>
+</div>
+
+<!-- 選夜：故事模式一夜一列（星與通過的難度）；試煉也是一夜一列，右邊是守望／烈火各自的狀態，守望或烈火進開場頁再選 -->
+<div class="overlay" id="nights" hidden>
+  <div class="dialog home">
+    <button class="corner left back" id="nights-back">‹ 選章</button>
+    <h1 id="nights-title"></h1>
+    <div class="ref ch-sub" id="ch-sub"></div>
+    <div id="lv-list"></div>
+    <div class="ref" id="lv-note" hidden></div>
   </div>
 </div>
 
@@ -385,6 +406,7 @@
     <div id="best"></div>
     </div>
     <div class="intro-actions">
+    <div id="kinds" hidden><button class="diff" data-kind="watch">🕯️ 守望試煉</button><button class="diff" data-kind="fire">🔥 烈火試煉</button></div>
     <div id="diffs">
       <button class="diff" data-key="calm">寧靜夜</button>
       <button class="diff" data-key="windy">起風夜</button>
@@ -499,8 +521,8 @@
   </div>
 </div>
 
-<script src="data.js?v=19"></script>
-<script src="engine.js?v=23"></script>
+<script src="data.js?v=20"></script>
+<script src="engine.js?v=25"></script>
 <script src="save.js?v=5"></script>
 <script src="sound.js?v=8"></script>
 <script src="lib/pixi.min.js"></script>
@@ -535,7 +557,7 @@ if (typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(fitBo
 else window.addEventListener('resize', fitBoard);
 fitBoard();
 let G = null, level = LEVELS[0], diff = 'calm', selected = null, last = 0, raf = 0;
-let trial = null; const backLabel = () => (trial ? '回試煉冊' : '回關卡'); // 現在在打的試煉題（data.js TRIALS）；null＝故事模式。試煉的進度、檢查點、隊伍都存在 SD.trials，不碰故事那一夜的格子
+let trial = null; const backLabel = () => '回選夜'; // 開場頁、結算頁、暫停面板的回去鍵都回這一夜所在那一章的選夜（故事或試煉照 trial 分）。 現在在打的試煉題（data.js TRIALS）；null＝故事模式。試煉的進度、檢查點、隊伍都存在 SD.trials，不碰故事那一夜的格子
 let hintMap = new Map(); // 現在亮著提示框的格子：key → 'hint'（空地）／'swap'（可直接換）／'sell'（鏟子）；畫在 render.js，這裡留一份給範圍預覽查
 const gateEls = []; // 每排門口的看門的（跟著 G.gates 顯示／隱藏）
 const GATE_TIP = '🧍 看門的：第一隻摸到門口的地面敵人，會被他連同整排一起趕出去；用過一次他就走了，那排再漏就守不住。飛的不經過門。寧靜夜每排一位、起風夜中間三排、暴風夜第 2、4 排';
@@ -572,10 +594,17 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來', 3: '羊圈在山上，斜坡上的敵人直射打不到：要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛' };
-const HOME_UPDATE = '最近更新 10/30：雇工、火盆、油燈學會新招——放下後再點一下升級（講定工價、壇上的火、燈臺）；守夜試煉 6 題仍在首頁';
+const HOME_UPDATE = '最近更新 10/31：首頁分成三層——主畫面、選章、選夜；守夜試煉改版，每一夜兩題「守望」與「烈火」，那一夜暴風夜拿滿星就開';
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.10.31', notes: [
+    '首頁分成三層：主畫面只有「接著守」和「守夜」「守夜試煉」兩個入口，進去再選章、選夜，每一屏都不用捲；試煉一夜一列，進開場頁再選守望或烈火',
+    '封面重畫：換成現在的角色（棕白牧羊犬、投石手、弓箭手都在），主畫面上方多了封面橫幅，分享預覽圖也換了',
+    '守夜試煉改版：每一夜兩題——「守望試煉」（同一夜的敵人另排一張表，更密、沒有看門的）與「烈火試煉」（整夜的敵人一波來、一筆糧、少幾張卡）；先出第一章十夜共 20 題，第二、三章陸續加',
+    '解鎖改成：那一夜暴風夜拿到全部的星，那一夜的兩題就開；有羊的夜失一隻羊就輸',
+    '原本的 6 題（排陣解謎、送卡護羊、一筆糧）下架，它們的紀錄不再顯示',
+  ] },
   { ver: '2026.10.30', notes: [
     '三位少用的夥伴學會新招，放下後再點一下升級：雇工第 5 夜起「講定工價」（25 糧）不再逃跑、血量變多；火盆第 9 夜起「壇上的火」（50 糧）連上下兩排的石子箭矢也點燃；油燈第 16 夜起放上「燈臺」（50 糧）照亮上下各兩排',
     '點棋盤上升級過的火盆、油燈，亮的範圍會照升級後的畫',
@@ -659,41 +688,97 @@ function buildCards() {
 // 下一個還沒守過的夜（已開放但沒通過任一難度）；全守完就回 null
 function nextLevel() { return LEVELS.find(L => unlocked(L.id) && !P.cleared[L.id]) || null; }
 const chapterOf = L => L.chapter || 1;
-let homeChapter = 0; // 首頁停在哪一章；0＝自動（進度所在的章）
+// ====== 選單三層：主畫面 → 選章 → 選夜（2026-10-31）======
+// nav.mode：'story' 故事模式、'trial' 守夜試煉；nav.chapter：停在哪一章。三屏各自一個 overlay，回上一層時重畫一次（進度可能變了）
+const nav = { mode: 'story', chapter: 0 };
+const MENU_IDS = ['#levels', '#chapters', '#nights', '#intro']; // 選單類的畫面，一次只開一個
+function showMenu(id) { for (const m of MENU_IDS) $(m).hidden = m !== id; $('#result').hidden = true; }
+const CH_NUM = c => ['', '一', '二', '三', '四'][c] || String(c);
+const chapterList = () => [...new Set(LEVELS.map(chapterOf))];
+const nightsOf = c => LEVELS.filter(L => chapterOf(L) === c);
+const rangeOf = ls => `第 ${Engine.posOf(ls[0].id)}-${Engine.posOf(ls[ls.length - 1].id)} 夜`;
+const trialsOf = L => TRIALS.filter(T => T.levelId === L.id);
+// 試煉一章的題數、過了幾題、開了幾題（沒出題的夜不算）
+function trialStats(ls) { const ts = ls.flatMap(trialsOf); return { tot: ts.length, done: ts.filter(T => SD.trials.cleared[T.id]).length, open: ts.filter(trialUnlocked).length }; }
+// 一列：左邊號碼或圖示、中間標題與副標、右邊狀態；big＝模式入口與章卡（高一點、字大一點）
+function row(ico, title, sub, right, cls = '') { const d = document.createElement('div'); d.className = 'lv ' + cls; d.innerHTML = `<div class="n">${ico}</div><div class="t"><b>${title}</b><span>${sub}</span></div><div class="s">${right}</div>`; return d; }
+const CHEV = '<span class="chev">›</span>';
+// 主畫面：接著守 ＋ 守夜／守夜試煉兩個入口，各寫一句進度
 function buildLevels() {
-  const chapters = [...new Set(LEVELS.map(chapterOf))];
   const nx = nextLevel();
-  const cur = chapters.includes(homeChapter) ? homeChapter : chapterOf(nx || LEVELS[LEVELS.length - 1]);
-  // 接著守：一指跳到下一夜
   const cb = $('#continue-btn'); cb.hidden = !nx;
   if (nx) { cb.textContent = `接著守：第 ${Engine.posOf(nx.id)} 夜 ${nx.name}`; cb.onclick = () => openIntro(nx); }
-  // 章節頁籤：第一夜還沒開的章壓暗
-  const tabs = $('#ch-tabs'); tabs.innerHTML = '';
-  for (const c of chapters) {
-    const first = LEVELS.find(L => chapterOf(L) === c), ok = unlocked(first.id), cs = chapterStars(c);
-    const b = document.createElement('button'); b.className = 'tab' + (c === cur ? ' selected' : '') + (ok ? '' : ' locked') + (cs.tot && cs.got >= cs.tot ? ' full' : ''); // 本章滿星：金邊
-    b.textContent = `第${['', '一', '二', '三', '四'][c] || c}章 ${CHAPTER_NAMES[c] || ''}`;
-    b.addEventListener('click', () => { homeChapter = c; buildLevels(); });
-    tabs.appendChild(b);
-  }
-  const inCh = LEVELS.filter(L => chapterOf(L) === cur), range = `第 ${Engine.posOf(inCh[0].id)}-${Engine.posOf(inCh[inCh.length - 1].id)} 夜`;
-  const cs = chapterStars(cur);
-  $('#ch-sub').textContent = unlocked(inCh[0].id) ? `${range}・★ ${cs.got}/${cs.tot}。${CHAPTERS[cur] || ''}` : `${range}，守過上一章最後一夜就會開`;
-  const list = $('#lv-list'); list.innerHTML = '';
-  for (const L of LEVELS) {
-    if (chapterOf(L) !== cur) continue;
-    const ok = unlocked(L.id);
-    const d = document.createElement('div');
-    d.className = 'lv' + (ok ? '' : ' locked') + (nx && nx.id === L.id ? ' next' : '');
-    const done = P.cleared[L.id] ? Object.keys(P.cleared[L.id]).map(k => DIFFS[k].name.slice(0, 2)).join('・') + ' ✅' : '';
-    const stars = ok ? `<div class="stars${starCount(L.id) ? '' : ' none'}">${starText(L)}</div>` : ''; // 開了的夜才顯示星，沒拿到的是空星
-    d.innerHTML = `<div class="n">${ok ? Engine.posOf(L.id) : '🔒'}</div><div class="t"><b>${L.name}</b><span>${ok ? L.ref.replace('取材：', '') : '守過上一夜就會開'}</span></div><div class="s">${stars}<div>${done}</div></div>`;
-    if (ok) d.addEventListener('click', () => openIntro(L));
-    list.appendChild(d);
-  }
+  const all = chapterList().reduce((a, c) => { const s = chapterStars(c); a.got += s.got; a.tot += s.tot; return a; }, { got: 0, tot: 0 });
+  const cleared = LEVELS.filter(L => P.cleared[L.id]).length;
+  const ts = trialStats(LEVELS), daily = Engine.dailyTrial(new Date(), trialProgress());
+  const box = $('#modes'); box.innerHTML = '';
+  const story = row('🌙', '守夜', cleared ? `${chapterList().length} 章 ${LEVELS.length} 夜，守過 ${cleared} 夜・★ ${all.got}/${all.tot}` : `${chapterList().length} 章 ${LEVELS.length} 夜，每一夜取材自一段牧人的故事`, CHEV, 'big');
+  story.addEventListener('click', () => { openChapters('story'); Sound.play('tap'); });
+  const tr = row('🏔️', '守夜試煉', ts.open ? `每夜兩題，過了 ${ts.done}/${ts.tot}${daily ? `・今日推薦：${daily.title}` : ''}` : '每夜兩題「守望」與「烈火」；哪一夜暴風夜拿滿星，那一夜的題就開', CHEV, 'big');
+  tr.addEventListener('click', () => { openChapters('trial'); track('open_trials', {}); Sound.play('tap'); });
+  box.append(story, tr);
   $('#home-upd').textContent = HOME_UPDATE;
   const sn = $('#save-note'); sn.hidden = !SAVE.problems.length; sn.textContent = SAVE.problems.join('；'); // 存檔搬移／接回／壞掉的說明，首頁說一次（不靜默）
+  showMenu('#levels');
 }
+// 選章：第一夜還沒開的章壓暗；試煉的章要故事那章開了、而且題寫出來了才能進（進去才看得到哪一夜鎖著、怎麼開）
+function openChapters(mode) {
+  nav.mode = mode;
+  const story = mode === 'story';
+  $('#chapters-title').textContent = story ? '守夜' : '守夜試煉';
+  $('#chapters-sub').textContent = story ? '選一章。守過上一章的最後一夜，下一章就開。' : '同一片草地，換一套規矩。每一夜兩題：守望與烈火，固定題目、固定難度。';
+  const list = $('#ch-list'); list.innerHTML = '';
+  for (const c of chapterList()) {
+    const ls = nightsOf(c), range = rangeOf(ls), okStory = unlocked(ls[0].id);
+    let ok, sub, right, full = false;
+    if (story) {
+      const cs = chapterStars(c); ok = okStory; full = ok && cs.tot > 0 && cs.got >= cs.tot;
+      sub = ok ? `${range}・${CHAPTERS[c] || ''}` : `${range}，守過上一章最後一夜就會開`;
+      right = ok ? `<div class="stars${cs.got ? '' : ' none'}">★ ${cs.got}/${cs.tot}</div>` : '';
+    } else {
+      const s = trialStats(ls); ok = okStory && s.tot > 0; full = ok && s.done >= s.tot;
+      sub = !s.tot ? `${range}，這一章的題還在寫` : !okStory ? `${range}，守過上一章最後一夜就會開` : `${range}・${s.tot} 題，開了 ${s.open} 題`;
+      right = ok ? `<div class="stars${s.done ? '' : ' none'}">過了 ${s.done}/${s.tot}</div>` : '';
+    }
+    const d = row(ok ? c : '🔒', `第${CH_NUM(c)}章 ${CHAPTER_NAMES[c] || ''}`, sub, right + (ok ? CHEV : ''), 'big' + (ok ? '' : ' locked') + (full ? ' full' : ''));
+    if (ok) d.addEventListener('click', () => { openNights(mode, c); Sound.play('tap'); });
+    list.appendChild(d);
+  }
+  showMenu('#chapters');
+}
+// 選夜：故事模式一夜一列（星、過了哪些難度）；試煉一夜一列，右邊 🕯️ 守望、🔥 烈火各自的狀態，點進去在開場頁選哪一題
+function openNights(mode, c) {
+  nav.mode = mode; nav.chapter = c;
+  const story = mode === 'story', ls = nightsOf(c), range = rangeOf(ls), nx = nextLevel(), cs = chapterStars(c);
+  $('#nights-title').textContent = `第${CH_NUM(c)}章 ${CHAPTER_NAMES[c] || ''}`;
+  $('#ch-sub').textContent = story ? `${range}・★ ${cs.got}/${cs.tot}。${CHAPTERS[c] || ''}` : `${range}的守望與烈火。哪一夜暴風夜拿到全部的星，那一夜的兩題就開`;
+  const daily = story ? null : Engine.dailyTrial(new Date(), trialProgress());
+  const list = $('#lv-list'); list.innerHTML = '';
+  let missing = 0; // 還沒出題的夜（第二、三章陸續加）
+  for (const L of ls) {
+    let d;
+    if (story) {
+      const ok = unlocked(L.id);
+      const done = P.cleared[L.id] ? Object.keys(P.cleared[L.id]).map(k => DIFFS[k].name.slice(0, 2)).join('・') + ' ✅' : '';
+      const stars = ok ? `<div class="stars${starCount(L.id) ? '' : ' none'}">${starText(L)}</div>` : ''; // 開了的夜才顯示星，沒拿到的是空星
+      d = row(ok ? Engine.posOf(L.id) : '🔒', L.name, ok ? L.ref.replace('取材：', '') : '守過上一夜就會開', `${stars}<div>${done}</div>`, (ok ? '' : 'locked') + (nx && nx.id === L.id ? ' next' : ''));
+      if (ok) d.addEventListener('click', () => openIntro(L));
+    } else {
+      const ts = trialsOf(L); if (!ts.length) { missing++; continue; }
+      const ok = trialUnlocked(ts[0]), isDaily = !!daily && ts.some(T => T.id === daily.id);
+      // 一題一個標記：✅ 過了／3波 最遠打到／存 有檢查點／— 還沒打
+      const mark = T => { const b = SD.trials.best[T.id], done = SD.trials.cleared[T.id], cp = SD.trials.checkpoints[T.id]; return `<span class="tm">${TRIAL_KINDS[T.kind].ico}${done ? '✅' : b ? `${b.wave}波` : cp ? '存' : '—'}</span>`; };
+      d = row(ok ? Engine.posOf(L.id) : '🔒', L.name, ok ? (isDaily ? '<span class="trial-tag">今日</span> ' : '') + L.ref.replace('取材：', '') : `暴風夜 ${'★'.repeat(Engine.starSlots(L))} 就會開`, ok ? ts.map(mark).join(' ') : '', (ok ? '' : 'locked') + (isDaily ? ' next' : ''));
+      // 點一夜：今日推薦的那題優先，否則先開還沒過的；都過了從守望開始
+      if (ok) d.addEventListener('click', () => openTrial((isDaily && ts.find(T => T.id === daily.id)) || ts.find(T => !SD.trials.cleared[T.id]) || ts[0]));
+    }
+    list.appendChild(d);
+  }
+  const note = $('#lv-note'); note.hidden = !missing; note.textContent = missing ? `還有 ${missing} 夜的守望與烈火在寫，之後的更新陸續加進來。` : '';
+  showMenu('#nights');
+}
+$('#chapters-back').addEventListener('click', () => { buildLevels(); Sound.play('tap'); });
+$('#nights-back').addEventListener('click', () => { openChapters(nav.mode); Sound.play('tap'); });
 // 故事模式：L 是 LEVELS 裡的那一夜。試煉：T 是 TRIALS 的一題，L 是 Engine.trialLevel(T)（套好修飾詞的夜，id 跟原夜一樣）
 function openIntro(L, T) {
   level = L; trial = T || null;
@@ -704,7 +789,11 @@ function openIntro(L, T) {
     $('#intro-ref').textContent = `${kind.ico} ${kind.name}・取自第 ${Engine.posOf(base.id)} 夜「${base.name}」`;
     t.innerHTML = `<div class="verse">${trial.text}</div>`;
     $('#intro-tips').innerHTML = `<div>${kind.desc}。</div>` + modsText(trial, L).map(x => `<div class="new">${x}</div>`).join('');
+    // 守望／烈火切換：同一夜的另一題直接換開場頁（位置同故事模式的選難度）；那一夜只出一題就不顯示
+    const sibs = trialsOf(base), kb = $('#kinds'); kb.hidden = sibs.length < 2;
+    kb.querySelectorAll('.diff').forEach(b => { const T2 = sibs.find(x => x.kind === b.dataset.kind); b.hidden = !T2; b.classList.toggle('selected', T2 === trial); b.onclick = T2 && T2 !== trial ? () => { openTrial(T2); Sound.play('tap'); } : null; });
   } else {
+    $('#kinds').hidden = true;
     $('#intro-title').textContent = L.title;
     $('#intro-ref').textContent = L.ref;
     t.innerHTML = L.speaker ? `<span class="who">${L.speaker}：</span>${L.intro}` : `<div class="verse">${L.intro}</div>`;
@@ -732,7 +821,7 @@ function openIntro(L, T) {
   $('#resume-line').hidden = !mine; $('#resume-cp').hidden = !hasCp;
   if (mine) $('#resume-text').textContent = hasCp ? `上次${DIFFS[cp.diff].name}守到第 ${cp.wave} 波，場上的人都還在。` : CP_BROKEN;
   $('#start').textContent = hasCp ? '重新開始' : '開始守夜';
-  $('#levels').hidden = true; $('#trials').hidden = true; $('#intro').hidden = false;
+  showMenu('#intro');
 }
 // 這一夜新開的卡、或舊卡在這一夜學會的新招（升級 from＝這一夜），第一次來先引去圖鑑看
 let markIntroSeen = () => {}; // 開場頁有新夥伴框時由 showIntroNew 換成真的；開始守夜也會叫
@@ -774,6 +863,8 @@ function modsText(T, L) {
   const m = T.mods, out = [];
   if (L.conveyor) out.push(`📦 卡每 ${L.conveyor.every} 秒送一張，手上最多 ${L.conveyor.max} 張，滿了就不送${Array.isArray(L.conveyor.start) && L.conveyor.start.length ? `；開局先給 ${L.conveyor.start.map(k => UNITS[k] ? UNITS[k].name : k).join('、')}` : ''}`);
   if (m.waves !== undefined) out.push(`🌙 只打 ${L.waves.length} 波就天亮`);
+  if (m.waveOverride) { const n = L.waves.reduce((a, w) => a + w.list.reduce((s, [, k]) => s + k, 0), 0); const r0 = L.waves[0].rows.length; out.push(L.waves.length === 1 ? `🔥 整夜 ${n} 隻一波來，沒有波間的喘息` : `🕯️ 敵人表另寫：${L.waves.length} 波共 ${n} 隻，第一波就${r0 === ROWS ? '五排都來' : `從 ${r0} 排來`}`); }
+  if (m.maxSheepLost !== undefined && L.sheep) out.push(m.maxSheepLost === 0 ? '🐑 失一隻羊就輸' : `🐑 最多只能失 ${m.maxSheepLost} 隻羊`);
   return out; // 看門的幾位在難度提示那行（gateAdvice）與五格預覽；哪幾張卡在「今晚上場」那行——不重講（審查 10/29：同一件事講三次）
 }
 // 試煉的修飾詞整理成引擎認得的那一組（檢查點對帳用）
@@ -788,7 +879,7 @@ function gateAdvice(L, key) {
 }
 function applyDiff(key, save = true) {
   diff = key;
-  document.querySelectorAll('.diff').forEach(b => b.classList.toggle('selected', b.dataset.key === key));
+  document.querySelectorAll('#diffs .diff').forEach(b => b.classList.toggle('selected', b.dataset.key === key));
   $('#diff-hint').textContent = `${DIFFS[key].hint}。${gateAdvice(level, key)}`;
   const rows = Engine.gateRows(level, key);
   $('#gate-preview').innerHTML = Array.from({ length: ROWS }, (_, r) => `<span class="${rows.includes(r) ? 'protected' : ''}" aria-label="第 ${r + 1} 排${rows.includes(r) ? '有看門的' : '沒有看門的'}">${r + 1} 排 ${rows.includes(r) ? '🧍' : '—'}</span>`).join('');
@@ -1055,7 +1146,7 @@ function onWin() {
   const saved = recordBest(true);
   trackNightEnd('win');
   if (saved) clearCheckpoint(); // 紀錄沒存進去就不清檢查點：至少還能「繼續上次」重守最後一波，不會畫面說守過、重開卻什麼都沒有
-  const next = trial ? null : Engine.nextOf(level.id); // 試煉沒有「下一夜」，回試煉冊挑下一題
+  const next = trial ? null : Engine.nextOf(level.id); // 試煉沒有「下一夜」，回試煉的選夜挑下一題
   dawn();
   setTimeout(() => { // 先讓人看到天亮，結算頁慢 2.6 秒出來（減少動態：立刻）
     const left = level.noShepherd ? `剩 ${Math.floor(G.food)} 糧。` : ''; // 第 25 夜一筆糧：天亮時剩多少（提案 §4 要記的那一筆，先給玩家看；調 startFood 用）
@@ -1084,8 +1175,9 @@ function onLose(reason, by) {
   recordBest(false); clearCheckpoint();
   trackNightEnd('lose');
   const who = by && ENEMIES[by] ? ENEMIES[by].name : null; // 標題寫闖進來的那一隻的名字：夜鴞就是夜鴞、母熊就是母熊，不再一律翻成狼／鷙鳥
-  const titles = { wolf: `${who || '狼'}闖進羊圈了`, bird: `${who || '鷙鳥'}飛進羊圈了`, sheep: '羊被偷光了' };
-  const text = trial ? TRIAL_KINDS[trial.kind].lose : (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
+  const allow = level.maxSheepLost || 0; // sheepLost：試煉「失羊即輸」（新期 2）；題目准失幾隻就寫幾隻
+  const titles = { wolf: `${who || '狼'}闖進羊圈了`, bird: `${who || '鷙鳥'}飛進羊圈了`, sheep: '羊被偷光了', sheepLost: allow ? `失了 ${allow + 1} 隻羊` : '失了一隻羊' };
+  const text = trial ? (reason === 'sheepLost' ? (allow ? `這一題最多只能失 ${allow} 隻羊。` : '這一題失一隻羊就算輸。') : '') + TRIAL_KINDS[trial.kind].lose : (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
   nightfall();
   setTimeout(() => { endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`); $('#next').hidden = true; $('#retry').textContent = trial ? '再打這一題' : '再守一夜'; }, REDUCE_MOTION.matches ? 0 : 900);
 }
@@ -1118,7 +1210,7 @@ function startGame(fromCp) {
   // 重新開始「同一關」才丟掉舊檢查點（每關各一份，別關不動）；開著開發者面板這局不會存，舊檔一併清掉免得之後重打
   if (!resumed || devUsed) clearCheckpoint();
   buildCards();
-  $('#back').textContent = $('#pause-back').textContent = backLabel(); // 結算頁與暫停面板的回去鍵：試煉回試煉冊
+  $('#back').textContent = $('#pause-back').textContent = backLabel(); // 結算頁與暫停面板的回去鍵：回這一夜所在的選夜
   $('#sheep').hidden = !level.sheep; $('#sheep-n').textContent = G.sheep;
   Board.newGame(G, { diff, speed, resumed }); // 石頭格、場上單位、入夜暖橘（續玩不做）
   for (let i = G.events.length - 1; i >= 0; i--) if (G.events[i].t === 'unit') G.events.splice(i, 1); // 單位已直接畫了，其餘事件留給第一幀
@@ -1138,38 +1230,16 @@ function backToLevels() {
   if (G) G.over = true; // 中途回關卡不清檢查點，之後可以「繼續上次」
   if (saveFailed && saveProgress()) toast('剛才沒存進去的紀錄，這次存好了'); // 上次寫失敗的永久進度再試一次（P 在記憶體裡還是對的）
   paused = false; $('#pause').hidden = true; syncPause();
-  $('#intro').hidden = true; $('#result').hidden = true;
-  if (trial) { openTrials(); return; } // 試煉打完回試煉冊挑下一題
-  buildLevels(); $('#levels').hidden = false;
+  // 回到這一夜所在那一章的選夜（試煉回試煉的選夜）挑下一夜；還沒選過夜（理論上不會）就回主畫面
+  if (level) openNights(trial ? 'trial' : 'story', chapterOf(level)); else buildLevels();
 }
 
 // ====== 守夜試煉冊（期 2）======
-const trialUnlocked = T => unlockAll || Engine.isTrialUnlocked(P.cleared, T);
-function buildTrials() {
-  const list = $('#trial-list'); list.innerHTML = '';
-  const daily = Engine.dailyTrial(new Date(), unlockAll ? Object.fromEntries(LEVELS.map(l => [l.id, { calm: true }])) : P.cleared);
-  $('#trial-daily').textContent = daily ? `今日推薦：${daily.title}` : '守過第一章的最後一夜，試煉就開了';
-  for (const T of TRIALS) {
-    const base = Engine.levelById(T.levelId), kind = TRIAL_KINDS[T.kind], ok = trialUnlocked(T);
-    const last = Engine.trialGate(T); // 要守過哪一夜才開（規則只在引擎一份）
-    const b = SD.trials.best[T.id], done = SD.trials.cleared[T.id];
-    const cp = SD.trials.checkpoints[T.id];
-    const d = document.createElement('div');
-    d.className = 'lv' + (ok ? '' : ' locked') + (daily && daily.id === T.id ? ' next' : '');
-    // 副標一行放不下兩件事（手機 360px 約 200px 可用）：開了的寫口味與取自哪一夜，鎖著的只寫怎麼開
-    const isDaily = daily && daily.id === T.id;
-    d.innerHTML = `<div class="n">${ok ? kind.ico : '🔒'}</div><div class="t"><b>${T.title}</b><span>${ok ? `${kind.name}・第 ${Engine.posOf(base.id)} 夜 ${base.name}` : last ? `守過第 ${Engine.posOf(last.id)} 夜「${last.name}」就會開` : '這一題的夜不在了'}</span></div><div class="s">${isDaily ? '<span class="trial-tag">今日</span> ' : ''}${done ? '✅' : b ? `第 ${b.wave} 波` : ''}${cp && !done ? '<div class="cp">有存檔</div>' : ''}</div>`;
-    if (ok) d.addEventListener('click', () => openTrial(T));
-    list.appendChild(d);
-  }
-}
-const openTrial = T => openIntro(Engine.trialLevel(T), T); // 開一題：開場頁用套好修飾詞的夜
-function openTrials() {
-  trial = null; buildTrials();
-  $('#levels').hidden = true; $('#intro').hidden = true; $('#result').hidden = true; $('#trials').hidden = false;
-}
-$('#levels-trials').addEventListener('click', () => { openTrials(); track('open_trials', {}); Sound.play('tap'); });
-$('#trials-back').addEventListener('click', () => { $('#trials').hidden = true; buildLevels(); $('#levels').hidden = false; Sound.play('tap'); });
+// 新期 2（2026-10-31）：每夜兩題——守望（w<夜 id>）與烈火（f<夜 id>），那一夜暴風夜三星就同時開（規則在引擎 isTrialUnlocked 一份）；?all 全開
+const ALL_PROGRESS = { cleared: Object.fromEntries(LEVELS.map(l => [l.id, { storm: true }])), stars: Object.fromEntries(LEVELS.map(l => [l.id, { noLoss: true, gates: true }])) };
+const trialProgress = () => (unlockAll ? ALL_PROGRESS : P);
+const trialUnlocked = T => Engine.isTrialUnlocked(trialProgress(), T);
+const openTrial = T => openIntro(Engine.trialLevel(T), T); // 開一題：開場頁用套好修飾詞的夜（選夜列與開場頁的守望／烈火切換都走這裡）
 
 
 // ====== 點兵與圖鑑 ======
@@ -1216,7 +1286,7 @@ function openRoster(mode, from) {
   $('#roster-go').hidden = mode !== 'pick';
   $('#roster-back').textContent = roster.from === 'intro' ? '回開場' : roster.from === 'pause' ? '回暫停' : '回關卡';
   renderRoster();
-  $('#levels').hidden = true; $('#trials').hidden = true; $('#intro').hidden = true; $('#pause').hidden = true; $('#roster').hidden = false;
+  for (const m of MENU_IDS) $(m).hidden = true; $('#pause').hidden = true; $('#roster').hidden = false;
 }
 function renderRoster() {
   const grid = $('#roster-grid'); grid.innerHTML = '';
@@ -1432,7 +1502,7 @@ function syncPause() {
 }
 function pauseGame() {
   if (!G || G.over || paused) return;
-  if (!$('#result').hidden || !$('#roster').hidden || !$('#intro').hidden || !$('#levels').hidden) return;
+  if (!$('#result').hidden || !$('#roster').hidden || MENU_IDS.some(m => !$(m).hidden)) return;
   paused = true; $('#pause').hidden = false; syncPause(); syncSoundUI();
   $('#pause-note').textContent = `狼也在等。回來再按繼續。${checkpointNote()}`;
 }
@@ -1628,7 +1698,7 @@ $('#notice-ok').addEventListener('click', () => { $('#notice').hidden = true; So
 buildBoard(); buildLevels(); // buildBoard 是非同步的（載圖）；開始守夜前會確認棋盤已就緒
 diff = SD.prefs.diff || 'calm';
 if (!DIFFS[diff]) diff = 'calm';
-document.querySelectorAll('.diff').forEach(b => b.addEventListener('click', () => applyDiff(b.dataset.key)));
+document.querySelectorAll('#diffs .diff').forEach(b => b.addEventListener('click', () => applyDiff(b.dataset.key))); // 守望／烈火那兩顆也是 .diff，點了是換題（openIntro 裡掛），不是換難度
 $('#start').addEventListener('click', () => { if (!boardReady) { toast(Board.ready ? '棋盤圖還在載入，等一下再按' : '這支瀏覽器開不了棋盤畫面', true); return; } markIntroSeen(); if (pickedFor(level) && !hasLoadout(level)) { openRoster('pick', 'intro'); return; } $('#intro').hidden = true; startGame(); });
 $('#intro-back').addEventListener('click', backToLevels);
 $('#retry').addEventListener('click', () => startGame());
