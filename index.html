@@ -776,7 +776,7 @@ function modsText(T, L) {
   const m = T.mods, out = [];
   if (L.conveyor) out.push(`📦 卡每 ${L.conveyor.every} 秒送一張，手上最多 ${L.conveyor.max} 張，滿了就不送${Array.isArray(L.conveyor.start) && L.conveyor.start.length ? `；開局先給 ${L.conveyor.start.map(k => UNITS[k] ? UNITS[k].name : k).join('、')}` : ''}`);
   if (m.waves !== undefined) out.push(`🌙 只打 ${L.waves.length} 波就天亮`);
-  if (m.waveOverride) { const n = L.waves.reduce((a, w) => a + w.list.reduce((s, [, k]) => s + k, 0), 0); out.push(L.waves.length === 1 ? `🔥 整夜 ${n} 隻一波來，沒有波間的喘息` : `🕯️ 敵人表另寫：${L.waves.length} 波共 ${n} 隻，第一波就五排都來`); }
+  if (m.waveOverride) { const n = L.waves.reduce((a, w) => a + w.list.reduce((s, [, k]) => s + k, 0), 0); const r0 = L.waves[0].rows.length; out.push(L.waves.length === 1 ? `🔥 整夜 ${n} 隻一波來，沒有波間的喘息` : `🕯️ 敵人表另寫：${L.waves.length} 波共 ${n} 隻，第一波就${r0 === ROWS ? '五排都來' : `從 ${r0} 排來`}`); }
   if (m.maxSheepLost !== undefined && L.sheep) out.push(m.maxSheepLost === 0 ? '🐑 失一隻羊就輸' : `🐑 最多只能失 ${m.maxSheepLost} 隻羊`);
   return out; // 看門的幾位在難度提示那行（gateAdvice）與五格預覽；哪幾張卡在「今晚上場」那行——不重講（審查 10/29：同一件事講三次）
 }
@@ -1088,8 +1088,9 @@ function onLose(reason, by) {
   recordBest(false); clearCheckpoint();
   trackNightEnd('lose');
   const who = by && ENEMIES[by] ? ENEMIES[by].name : null; // 標題寫闖進來的那一隻的名字：夜鴞就是夜鴞、母熊就是母熊，不再一律翻成狼／鷙鳥
-  const titles = { wolf: `${who || '狼'}闖進羊圈了`, bird: `${who || '鷙鳥'}飛進羊圈了`, sheep: '羊被偷光了', sheepLost: '失了一隻羊' }; // sheepLost：試煉「失羊即輸」（新期 2）
-  const text = trial ? (reason === 'sheepLost' ? '這一題失一隻羊就算輸。' : '') + TRIAL_KINDS[trial.kind].lose : (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
+  const allow = level.maxSheepLost || 0; // sheepLost：試煉「失羊即輸」（新期 2）；題目准失幾隻就寫幾隻
+  const titles = { wolf: `${who || '狼'}闖進羊圈了`, bird: `${who || '鷙鳥'}飛進羊圈了`, sheep: '羊被偷光了', sheepLost: allow ? `失了 ${allow + 1} 隻羊` : '失了一隻羊' };
+  const text = trial ? (reason === 'sheepLost' ? (allow ? `這一題最多只能失 ${allow} 隻羊。` : '這一題失一隻羊就算輸。') : '') + TRIAL_KINDS[trial.kind].lose : (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
   nightfall();
   setTimeout(() => { endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`); $('#next').hidden = true; $('#retry').textContent = trial ? '再打這一題' : '再守一夜'; }, REDUCE_MOTION.matches ? 0 : 900);
 }

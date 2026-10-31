@@ -237,7 +237,10 @@
     if (m.startFood !== undefined) L.startFood = m.startFood;
     if (m.gates !== undefined) L.gates = m.gates.length ? m.gates.slice() : false;
     if (m.waves !== undefined) L.waves = level.waves.slice(0, m.waves);
-    if (m.waveOverride) { L.waves = m.waveOverride.map(w => ({ ...w, list: w.list.map(x => [...x]), rows: w.rows.slice() })); L.diffScale = 0; } // 自帶波表寫的是最終數字，難度倍率不再乘
+    if (m.waveOverride) { // 自帶波表寫的是最終數字，難度倍率不再乘；但牧人產糧的難度折扣照原夜（shepherdEvery 也讀 diffScale，code-review 10/31 抓到）
+      L.waves = m.waveOverride.map(w => ({ ...w, list: w.list.map(x => [...x]), rows: w.rows.slice() }));
+      L.shepherdScale = level.shepherdScale ?? level.diffScale ?? 0.6; L.diffScale = 0;
+    }
     if (m.maxSheepLost !== undefined) L.maxSheepLost = m.maxSheepLost;
     if (m.conveyor === false) delete L.conveyor;
     else if (m.conveyor) {
@@ -400,6 +403,7 @@
       if (!nm.mods || nm.problems.length || !sameMods(nm.mods, snap.mods)) return false;
       if (nm.mods.waves !== undefined && snap.wave >= nm.mods.waves) return false;
       if (nm.mods.waveOverride && snap.wave >= nm.mods.waveOverride.length) return false; // 自帶波表的波數跟原夜不同（烈火只有一波：沒有波間檢查點）
+      if (nm.mods.maxSheepLost !== undefined && (snap.sheepLost || 0) > nm.mods.maxSheepLost) return false; // 失羊已經超過題目准的：這局早該輸了，不接
     }
     if (snap.sheep !== undefined && !isInt(snap.sheep, 0, 99)) return false;
     if (snap.sheepLost !== undefined && !isInt(snap.sheepLost, 0, 99)) return false;

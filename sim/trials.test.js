@@ -66,6 +66,7 @@ test('修飾詞 waveOverride：換掉整張波表、數字照寫不乘難度倍�
     assert.strictEqual(G.total, 18); assert.strictEqual(G.level.diffScale, 0);
   }
   const story = E.create(1, 'storm', rng); assert.notStrictEqual(story.waves[1].gap, 2.6, '沒給修飾詞的暴風夜照常乘倍率');
+  const Gs = E.create(1, 'storm', rng, { waveOverride: WO }); assert.strictEqual(Gs.level.shepherdScale, 1, '牧人產糧的難度折扣照原夜（第 1 夜 diffScale 1），不跟著 diffScale 歸 0'); assert.strictEqual(E.create(8, 'storm', rng, { waveOverride: WO }).level.shepherdScale, 0.6);
   for (const bad of [[{ list: [['boar', 2]], gap: 1, rows: [9] }], [{ list: [], gap: 1, rows: [1] }], [{ list: [['nope', 1]], gap: 1, rows: [1] }], [{ list: [['wolf', 1]], gap: 0, rows: [1] }], [], 'x', [{ list: [['wolf', 1]], gap: 1, rows: [1], hpMul: 99 }]]) {
     const r = E.normalizeMods(base, { waveOverride: bad }); assert.strictEqual(r.mods, null, JSON.stringify(bad)); assert.ok(r.problems.some(p => p.includes('waveOverride')));
   }
@@ -163,4 +164,5 @@ test('檢查點：試煉的快照帶修飾詞（含整張波表），同一題�
   const ss = JSON.parse(JSON.stringify(E.snapshot(sg)));
   assert.ok(!E.restore(E.create(t.levelId, t.diff, rng, t.mods), ss), '故事的檔不能接試煉');
   const other = E.create(t.levelId, t.diff, rng, { ...t.mods, maxSheepLost: 1 }); assert.ok(!E.restore(other, snap), '同一夜、修飾詞差一個欄位也不能接');
+  const over = { ...snap, sheepLost: 1 }; assert.ok(!E.checkSnapshot(over, t.levelId), '失羊已超過 maxSheepLost 的檔不接'); assert.ok(!E.restore(E.create(t.levelId, t.diff, rng, t.mods), over));
 });

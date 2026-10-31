@@ -707,9 +707,9 @@ const TRIALS = [
   // ── 第 1 夜 雅各的夜 ──
   { id: 'w1', kind: 'watch', levelId: 1, diff: 'storm', title: '雅各的夜・守望',
     mods: { gates: 0, waveOverride: [
-      { list: [['wolf', 10]], gap: 1.6, rows: ALL, hpMul: 2.2, say: '第 1 波，五排都有狼' },
-      { list: [['fast', 10], ['wolf', 16]], gap: 0.8, rows: ALL, hpMul: 3.2, say: '快狼先到' },
-      { list: [['wolf', 28], ['fast', 18]], gap: 0.55, rows: ALL, hpMul: 4.6, say: '最後一波，整群一起來' },
+      { list: [['wolf', 6]], gap: 2.32, rows: ALL, hpMul: 1.66, say: '第 1 波，五排都有狼' },
+      { list: [['fast', 6], ['wolf', 9]], gap: 1.16, rows: ALL, hpMul: 2.21, say: '快狼先到' },
+      { list: [['wolf', 15], ['fast', 10]], gap: 0.8, rows: ALL, hpMul: 2.98, say: '最後一波，整群一起來' },
     ] },
     text: '同一片草地，但今晚門口沒有看門的。狼第一波就從五排來，比暴風夜更密、更壯。石牆要擋在每一排射手前面。',
     win: '沒有人替你擋，你也沒讓一隻進來。雅各說：「這二十年我就是這樣守的。」' },
@@ -722,9 +722,9 @@ const TRIALS = [
   // ── 第 2 夜 哈蘭的第二夜 ──
   { id: 'w15', kind: 'watch', levelId: 15, diff: 'storm', title: '哈蘭的第二夜・守望',
     mods: { gates: 0, waveOverride: [
-      { list: [['wolf', 12]], gap: 1.5, rows: ALL, hpMul: 2.2, say: '第 1 波' },
-      { list: [['fast', 17], ['wolf', 10]], gap: 0.75, rows: ALL, hpMul: 3.0, ordered: true, say: '快狼成群衝過來' },
-      { list: [['wolf', 23], ['fast', 19]], gap: 0.65, rows: ALL, hpMul: 4.3, say: '最後一波' },
+      { list: [['wolf', 9]], gap: 1.88, rows: ALL, hpMul: 1.9, say: '第 1 波' },
+      { list: [['fast', 13], ['wolf', 8]], gap: 0.94, rows: ALL, hpMul: 2.5, ordered: true, say: '快狼成群衝過來' },
+      { list: [['wolf', 17], ['fast', 14]], gap: 0.81, rows: ALL, hpMul: 3.47, say: '最後一波' },
     ] },
     text: '狼比昨夜多一倍，快狼成群先到。沒有看門的，狗撲住一隻的時候，其餘的還在跑。',
     win: '狗累得趴下，羊一隻不少。雅各說：「你所有的很少，現今卻發大眾多。」' },
@@ -737,10 +737,10 @@ const TRIALS = [
   // ── 第 3 夜 大衛的曠野 ──
   { id: 'w2', kind: 'watch', levelId: 2, diff: 'storm', title: '大衛的曠野・守望',
     mods: { gates: 0, waveOverride: [
-      { list: [['wolf', 10], ['fast', 4]], gap: 1.7, rows: ALL, hpMul: 2.0, say: '第 1 波' },
-      { list: [['alpha', 2], ['wolf', 12], ['fast', 6]], gap: 0.9, rows: ALL, hpMul: 2.6, ordered: true, say: '兩隻領頭狼' },
-      { list: [['bear', 2], ['wolf', 10], ['fast', 6]], gap: 1.1, rows: ALL, hpMul: 2.8, ordered: true, say: '兩隻熊' },
-      { list: [['lion', 2], ['alpha', 1], ['wolf', 16], ['fast', 10]], gap: 0.8, rows: ALL, hpMul: 3.4, ordered: true, say: '獅子，兩隻' },
+      { list: [['wolf', 7], ['fast', 3]], gap: 2.3, rows: ALL, hpMul: 1.65, say: '第 1 波' },
+      { list: [['alpha', 2], ['wolf', 8], ['fast', 4]], gap: 1.22, rows: ALL, hpMul: 2.04, ordered: true, say: '兩隻領頭狼' },
+      { list: [['bear', 2], ['wolf', 7], ['fast', 4]], gap: 1.49, rows: ALL, hpMul: 2.17, ordered: true, say: '兩隻熊' },
+      { list: [['lion', 2], ['alpha', 1], ['wolf', 10], ['fast', 7]], gap: 1.08, rows: ALL, hpMul: 2.56, ordered: true, say: '獅子，兩隻' },
     ] },
     text: '領頭狼兩隻、熊兩隻、獅子兩隻，沒有看門的。機弦手要在獅子到牆前就開始打。',
     win: '獅子和熊都倒在牆前。大衛說：「我追上去打牠，救出羊羔來。」' },
@@ -753,10 +753,10 @@ const TRIALS = [
   // ── 第 4 夜 雇工與賊（羊 3）──
   { id: 'w3', kind: 'watch', levelId: 3, diff: 'storm', title: '雇工與賊・守望',
     mods: { gates: 0, maxSheepLost: 0, waveOverride: [
-      { list: [['wolf', 12]], gap: 1.5, rows: ALL, hpMul: 2.2, say: '第 1 波' },
-      { list: [['wolf', 18], ['fast', 10]], gap: 0.8, rows: ALL, hpMul: 3.0, say: '狼群' },
-      { list: [['thief', 5], ['wolf', 14], ['thief', 5]], gap: 0.9, rows: ALL, hpMul: 3.4, ordered: true, say: '賊混在狼裡' },
-      { list: [['rustler', 4], ['fox', 10], ['wolf', 16], ['rustler', 4], ['fox', 10]], gap: 0.7, rows: ALL, hpMul: 4.0, ordered: true, say: '偷羊人來了，一隻都不能被抱走' },
+      { list: [['wolf', 9]], gap: 1.88, rows: ALL, hpMul: 1.9, say: '第 1 波' },
+      { list: [['wolf', 14], ['fast', 8]], gap: 1, rows: ALL, hpMul: 2.5, say: '狼群' },
+      { list: [['thief', 4], ['wolf', 11], ['thief', 4]], gap: 1.13, rows: ALL, hpMul: 2.8, ordered: true, say: '賊混在狼裡' },
+      { list: [['rustler', 3], ['fox', 8], ['wolf', 12], ['rustler', 3], ['fox', 8]], gap: 0.88, rows: ALL, hpMul: 3.25, ordered: true, say: '偷羊人來了，一隻都不能被抱走' },
     ] },
     text: '賊和偷羊人更多，沒有看門的，一隻羊被抱走就算輸。守望樓要看得到五排。',
     win: '羊一隻沒少，賊一個沒進來。「我是好牧人，好牧人為羊捨命。」' },
@@ -769,12 +769,12 @@ const TRIALS = [
   // ── 第 5 夜 葡萄園的小狐狸（羊 5）──
   { id: 'w16', kind: 'watch', levelId: 16, diff: 'storm', title: '葡萄園的小狐狸・守望',
     mods: { gates: 0, maxSheepLost: 0, waveOverride: [
-      { list: [['fox', 14]], gap: 1.0, rows: ALL, hpMul: 3.0, say: '狐狸，五排都來' },
-      { list: [['thief', 4], ['fox', 20]], gap: 0.65, rows: ALL, hpMul: 3.4, ordered: true, say: '賊帶著狐狸' },
-      { list: [['rustler', 6], ['fox', 16], ['wolf', 11]], gap: 0.6, rows: ALL, hpMul: 3.8, ordered: true, say: '偷羊人，六個' },
-      { list: [['rustler', 9], ['fox', 28], ['thief', 7]], gap: 0.5, rows: ALL, hpMul: 4.4, ordered: true, say: '最後一波，偷羊人最多' },
+      { list: [['fox', 8]], gap: 1.45, rows: ALL, hpMul: 2.1, say: '狐狸，五排都來' },
+      { list: [['thief', 2], ['fox', 11]], gap: 0.94, rows: ALL, hpMul: 2.32, ordered: true, say: '賊帶著狐狸' },
+      { list: [['rustler', 3], ['fox', 9], ['wolf', 6]], gap: 0.87, rows: ALL, hpMul: 2.54, ordered: true, say: '偷羊人，六個' },
+      { list: [['rustler', 5], ['fox', 15], ['thief', 4]], gap: 0.73, rows: ALL, hpMul: 2.87, ordered: true, say: '最後一波，偷羊人最多' },
     ] },
-    text: '小狐狸一波比一波多，偷羊人九個排在最後。沒有看門的，失一隻羊就輸。狗要放在偷羊人會走的排。',
+    text: '小狐狸一波比一波多，偷羊人五個排在最後。沒有看門的，失一隻羊就輸。狗要放在偷羊人會走的排。',
     win: '葡萄園一粒沒少，羊也一隻沒少。「要給我們擒拿狐狸，就是毀壞葡萄園的小狐狸。」' },
   { id: 'f16', kind: 'fire', levelId: 16, diff: 'storm', title: '葡萄園的小狐狸・烈火',
     mods: { units: ['slinger', 'wall', 'hireling'], oneBudget: true, startFood: 850, gates: 0, maxSheepLost: 0, waveOverride: [
@@ -785,10 +785,10 @@ const TRIALS = [
   // ── 第 6 夜 何烈山下 ──
   { id: 'w4', kind: 'watch', levelId: 4, diff: 'storm', title: '何烈山下・守望',
     mods: { gates: 0, waveOverride: [
-      { list: [['wolf', 8]], gap: 2.6, rows: ALL, hpMul: 1.6, say: '第 1 波' },
-      { list: [['locust', 36]], gap: 0.4, rows: [0, 2, 4], hpMul: 1.6, say: '蝗群，從邊排和中排來' },
-      { list: [['digger', 3], ['wolf', 10], ['digger', 3]], gap: 1.6, rows: ALL, hpMul: 2.4, ordered: true, say: '野狗從地底冒出來' },
-      { list: [['locust', 30], ['wolf', 11], ['digger', 4], ['fast', 7]], gap: 0.8, rows: ALL, hpMul: 3.4, say: '最後一波，什麼都來' },
+      { list: [['wolf', 7]], gap: 3.07, rows: ALL, hpMul: 1.49, say: '第 1 波' },
+      { list: [['locust', 30]], gap: 0.47, rows: [0, 2, 4], hpMul: 1.49, say: '蝗群，從邊排和中排來' },
+      { list: [['digger', 2], ['wolf', 8], ['digger', 2]], gap: 1.89, rows: ALL, hpMul: 2.15, ordered: true, say: '野狗從地底冒出來' },
+      { list: [['locust', 25], ['wolf', 9], ['digger', 3], ['fast', 6]], gap: 0.94, rows: ALL, hpMul: 2.97, say: '最後一波，什麼都來' },
     ] },
     text: '蝗群換了排走，野狗更多，沒有看門的。石堆佔住的格子還在，弓箭手和荊棘的位置要先想好。',
     win: '蝗群過去了，草還在。摩西說：「你站的地方是聖地。」' },
@@ -801,12 +801,12 @@ const TRIALS = [
   // ── 第 7 夜 提哥亞的牧人 ──
   { id: 'w5', kind: 'watch', levelId: 5, diff: 'storm', title: '提哥亞的牧人・守望',
     mods: { gates: 0, waveOverride: [
-      { list: [['wolf', 13]], gap: 1.5, rows: ALL, hpMul: 2.0, say: '第 1 波' },
-      { list: [['bird', 4], ['wolf', 13], ['bird', 5]], gap: 1.0, rows: ALL, hpMul: 3.0, ordered: true, say: '鷙鳥飛過牆' },
-      { list: [['wolf', 26], ['fast', 9]], gap: 0.5, rows: [1, 3], hpMul: 3.2, say: '兩排擠滿了狼' },
-      { list: [['bear', 2], ['wolf', 18], ['bird', 9], ['bear', 2]], gap: 0.8, rows: ALL, hpMul: 3.8, ordered: true, say: '四隻熊' },
+      { list: [['wolf', 10]], gap: 1.88, rows: ALL, hpMul: 1.75, say: '第 1 波' },
+      { list: [['bird', 3], ['wolf', 10], ['bird', 4]], gap: 1.25, rows: ALL, hpMul: 2.5, ordered: true, say: '鷙鳥飛過牆' },
+      { list: [['wolf', 20], ['fast', 7]], gap: 0.63, rows: [1, 3], hpMul: 2.65, say: '兩排擠滿了狼' },
+      { list: [['bear', 2], ['wolf', 14], ['bird', 7], ['bear', 2]], gap: 1, rows: ALL, hpMul: 3.1, ordered: true, say: '四隻熊' },
     ] },
-    text: '鷙鳥九隻、熊四隻，狼擠在第 2、4 排。沒有看門的。火盆的位置決定這一夜。',
+    text: '鷙鳥十四隻、熊四隻，狼擠在第 2、4 排。沒有看門的。火盆的位置決定這一夜。',
     win: '熊在火前停住了。阿摩司說：「獅子吼叫，誰不懼怕呢？」' },
   { id: 'f5', kind: 'fire', levelId: 5, diff: 'storm', title: '提哥亞的牧人・烈火',
     mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer'], oneBudget: true, startFood: 1700, gates: 0, waveOverride: [
@@ -817,10 +817,10 @@ const TRIALS = [
   // ── 第 8 夜 基甸的三百人 ──
   { id: 'w6', kind: 'watch', levelId: 6, diff: 'storm', title: '基甸的三百人・守望',
     mods: { gates: 0, waveOverride: [
-      { list: [['wolf', 11]], gap: 0.7, rows: [1, 2, 3], hpMul: 1.5, say: '狼從中間三排湧進來' },
-      { list: [['wolf', 14], ['fast', 8]], gap: 0.7, rows: [0, 2, 4], hpMul: 2.0, say: '換邊排了' },
-      { list: [['alpha', 3], ['locust', 28], ['wolf', 11]], gap: 0.65, rows: ALL, hpMul: 2.4, say: '三隻領頭狼' },
-      { list: [['alpha', 4], ['wolf', 20], ['fast', 11], ['locust', 28]], gap: 0.5, rows: ALL, hpMul: 3.0, say: '最後一波，四隻領頭狼' },
+      { list: [['wolf', 7]], gap: 0.9, rows: [1, 2, 3], hpMul: 1.36, say: '狼從中間三排湧進來' },
+      { list: [['wolf', 9], ['fast', 5]], gap: 0.9, rows: [0, 2, 4], hpMul: 1.7, say: '換邊排了' },
+      { list: [['alpha', 3], ['locust', 20], ['wolf', 7]], gap: 0.83, rows: ALL, hpMul: 1.99, say: '三隻領頭狼' },
+      { list: [['alpha', 4], ['wolf', 14], ['fast', 7], ['locust', 20]], gap: 0.65, rows: ALL, hpMul: 2.41, say: '最後一波，四隻領頭狼' },
     ] },
     text: '狼先湧中間三排、再換邊排；領頭狼七隻。準備時間一樣短，沒有看門的。',
     win: '三百人夠了。基甸說：「不是靠人多。」' },
@@ -833,12 +833,12 @@ const TRIALS = [
   // ── 第 9 夜 烏西雅的牧場 ──
   { id: 'w17', kind: 'watch', levelId: 17, diff: 'storm', title: '烏西雅的牧場・守望',
     mods: { gates: 0, waveOverride: [
-      { list: [['wolf', 12]], gap: 1.5, rows: ALL, hpMul: 2.2, say: '第 1 波' },
-      { list: [['wolf', 20], ['fast', 8]], gap: 0.65, rows: ALL, hpMul: 3.2, say: '狼群' },
-      { list: [['wolf', 28], ['locust', 32]], gap: 0.32, rows: [1, 3], hpMul: 3.6, say: '兩排擠滿了' },
-      { list: [['bear', 2], ['alpha', 2], ['bird', 8], ['wolf', 20], ['fast', 8]], gap: 0.75, rows: ALL, hpMul: 4.3, ordered: true, say: '熊、領頭狼、鷙鳥，一起來' },
+      { list: [['wolf', 9]], gap: 1.93, rows: ALL, hpMul: 1.84, say: '第 1 波' },
+      { list: [['wolf', 14], ['fast', 5]], gap: 0.84, rows: ALL, hpMul: 2.54, say: '狼群' },
+      { list: [['wolf', 19], ['locust', 23]], gap: 0.41, rows: [1, 3], hpMul: 2.83, say: '兩排擠滿了' },
+      { list: [['bear', 2], ['alpha', 2], ['bird', 5], ['wolf', 14], ['fast', 5]], gap: 0.96, rows: ALL, hpMul: 3.32, ordered: true, say: '熊、領頭狼、鷙鳥，一起來' },
     ] },
-    text: '第 3 波六十隻擠進第 2、4 排，最後一波熊和領頭狼一起。沒有看門的，投石機要早放。',
+    text: '第 3 波四十來隻擠進第 2、4 排，最後一波熊和領頭狼一起。沒有看門的，投石機要早放。',
     win: '牧場一夜無事。烏西雅說：「我喜愛農事。」' },
   { id: 'f17', kind: 'fire', levelId: 17, diff: 'storm', title: '烏西雅的牧場・烈火',
     mods: { units: ['slinger', 'wall', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn'], oneBudget: true, startFood: 1300, gates: 0, waveOverride: [
@@ -849,11 +849,11 @@ const TRIALS = [
   // ── 第 10 夜 尋找我的羊（羊 3）──
   { id: 'w7', kind: 'watch', levelId: 7, diff: 'storm', title: '尋找我的羊・守望',
     mods: { gates: 0, maxSheepLost: 0, waveOverride: [
-      { list: [['wolf', 9], ['fast', 3]], gap: 1.8, rows: ALL, hpMul: 2.2, say: '第 1 波' },
-      { list: [['wolf', 18], ['locust', 22]], gap: 0.6, rows: ALL, hpMul: 2.6, say: '蝗群和狼' },
-      { list: [['thief', 4], ['rustler', 3], ['fox', 6], ['digger', 4]], gap: 1.2, rows: ALL, hpMul: 2.8, say: '賊、偷羊人、狐狸、野狗' },
-      { list: [['bear', 3], ['alpha', 3], ['bird', 6], ['wolf', 15]], gap: 1.1, rows: ALL, hpMul: 3.2, ordered: true, say: '三隻熊、三隻領頭狼' },
-      { list: [['lion', 2], ['wolf', 15], ['lion', 1], ['fast', 12], ['locust', 30]], gap: 0.9, rows: ALL, hpMul: 3.6, ordered: true, say: '最後一波，三隻獅子' },
+      { list: [['wolf', 7], ['fast', 2]], gap: 2.25, rows: ALL, hpMul: 1.9, say: '第 1 波' },
+      { list: [['wolf', 14], ['locust', 17]], gap: 0.75, rows: ALL, hpMul: 2.2, say: '蝗群和狼' },
+      { list: [['thief', 3], ['rustler', 2], ['fox', 5], ['digger', 3]], gap: 1.5, rows: ALL, hpMul: 2.35, say: '賊、偷羊人、狐狸、野狗' },
+      { list: [['bear', 3], ['alpha', 3], ['bird', 5], ['wolf', 11]], gap: 1.38, rows: ALL, hpMul: 2.65, ordered: true, say: '三隻熊、三隻領頭狼' },
+      { list: [['lion', 2], ['wolf', 11], ['lion', 1], ['fast', 9], ['locust', 23]], gap: 1.13, rows: ALL, hpMul: 2.95, ordered: true, say: '最後一波，三隻獅子' },
     ] },
     text: '第一章的最後一夜，五波全部更密，獅子三隻。沒有看門的，失一隻羊就輸。',
     win: '找到了，一隻也沒少。「我的羊，我必親自尋找。」' },
