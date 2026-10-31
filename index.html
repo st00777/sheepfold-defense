@@ -222,6 +222,9 @@
   .btn.small { margin-top: 6px; padding: 6px 14px; font-size: 13px; }
   .home-btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 6px; }
   .corner.back { font-size: 14px; padding: 6px 10px; } /* 選章／選夜左上角的「‹ 回上一層」 */
+  /* 主畫面封面橫幅（img/cover-home.webp，2026-10-31 小居重畫的無字版，裁 2:1）：滿版貼到對話框邊，角落的 ⚙️ 🔊 壓在圖上 */
+  .cover { display: block; width: calc(100% + 32px); margin: -18px -16px 12px; aspect-ratio: 2 / 1; object-fit: cover; border-radius: 14px 14px 0 0; background: #0d1230; }
+  .corner { z-index: 1; }
   .ch-sub { font-size: 13px; min-height: 16px; }
   /* 主畫面的模式入口與選章的章卡：比夜列高、字大，一屏兩三張 */
   #modes { margin-top: 12px; }
@@ -354,6 +357,7 @@
   <div class="dialog home">
     <button class="corner snd-btn" id="snd-btn-levels" title="聲音">🔊</button>
     <button class="corner left" id="settings-btn" title="設定：存檔碼、統計">⚙️</button>
+    <img class="cover" src="img/cover-home.webp" alt="" onerror="this.remove()">
     <h1>羊圈守夜</h1>
     <div class="ref">受託守夜的無名牧人。每一夜都取材自聖經裡牧人的故事。</div>
     <div id="save-note" hidden></div>
@@ -596,6 +600,7 @@ const HOME_UPDATE = '最近更新 10/31：首頁分成三層——主畫面、�
 const CHANGELOG = [
   { ver: '2026.10.31', notes: [
     '首頁分成三層：主畫面只有「接著守」和「守夜」「守夜試煉」兩個入口，進去再選章、選夜，每一屏都不用捲；試煉一夜一列，進開場頁再選守望或烈火',
+    '封面重畫：換成現在的角色（棕白牧羊犬、投石手、弓箭手都在），主畫面上方多了封面橫幅，分享預覽圖也換了',
     '守夜試煉改版：每一夜兩題——「守望試煉」（同一夜的敵人另排一張表，更密、沒有看門的）與「烈火試煉」（整夜的敵人一波來、一筆糧、少幾張卡）；先出第一章十夜共 20 題，第二、三章陸續加',
     '解鎖改成：那一夜暴風夜拿到全部的星，那一夜的兩題就開；有羊的夜失一隻羊就輸',
     '原本的 6 題（排陣解謎、送卡護羊、一筆糧）下架，它們的紀錄不再顯示',
