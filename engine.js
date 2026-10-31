@@ -1071,7 +1071,7 @@
       if (e.deflectCd > 0) e.deflectCd -= dt; if (e.detourCd > 0) e.detourCd -= dt;
       // 換排的畫面位置：rv 朝 r 滑過去
       if (def.drift) { // 夜鴞：排號跟著飄；飄進油燈照到的排就停住（光裡的敵人不換排）
-        if (rowLit(G, e.r)) { e.rv += (e.r - e.rv) * Math.min(1, dt * 4); e.r0 = e.r; e.driftT = 0; }
+        if (rowLit(G, e.r)) { e.rv += (e.r - e.rv) * Math.min(1, dt * 4); e.r0 = Math.max(def.drift, Math.min(ROWS - 1 - def.drift, e.r)); e.driftT = 0; } // 軸心也夾在不會飄出棋盤的排：停在邊排時燈熄了，再飄會到第 -1 排（2026-10-31 模擬撞出）
         else { e.driftT += dt; e.rv = e.r0 + Math.sin(e.driftT / def.driftT * Math.PI * 2) * def.drift; const nr = Math.round(e.rv); if (nr !== e.r) { e.r = nr; } }
       }
       else if (e.rv !== e.r) { e.hopT = Math.min(1, (e.hopT || 0) + dt / STATUS.hop.t); const p = e.hopT * e.hopT * (3 - 2 * e.hopT); e.rv = e.hopT >= 1 ? e.r : (e.hopFrom ?? e.rv) + (e.r - (e.hopFrom ?? e.rv)) * p; }
