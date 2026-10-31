@@ -13,13 +13,14 @@ const run = (G, sec, dt = 0.1) => { for (let t = 0; t < sec; t += dt) { E.step(G
 const full = id => ({ cleared: { [id]: { storm: true } }, stars: { [id]: { noLoss: true, gates: true } } }); // 那一夜暴風三星
 const WO = [{ list: [['wolf', 6]], gap: 2, rows: [1, 2, 3] }, { list: [['wolf', 8], ['fast', 4]], gap: 1, rows: [0, 1, 2, 3, 4], hpMul: 1.8, ordered: true, say: '來了' }];
 
-test('資料：第一章十夜各兩題（守望 w<夜>、烈火 f<夜>），validateTrials 乾淨，題目文字齊全，每題的敵人與卡都是那一夜以前見過的', () => {
-  assert.strictEqual(TRIALS.length, 20);
+test('資料：第一、二章各十夜各兩題（守望 w<夜>、烈火 f<夜>），validateTrials 乾淨，題目文字齊全，每題的敵人與卡都是那一夜以前見過的', () => {
+  assert.strictEqual(TRIALS.length, 40);
   assert.deepStrictEqual(E.validateTrials(), []);
   const kinds = {}; for (const t of TRIALS) kinds[t.kind] = (kinds[t.kind] || 0) + 1;
-  assert.deepStrictEqual(kinds, { watch: 10, fire: 10 });
-  const ch1 = LEVELS.filter(l => (l.chapter || 1) === 1).map(l => l.id);
-  for (const id of ch1) { assert.ok(E.trialById('w' + id), 'w' + id); assert.ok(E.trialById('f' + id), 'f' + id); }
+  assert.deepStrictEqual(kinds, { watch: 20, fire: 20 });
+  const ch12 = LEVELS.filter(l => (l.chapter || 1) <= 2).map(l => l.id);
+  assert.strictEqual(ch12.length, 20);
+  for (const id of ch12) { assert.ok(E.trialById('w' + id), 'w' + id); assert.ok(E.trialById('f' + id), 'f' + id); }
   for (const t of TRIALS) {
     assert.ok(TRIAL_KINDS[t.kind] && E.trialById(t.id) === t && t.diff === 'storm', t.id);
     for (const f of ['title', 'text', 'win']) assert.ok(typeof t[f] === 'string' && t[f].length >= 3, `${t.id} 缺 ${f}`);
@@ -74,6 +75,23 @@ test('修飾詞 waveOverride：換掉整張波表、數字照寫不乘難度倍�
   run(G2, 25); assert.ok(!G2.events.some(e => e.t === 'toast' && e.msg === undefined), '第 1 波沒 say 不丟空 toast');
 });
 
+test('修飾詞 waveOverride 帶 strays／give（期 2c）：合規的留到關卡波表，迷羊照秒數進場、送卡夜照波送；壞的 strays 或不認識的 give 讓整張波表略過', () => {
+  const sheepNight = LEVELS.find(l => l.sheep && l.chapter === 2).id, giveNight = LEVELS.find(l => l.conveyor).id;
+  const ok = E.normalizeMods(E.levelById(sheepNight), { gates: 0, maxSheepLost: 0, waveOverride: [{ list: [['wolf', 2]], gap: 2, rows: [0, 1, 2, 3, 4], strays: [3, 9] }] });
+  assert.deepStrictEqual(ok.problems, []); assert.deepStrictEqual(ok.mods.waveOverride[0].strays, [3, 9]);
+  const G = E.create(sheepNight, 'storm', rng, ok.mods); assert.deepStrictEqual(G.waves[0].strays, [3, 9]);
+  E.dev.nextWave(G); run(G, 2); // 直接開第 1 波，這一波的迷羊秒數進佇列（3 秒那隻可能已經在場上）
+  assert.ok(G.strays.length + G.strayQueue.length >= 1, '迷羊排進佇列或已進場');
+  const gv = E.normalizeMods(E.levelById(giveNight), { gates: 0, waveOverride: [{ list: [['wolf', 2]], gap: 2, rows: [0, 1, 2, 3, 4], give: 'dog' }] });
+  assert.deepStrictEqual(gv.problems, []); assert.strictEqual(gv.mods.waveOverride[0].give, 'dog');
+  for (const bad of [{ strays: 'x' }, { strays: [-1] }, { strays: [700] }, { give: 'nope' }, { give: 3 }]) {
+    const r = E.normalizeMods(E.levelById(sheepNight), { gates: 0, maxSheepLost: 0, waveOverride: [{ list: [['wolf', 2]], gap: 2, rows: [0, 1, 2, 3, 4], ...bad }] });
+    assert.ok(r.problems.some(m => m.includes('waveOverride')) && r.mods.waveOverride === undefined, JSON.stringify(bad));
+  }
+  const empty = E.normalizeMods(E.levelById(sheepNight), { gates: 0, maxSheepLost: 0, waveOverride: [{ list: [['wolf', 2]], gap: 2, rows: [0, 1, 2, 3, 4], strays: [] }] });
+  assert.strictEqual(empty.mods.waveOverride[0].strays, undefined, '空陣列不留');
+});
+
 test('修飾詞 maxSheepLost：失一隻羊就輸（reason sheepLost，羊還在），沒羊的夜只提醒；快照帶著、同一題接得回', () => {
   const base = E.levelById(3);
   assert.deepStrictEqual(E.normalizeMods(base, { maxSheepLost: 0 }).mods, { maxSheepLost: 0 });
@@ -123,9 +141,10 @@ test('今日推薦：只在已開的題裡輪，同一天同一題、隔天換�
   const all = { cleared: Object.fromEntries(LEVELS.map(l => [l.id, { storm: true }])), stars: Object.fromEntries(LEVELS.map(l => [l.id, { noLoss: true, gates: true }])) };
   const a = E.dailyTrial(day(1), all), b = E.dailyTrial(new Date('2026-11-01T23:30:00'), all);
   assert.ok(a && a === b, '同一天不變');
-  const seq = Array.from({ length: 20 }, (_, i) => E.dailyTrial(day(i + 1), all).id);
-  assert.strictEqual(new Set(seq).size, 20, '二十天各不同：' + seq.join(' '));
-  assert.strictEqual(E.dailyTrial(day(21), all).id, seq[0], '第 21 天回到第一題');
+  const N = TRIALS.length, dayN = i => new Date(day(1).getTime() + i * 86400000); // 題數幾題就幾天輪一圈（第一章 20、加第二章 40）
+  const seq = Array.from({ length: N }, (_, i) => E.dailyTrial(dayN(i), all).id);
+  assert.strictEqual(new Set(seq).size, N, `${N} 天各不同：` + seq.join(' '));
+  assert.strictEqual(E.dailyTrial(dayN(N), all).id, seq[0], `第 ${N + 1} 天回到第一題`);
   for (let d = 1; d <= 6; d++) assert.ok(['w1', 'f1'].includes(E.dailyTrial(day(d), full(1)).id), '只有第 1 夜開：只推那兩題');
   assert.strictEqual(E.dailyTrial(day(1), { cleared: {}, stars: {} }), null); assert.strictEqual(E.dailyTrial(day(1), null), null);
 });
@@ -142,7 +161,7 @@ test('每題用模擬器的 good 玩家跑 10 局都能建局、打得完（不�
     assert.deepStrictEqual(G.mods, E.normalizeMods(E.levelById(t.levelId), t.mods).mods);
     assert.deepStrictEqual(G.gates, [], t.id + ' 沒看門的');
     if (t.kind === 'fire') { assert.ok(G.level.noShepherd); assert.strictEqual(G.food, t.mods.startFood); assert.ok(!G.level.units.includes('shepherd')); assert.strictEqual(G.waves.length, 1); }
-    else { assert.ok(!G.level.noShepherd && G.level.units.includes('shepherd')); assert.strictEqual(G.waves.length, E.levelById(t.levelId).waves.length); }
+    else { assert.ok(!G.level.noShepherd && (G.level.units.includes('shepherd') || G.level.conveyor), t.id + ' 守望有牧人（送卡夜除外）'); assert.strictEqual(G.waves.length, E.levelById(t.levelId).waves.length); }
     let timeouts = 0;
     for (let i = 0; i < 10; i++) { const r = SIM.play(t.levelId, t.diff, 1000 + i, 'good', t.mods); if (r.reason === 'timeout') timeouts++; }
     assert.strictEqual(timeouts, 0, `${t.id} 有局超時`);

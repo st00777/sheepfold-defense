@@ -138,7 +138,7 @@
   //   conveyor   true＝送卡模式（沒有糧、卡定時送；預設 7 秒一張、手上最多 6 張、開局隨機 3 張、權重均等）、物件＝自己給 every／max／start／weights、false＝關掉這一夜的送卡
   //   oneBudget  true＝一筆糧（糧不滴、沒有牧人）、false＝關掉這一夜的一筆糧
   // 新期 2（2026-10-31，守望／烈火試煉）再加兩個：
-  //   waveOverride 自帶波表（陣列，格式跟關卡 waves 一樣：list／gap／rows／hpMul／ordered／say／hint）。寫的是最終數字：套了這個，難度倍率不再乘（diffScale 0），作者寫幾隻就幾隻
+  //   waveOverride 自帶波表（陣列，格式跟關卡 waves 一樣：list／gap／rows／hpMul／ordered／say／hint／strays／give）。寫的是最終數字：套了這個，難度倍率不再乘（diffScale 0），作者寫幾隻就幾隻
   //   maxSheepLost 最多能失幾隻羊，超過就輸（0＝失一隻即輸；只有有羊的夜有意義，沒羊的夜寫了沒作用）
   // normalizeMods 把它整理成固定形狀（鍵固定順序、值已驗過），壞的欄位丟掉並寫進 problems；整理後的那份存進 G.mods 與檢查點，續玩時必須一模一樣
   const GATE_SETS = { 0: [], 1: [2], 2: [1, 3], 3: [1, 2, 3], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4] };
@@ -198,10 +198,13 @@
         && Array.isArray(w.rows) && w.rows.length > 0 && w.rows.every(r => Number.isInteger(r) && r >= 0 && r < ROWS) && new Set(w.rows).size === w.rows.length
         && (w.hpMul === undefined || (Number.isFinite(w.hpMul) && w.hpMul > 0 && w.hpMul <= 20))
         && (w.ordered === undefined || typeof w.ordered === 'boolean')
-        && (w.say === undefined || typeof w.say === 'string') && (w.hint === undefined || typeof w.hint === 'string');
-      if (!Array.isArray(W) || !W.length || W.length > 12 || !W.every(okWave)) problems.push('waveOverride 要是 1 到 12 波的陣列，每波 list／gap／rows 合規（hpMul／ordered／say／hint 可不給），略過');
+        && (w.say === undefined || typeof w.say === 'string') && (w.hint === undefined || typeof w.hint === 'string')
+        // 第二章的兩樣（期 2c，2026-10-31）：strays 這波迷羊幾秒後走進來（秒的陣列）、give 這波開打前送哪張卡（送卡夜用）
+        && (w.strays === undefined || (Array.isArray(w.strays) && w.strays.length <= 12 && w.strays.every(t => Number.isFinite(t) && t >= 0 && t <= 600)))
+        && (w.give === undefined || (typeof w.give === 'string' && Object.prototype.hasOwnProperty.call(UNITS, w.give)));
+      if (!Array.isArray(W) || !W.length || W.length > 12 || !W.every(okWave)) problems.push('waveOverride 要是 1 到 12 波的陣列，每波 list／gap／rows 合規（hpMul／ordered／say／hint／strays／give 可不給），略過');
       else {
-        out.waveOverride = W.map(w => { const o = { list: w.list.map(x => [x[0], x[1]]), gap: w.gap, rows: w.rows.slice().sort((a, b) => a - b), hpMul: w.hpMul === undefined ? 1 : w.hpMul }; if (w.ordered) o.ordered = true; if (w.say) o.say = w.say; if (w.hint) o.hint = w.hint; return o; });
+        out.waveOverride = W.map(w => { const o = { list: w.list.map(x => [x[0], x[1]]), gap: w.gap, rows: w.rows.slice().sort((a, b) => a - b), hpMul: w.hpMul === undefined ? 1 : w.hpMul }; if (w.ordered) o.ordered = true; if (w.say) o.say = w.say; if (w.hint) o.hint = w.hint; if (w.strays && w.strays.length) o.strays = w.strays.slice(); if (w.give) o.give = w.give; return o; });
         if (out.waves !== undefined) { delete out.waves; problems.push('有 waveOverride 就不用 waves（波數就是自帶波表的長度），waves 略過'); }
       }
     }
