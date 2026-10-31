@@ -60,22 +60,30 @@
   const TRIALS = D.TRIALS;
   const chapterOf = L => L.chapter || 1;
   function trialById(id) { return TRIALS.find(t => t.id === id) || null; }
-  // 這一題要守過哪一夜才開：那一夜所在的章的最後一夜；題目指到不存在的夜就回 null（鎖著，不讓畫面炸）
+  // 這一題要守過哪一夜才開：就是題目取材的那一夜（新期 2：該夜暴風夜三星，守望與烈火同時開）；題目指到不存在的夜就回 null（鎖著，不讓畫面炸）
   function trialGate(trial) {
     if (!trial) return null;
-    const base = LEVELS.find(l => l.id === trial.levelId); if (!base) return null;
-    const ch = chapterOf(base);
-    return LEVELS.filter(l => chapterOf(l) === ch).pop() || null;
+    return LEVELS.find(l => l.id === trial.levelId) || null;
   }
-  function isTrialUnlocked(cleared, trial) {
-    const gate = trialGate(trial);
-    return !!(gate && cleared && cleared[gate.id] && Object.keys(cleared[gate.id]).length);
+  // 暴風夜守過，而且那一夜的星全拿（星不分難度、整夜一份：noLoss 零損失＋gates 看門的都在；沒看門的夜只有兩顆）
+  // progress ＝ 存檔的 progress（{ cleared, stars }）；只給 cleared 的舊呼叫法當作沒有星
+  function isTrialUnlocked(progress, trial) {
+    const gate = trialGate(trial); if (!gate || !progress) return false;
+    const cleared = progress.cleared || progress, st = (progress.stars && progress.stars[gate.id]) || {};
+    if (!(cleared[gate.id] && cleared[gate.id].storm)) return false;
+    return !!(st.noLoss && (st.gates || starSlots(gate) === 2));
+  }
+  // 到這一夜為止（含這一夜）故事裡出現過的敵人種類：守望／烈火只准用這些（James 10/31：不把後面的敵人提前）
+  function enemiesSeenBy(levelId) {
+    const i = idxOf(levelId), seen = new Set();
+    for (let j = 0; j <= i; j++) for (const w of LEVELS[j].waves) for (const [t] of w.list) seen.add(t);
+    return seen;
   }
   // 這一題實際打的那一夜（套好修飾詞的關卡物件；id 跟原夜一樣，存檔要用 trial.id 另開一格）
   function trialLevel(trial) { const base = levelById(trial.levelId); return applyMods(base, normalizeMods(base, trial.mods).mods); }
   // 「今日推薦一題」：日期取模，不隨機。只在已開的題裡輪（審查 10/29：推薦一題鎖著的沒有用）；一題都沒開就回 null
-  function dailyTrial(now = new Date(), cleared = null) {
-    const pool = TRIALS.filter(t => isTrialUnlocked(cleared, t)); if (!pool.length) return null;
+  function dailyTrial(now = new Date(), progress = null) {
+    const pool = TRIALS.filter(t => isTrialUnlocked(progress, t)); if (!pool.length) return null;
     const day = Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
     return pool[((day % pool.length) + pool.length) % pool.length];
   }
@@ -87,6 +95,21 @@
       if (!DIFFS[t.diff]) bad.push(`試煉 ${t.id} 的難度 ${t.diff} 不認識`);
       if (!D.TRIAL_KINDS[t.kind]) bad.push(`試煉 ${t.id} 的口味 ${t.kind} 不認識`);
       for (const p of checkMods(t.levelId, t.mods)) bad.push(`試煉 ${t.id}：${p}`);
+      // 新期 2 的規矩（James 10/31）：守望 w<夜 id>、烈火 f<夜 id>；都沒看門的、有羊的夜失一隻即輸；敵人與卡只用到那一夜為止見過的；守望波數同原夜、烈火就一大波＋一筆糧＋限卡
+      const base = levelById(t.levelId), m = normalizeMods(base, t.mods).mods || {}, pre = { watch: 'w', fire: 'f' }[t.kind];
+      if (pre && t.id !== pre + t.levelId) bad.push(`試煉 ${t.id} 的 id 要是 ${pre}${t.levelId}`);
+      if (!(m.gates && m.gates.length === 0)) bad.push(`試煉 ${t.id} 要用 gates: 0 關掉看門的`);
+      if (base.sheep && m.maxSheepLost !== 0) bad.push(`試煉 ${t.id} 的夜有羊，要寫 maxSheepLost: 0`);
+      if (m.units) for (const k of m.units) if (!base.units.includes(k)) bad.push(`試煉 ${t.id} 的卡 ${k} 那一夜還沒學`);
+      if (!m.waveOverride) bad.push(`試煉 ${t.id} 要自帶波表 waveOverride`);
+      else {
+        const seen = enemiesSeenBy(t.levelId);
+        for (const w of m.waveOverride) for (const [k] of w.list) if (!seen.has(k)) bad.push(`試煉 ${t.id} 的敵人 ${k} 到那一夜還沒出現過`);
+        if (t.kind === 'watch' && m.waveOverride.length !== base.waves.length) bad.push(`守望 ${t.id} 的波數要跟原夜一樣（${base.waves.length} 波）`);
+        if (t.kind === 'fire' && m.waveOverride.length !== 1) bad.push(`烈火 ${t.id} 只能一波`);
+      }
+      if (t.kind === 'fire' && !(m.oneBudget === true && m.startFood !== undefined && m.units)) bad.push(`烈火 ${t.id} 要 oneBudget: true、startFood、units 三樣齊`);
+      if (t.kind === 'watch' && m.oneBudget) bad.push(`守望 ${t.id} 不用一筆糧`);
     }
     return bad;
   }
@@ -114,6 +137,9 @@
   //   waves      只打前幾波（1 到這一夜的波數）
   //   conveyor   true＝送卡模式（沒有糧、卡定時送；預設 7 秒一張、手上最多 6 張、開局隨機 3 張、權重均等）、物件＝自己給 every／max／start／weights、false＝關掉這一夜的送卡
   //   oneBudget  true＝一筆糧（糧不滴、沒有牧人）、false＝關掉這一夜的一筆糧
+  // 新期 2（2026-10-31，守望／烈火試煉）再加兩個：
+  //   waveOverride 自帶波表（陣列，格式跟關卡 waves 一樣：list／gap／rows／hpMul／ordered／say／hint）。寫的是最終數字：套了這個，難度倍率不再乘（diffScale 0），作者寫幾隻就幾隻
+  //   maxSheepLost 最多能失幾隻羊，超過就輸（0＝失一隻即輸；只有有羊的夜有意義，沒羊的夜寫了沒作用）
   // normalizeMods 把它整理成固定形狀（鍵固定順序、值已驗過），壞的欄位丟掉並寫進 problems；整理後的那份存進 G.mods 與檢查點，續玩時必須一模一樣
   const GATE_SETS = { 0: [], 1: [2], 2: [1, 3], 3: [1, 2, 3], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4] };
   const isCard = k => typeof k === 'string' && Object.prototype.hasOwnProperty.call(UNITS, k); // 不能用 UNITS[k] 真假判斷：'constructor' 這種原型鏈上的名字會混進來
@@ -122,7 +148,7 @@
     const out = {}, problems = [], notes = [];
     if (mods === undefined || mods === null) return { mods: null, problems, notes };
     if (typeof mods !== 'object' || Array.isArray(mods)) return { mods: null, problems: ['修飾詞要是物件'], notes };
-    for (const k of Object.keys(mods)) if (!['units', 'startFood', 'gates', 'waves', 'conveyor', 'oneBudget'].includes(k)) problems.push(`不認識的修飾詞 ${k}，略過`);
+    for (const k of Object.keys(mods)) if (!['units', 'startFood', 'gates', 'waves', 'conveyor', 'oneBudget', 'waveOverride', 'maxSheepLost'].includes(k)) problems.push(`不認識的修飾詞 ${k}，略過`);
     if (mods.units !== undefined) {
       if (!isCardList(mods.units)) problems.push('units 要是卡片名稱的陣列，略過');
       else {
@@ -164,6 +190,26 @@
     if (mods.oneBudget !== undefined) {
       if (typeof mods.oneBudget === 'boolean') out.oneBudget = mods.oneBudget; else problems.push('oneBudget 要是 true／false，略過');
     }
+    if (mods.waveOverride !== undefined) { // 自帶波表：逐波驗，一波壞整個略過（半套波表比沒有更糟）
+      const W = mods.waveOverride, isEnemy = k => typeof k === 'string' && Object.prototype.hasOwnProperty.call(ENEMIES, k);
+      const okWave = w => w && typeof w === 'object' && !Array.isArray(w)
+        && Array.isArray(w.list) && w.list.length > 0 && w.list.every(x => Array.isArray(x) && x.length === 2 && isEnemy(x[0]) && Number.isInteger(x[1]) && x[1] >= 1 && x[1] <= 99)
+        && Number.isFinite(w.gap) && w.gap >= 0.1 && w.gap <= 60
+        && Array.isArray(w.rows) && w.rows.length > 0 && w.rows.every(r => Number.isInteger(r) && r >= 0 && r < ROWS) && new Set(w.rows).size === w.rows.length
+        && (w.hpMul === undefined || (Number.isFinite(w.hpMul) && w.hpMul > 0 && w.hpMul <= 20))
+        && (w.ordered === undefined || typeof w.ordered === 'boolean')
+        && (w.say === undefined || typeof w.say === 'string') && (w.hint === undefined || typeof w.hint === 'string');
+      if (!Array.isArray(W) || !W.length || W.length > 12 || !W.every(okWave)) problems.push('waveOverride 要是 1 到 12 波的陣列，每波 list／gap／rows 合規（hpMul／ordered／say／hint 可不給），略過');
+      else {
+        out.waveOverride = W.map(w => { const o = { list: w.list.map(x => [x[0], x[1]]), gap: w.gap, rows: w.rows.slice().sort((a, b) => a - b), hpMul: w.hpMul === undefined ? 1 : w.hpMul }; if (w.ordered) o.ordered = true; if (w.say) o.say = w.say; if (w.hint) o.hint = w.hint; return o; });
+        if (out.waves !== undefined) { delete out.waves; problems.push('有 waveOverride 就不用 waves（波數就是自帶波表的長度），waves 略過'); }
+      }
+    }
+    if (mods.maxSheepLost !== undefined) {
+      if (Number.isInteger(mods.maxSheepLost) && mods.maxSheepLost >= 0 && mods.maxSheepLost <= 99) out.maxSheepLost = mods.maxSheepLost;
+      else problems.push('maxSheepLost 要是 0 到 99 的整數，略過');
+      if (out.maxSheepLost !== undefined && !level.sheep) notes.push('這一夜沒有羊，maxSheepLost 沒作用');
+    }
     // 互相打架的組合只提醒（notes），欄位照留：送卡模式沒有糧，一筆糧與開局糧都沒意義
     const cvOn = out.conveyor === undefined ? !!level.conveyor : out.conveyor !== false;
     if (cvOn && out.oneBudget === true) notes.push('送卡模式沒有糧，oneBudget 沒作用');
@@ -191,6 +237,8 @@
     if (m.startFood !== undefined) L.startFood = m.startFood;
     if (m.gates !== undefined) L.gates = m.gates.length ? m.gates.slice() : false;
     if (m.waves !== undefined) L.waves = level.waves.slice(0, m.waves);
+    if (m.waveOverride) { L.waves = m.waveOverride.map(w => ({ ...w, list: w.list.map(x => [...x]), rows: w.rows.slice() })); L.diffScale = 0; } // 自帶波表寫的是最終數字，難度倍率不再乘
+    if (m.maxSheepLost !== undefined) L.maxSheepLost = m.maxSheepLost;
     if (m.conveyor === false) delete L.conveyor;
     else if (m.conveyor) {
       L = restrict(L, k => k !== 'shepherd'); // 送卡夜沒有糧，牧人沒事做
@@ -351,6 +399,7 @@
       const nm = normalizeMods(level, snap.mods);
       if (!nm.mods || nm.problems.length || !sameMods(nm.mods, snap.mods)) return false;
       if (nm.mods.waves !== undefined && snap.wave >= nm.mods.waves) return false;
+      if (nm.mods.waveOverride && snap.wave >= nm.mods.waveOverride.length) return false; // 自帶波表的波數跟原夜不同（烈火只有一波：沒有波間檢查點）
     }
     if (snap.sheep !== undefined && !isInt(snap.sheep, 0, 99)) return false;
     if (snap.sheepLost !== undefined && !isInt(snap.sheepLost, 0, 99)) return false;
@@ -550,7 +599,7 @@
     const left = G.strayQueue.map(t => Math.max(0, t - G.waveT));
     G.waveT = 0; G.strayQueue = [...left, ...(w.strays || [])].sort((a, b) => a - b);
     if (w.give) dealNamed(G, w.give);
-    ev(G, { t: 'toast', msg: w.say });
+    if (w.say) ev(G, { t: 'toast', msg: w.say }); // 自帶波表（新期 2）可以不寫台詞
   }
 
   // 無月夜：這一波起腳印預告看不見，除非那排在油燈照得到的範圍
@@ -1131,7 +1180,7 @@
       // 抱著羊往回跑
       if (e.carrying) {
         e.x += (def.fleeSpeed || def.speed * 1.4) * dt;
-        if (e.x > COLS + 0.3) { e.dead = true; G.sheep--; G.sheepLost++; ev(G, { t: 'toast', msg: e.carryOwn ? `一隻羊被${def.name}抓走了 🐑` : e.carryStray ? '迷羊被叼走了 🐑' : '一隻羊被抱走了 🐑' }); ev(G, { t: 'sheep' }); if (G.sheep <= 0) return lose(G, 'sheep'); }
+        if (e.x > COLS + 0.3) { e.dead = true; G.sheep--; G.sheepLost++; ev(G, { t: 'toast', msg: e.carryOwn ? `一隻羊被${def.name}抓走了 🐑` : e.carryStray ? '迷羊被叼走了 🐑' : '一隻羊被抱走了 🐑' }); ev(G, { t: 'sheep' }); if (G.sheep <= 0) return lose(G, 'sheep'); if (G.level.maxSheepLost !== undefined && G.sheepLost > G.level.maxSheepLost) return lose(G, 'sheepLost'); } // sheepLost：試煉「失羊即輸」（新期 2），羊還有但超過題目准失的隻數
         continue;
       }
       // 強盜：走到坡下定點就站住，朝這排最前面的夥伴丟石頭；這排沒夥伴了才繼續走（被推回去就再走回來站好）
@@ -1273,6 +1322,6 @@
   for (const msg of validateLevels()) console.error(msg);
   for (const msg of validateTrials()) console.error(msg);
 
-  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, trialById, trialGate, isTrialUnlocked, trialLevel, dailyTrial, validateTrials, sameMods, rowLit, starSlots, validateLevels, onHillCell, dev };
+  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, trialById, trialGate, isTrialUnlocked, enemiesSeenBy, trialLevel, dailyTrial, validateTrials, sameMods, rowLit, starSlots, validateLevels, onHillCell, dev };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);

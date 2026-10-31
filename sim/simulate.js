@@ -276,7 +276,12 @@ module.exports = { play, run, compare, decide, STRATS, mulberry32 };
 if (require.main === module) {
   const [,, L = 'all', DF = 'all', N = '100', SK = 'good'] = process.argv;
   if (SK !== 'compare' && !STRATS[SK]) { console.error(`不認識的玩家／打法：${SK}（可用 ${Object.keys(STRATS).join(' ')} compare）`); process.exit(1); }
-  const levels = L === 'all' ? LEVELS.map(l => l.id) : [Number(L)];
-  const diffs = DF === 'all' ? Object.keys(D.DIFFS) : [DF];
-  for (const l of levels) for (const d of diffs) SK === 'compare' ? compare(l, d, Number(N)) : run(l, d, Number(N), SK);
+  let levels = L === 'all' ? LEVELS.map(l => l.id) : [Number(L)];
+  let diffs = DF === 'all' ? Object.keys(D.DIFFS) : [DF];
+  let mods = ENV_MODS;
+  if (process.env.SIM_TRIAL) { // SIM_TRIAL=w1：跑試煉冊的一題（夜、難度、修飾詞都照題目；前兩個參數不看）。例：SIM_TRIAL=f4 node sim/simulate.js x x 30 compare
+    const T = E.trialById(process.env.SIM_TRIAL); if (!T) { console.error(`沒有這一題：${process.env.SIM_TRIAL}（有 ${D.TRIALS.map(t => t.id).join(' ')}）`); process.exit(1); }
+    levels = [T.levelId]; diffs = [T.diff]; mods = T.mods; console.log(`試煉 ${T.id}「${T.title}」`);
+  }
+  for (const l of levels) for (const d of diffs) SK === 'compare' ? compare(l, d, Number(N), mods) : run(l, d, Number(N), SK, mods);
 }
