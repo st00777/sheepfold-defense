@@ -1901,11 +1901,11 @@ let coverImg = null;
 function preloadCover() { if (!coverImg) { coverImg = new Image(); coverImg.src = 'img/cover-home.webp'; } }
 function shareNote(msg) { const n = $('#share-note'); n.textContent = msg; n.hidden = !msg; }
 function dataUrlToBlob(u) { const [head, b64] = u.split(','); const bin = atob(b64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return new Blob([arr], { type: /:(.*?);/.exec(head)[1] }); }
-async function shareImage() {
+function drawShareCard(useCover) { // 畫一張結果卡、回傳 canvas。useCover=false 是備援：封面圖若讓畫布被鎖住（SecurityError）就不畫封面再來一次
   const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
   const win = !!(G && G.result && G.result.win);
   const grad = x.createLinearGradient(0, 0, 0, H); (win ? ['#f0c982', '#5a4a3a', '#2b2a26'] : ['#1a2238', '#2b2a26', '#2b2a26']).forEach((c, i) => grad.addColorStop(i / 2, c)); x.fillStyle = grad; x.fillRect(0, 0, W, H);
-  preloadCover(); const img = coverImg.complete && coverImg.naturalWidth ? coverImg : null; // 還沒載好就不等了，少一條封面橫幅而已
+  preloadCover(); const img = useCover && coverImg.complete && coverImg.naturalWidth ? coverImg : null; // 還沒載好就不等了，少一條封面橫幅而已
   if (img) { x.drawImage(img, 0, 0, W, W / 2); const g2 = x.createLinearGradient(0, W / 2 - 160, 0, W / 2); g2.addColorStop(0, '#2b2a2600'); g2.addColorStop(1, '#2b2a26'); x.fillStyle = g2; x.fillRect(0, W / 2 - 160, W, 160); }
   const font = (px, bold) => `${bold ? 'bold ' : ''}${px}px -apple-system, "PingFang TC", "Noto Sans TC", sans-serif`;
   x.textAlign = 'center'; x.textBaseline = 'top';
@@ -1922,8 +1922,15 @@ async function shareImage() {
   for (const chx of text) { if (x.measureText(line + chx).width > maxW) { lines.push(line); line = chx; } else line += chx; } if (line) lines.push(line);
   for (const l of lines.slice(0, 7)) { x.fillText(l, W / 2, y); y += 50; }
   x.font = font(30); x.fillStyle = '#b9b09c'; x.fillText(`${fmtDate(new Date().toISOString())}・${location.host || '羊圈守夜'}`, W / 2, H - 90);
-  let blob = null; try { blob = dataUrlToBlob(cv.toDataURL('image/jpeg', 0.9)); } catch (e) {} // 同步轉檔（toBlob 是非同步，會讓手機認定不是剛點的那一下）；JPEG 約 200 KB，PNG 要 1.4 MB，LINE 分享差很多
-  if (!blob) { shareNote('這支瀏覽器畫不出圖'); return; }
+  return cv;
+}
+async function shareImage() {
+  // 同步轉檔（toBlob 是非同步，會讓手機認定不是剛點的那一下）；JPEG 約 200 KB，PNG 要 1.4 MB，LINE 分享差很多
+  // 11/2 James 的 Android 第一次就看到「畫不出圖」：帶封面失敗就改不帶封面再試一次，還是不行就把錯誤名稱印在訊息裡，下次不用猜
+  const encode = cv => dataUrlToBlob(cv.toDataURL('image/jpeg', 0.9));
+  let blob = null, err = null;
+  try { blob = encode(drawShareCard(true)); } catch (e) { err = e; try { blob = encode(drawShareCard(false)); } catch (e2) { err = e2; } }
+  if (!blob) { shareNote(`這支瀏覽器畫不出圖（${(err && (err.name || err.message)) || '不明'}）`); return; }
   const file = new File([blob], `sheepfold-${trial ? trial.id : 'n' + level.id}.jpg`, { type: 'image/jpeg' });
   if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) { // 手機：系統分享（LINE、存到相簿都在裡面）；取消就取消
     try { await navigator.share({ files: [file], title: '羊圈守夜' }); shareNote('分享出去了'); return; }
