@@ -1,4 +1,5 @@
-// 羊圈守夜 · 音效。全部用 Web Audio 現場合成，沒有音檔、沒有授權問題。
+// 羊圈守夜 · 音效與音樂。全部用 Web Audio 現場合成，沒有音檔、沒有授權問題。
+// 期 5（2026-11-01）：背景音樂也是生成式——三章各一套音階與和弦，慢慢鋪的墊底和弦＋稀疏的五聲音階旋律，跟音效分軌（prefs.music 開關）
 // 用法：Sound.unlock() 在第一次點擊時叫（iOS 要有手勢才出聲）；Sound.play('howl')；Sound.set('vol', 2)
 // 設定 { sfx 音效開關, amb 蟲鳴開關, vol 音量 0 小 1 中 2 大 } 住在存檔裡（save.js 的 prefs.sound）：頁面開好後叫 Sound.attach(存檔裡那個物件, 寫回存檔的函式)；attach 之前用預設值（2026-10-29 期 0 以前自己存 localStorage 'sheepfold-sound'）
 'use strict';
@@ -8,12 +9,14 @@
   const lastAt = {};  // 每種音效上次播放的時間，太密就不重播（咬牆、石子每幀都在發生）
   const GAP = { shot: 0.08, bite: 0.45, die: 0.12, ignite: 0.25, food: 0.05, place: 0.05, hit: 0.1, whine: 0.3, grab: 0.2, sheep: 0.2, overfly: 0.5, throw: 0.1, roll: 0.3 }; // 咻：一排五個射手一起射也只響一聲
 
-  const prefs = { sfx: true, amb: false, vol: 1 };
+  const prefs = { sfx: true, amb: false, music: true, vol: 1 };
+  let mgain = null, comp = null; // 音樂自己的音量節點（跟音效分軌），一起進壓縮器
   let store = null, onChange = null; // 存檔裡的那個物件、改了要叫誰寫回
   function attach(obj, fn) {
     store = obj || null; onChange = typeof fn === 'function' ? fn : null;
-    if (store) { prefs.sfx = store.sfx !== false; prefs.amb = !!store.amb; prefs.vol = [0, 1, 2].includes(store.vol) ? store.vol : 1; }
+    if (store) { prefs.sfx = store.sfx !== false; prefs.amb = !!store.amb; prefs.music = store.music !== false; prefs.vol = [0, 1, 2].includes(store.vol) ? store.vol : 1; }
     if (master) master.gain.setValueAtTime(prefs.sfx ? VOLS[prefs.vol] : 0, ctx.currentTime);
+    if (mgain) mgain.gain.setValueAtTime(prefs.music ? VOLS[prefs.vol] * MUSIC_LEVEL : 0, ctx.currentTime);
   }
   function save() { if (store) Object.assign(store, prefs); if (onChange) try { onChange(); } catch (e) {} }
 
@@ -22,27 +25,28 @@
     const AC = root.AudioContext || root.webkitAudioContext; if (!AC) return null;
     try { ctx = new AC(); } catch (e) { return null; }
     master = ctx.createGain(); master.gain.value = prefs.sfx ? VOLS[prefs.vol] : 0;
-    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 6; // 好幾個音疊在一起不爆音
+    comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 6; // 好幾個音疊在一起不爆音
     master.connect(comp); comp.connect(ctx.destination);
+    mgain = ctx.createGain(); mgain.gain.value = prefs.music ? VOLS[prefs.vol] * MUSIC_LEVEL : 0; mgain.connect(comp);
     return ctx;
   }
   // context 沒在跑就叫它跑（iOS 第一次手勢後是 suspended；來電、Siri 之後是 interrupted）
-  function wake() { if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().then(() => { if (ambWanted) startAmb(); }).catch(() => {}); }
+  function wake() { if (ctx && ctx.state !== 'running' && ctx.state !== 'closed') ctx.resume().then(() => { if (ambWanted) startAmb(); if (musicWanted) startMusic(); }).catch(() => {}); }
   // 第一次手勢時叫：建好 context 並解除 iOS 的靜音狀態
-  function unlock() { if (!ensure()) return; wake(); if (ambWanted) startAmb(); }
+  function unlock() { if (!ensure()) return; wake(); if (ambWanted) startAmb(); if (musicWanted) startMusic(); }
   const now = () => ctx.currentTime;
 
   // ====== 合成積木 ======
   // 一個音：type 波形、f0→f1 頻率滑動、dur 秒、g 音量、a 起音秒數、lp 低通濾波頻率、vib 顫音 [Hz, 深度]
-  function tone({ type = 'sine', f0 = 440, f1, dur = 0.2, g = 0.3, a = 0.005, lp, vib, at = 0 }) {
+  function tone({ type = 'sine', f0 = 440, f1, dur = 0.2, g = 0.3, a = 0.005, lp, vib, at = 0, out, detune = 0 }) {
     const t = now() + at;
-    const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t);
+    const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t); if (detune) o.detune.value = detune;
     if (f1 !== undefined) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
     const env = ctx.createGain(); env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(g, t + a); env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     let node = o;
     if (lp) { const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; o.connect(f); node = f; }
     if (vib) { const l = ctx.createOscillator(); l.frequency.value = vib[0]; const lg = ctx.createGain(); lg.gain.value = vib[1]; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + dur + 0.05); }
-    node.connect(env); env.connect(master);
+    node.connect(env); env.connect(out || master);
     o.start(t); o.stop(t + dur + 0.05);
   }
   let noiseBuf = null;
@@ -135,16 +139,65 @@
   // 對局開始／結束叫這個：想要蟲鳴就放，離開對局就收
   function ambient(on) { ambWanted = on; if (on) startAmb(); else stopAmb(); }
 
+  // ====== 背景音樂（期 5）：生成式，三章各一套 ======
+  // 每一「小節」（bar 秒）換一個和弦：三個略微失諧的三角波經低通慢慢推上來、慢慢收；旋律每 1.5–3 秒有六成機率從五聲音階裡挑一個音，短而輕
+  // 不用音檔：沒有授權問題、檔案 0 KB；想換真曲子的話在這裡換成 AudioBufferSource 就好
+  const MUSIC_LEVEL = 0.55; // 音樂相對音效的比例（音效 1.0）
+  const MUSIC = {
+    1: { root: 146.83, scale: [0, 3, 5, 7, 10], chords: [[0, 3, 7], [3, 7, 10], [7, 10, 14], [10, 14, 17]], bar: 6, lp: 700, pad: 0.11, mel: 0.6, note: 1.4 },   // 守夜：D 小調五聲，溫的
+    2: { root: 123.47, scale: [0, 3, 5, 8, 10], chords: [[0, 3, 7], [0, 3, 7, 10], [5, 8, 12], [3, 7, 10]], bar: 7, lp: 450, pad: 0.12, mel: 0.4, note: 1.8 }, // 另外的羊：更低、更暗、旋律更少
+    3: { root: 164.81, scale: [0, 2, 4, 7, 9], chords: [[0, 7, 12], [5, 12, 17], [7, 14, 19], [0, 7, 12]], bar: 5.5, lp: 900, pad: 0.1, mel: 0.7, note: 1.2 },  // 諸山間：空五度、大調五聲，開闊
+  };
+  let music = null; // { cfg, timers, bar, seed }
+  const semi = (root, n) => root * Math.pow(2, n / 12);
+  function musicRng() { music.seed = (music.seed * 1664525 + 1013904223) >>> 0; return music.seed / 4294967296; }
+  function padChord(cfg, chord) {
+    const t = now(), dur = cfg.bar + 2.5;
+    for (const n of chord) for (const d of [-6, 0, 7]) tone({ type: 'triangle', f0: semi(cfg.root, n), dur, g: cfg.pad / 3, a: 2.2, lp: cfg.lp, out: mgain, detune: d });
+  }
+  function melNote(cfg) {
+    const n = cfg.scale[Math.floor(musicRng() * cfg.scale.length)] + (musicRng() < 0.5 ? 12 : 24);
+    tone({ type: 'sine', f0: semi(cfg.root, n), dur: cfg.note, g: 0.07, a: 0.04, out: mgain });
+    tone({ type: 'triangle', f0: semi(cfg.root, n), dur: cfg.note * 0.6, g: 0.03, a: 0.04, lp: 1800, out: mgain });
+  }
+  function musicTick() {
+    if (!music) return;
+    const cfg = music.cfg; const c = ctx;
+    if (c.state !== 'running') { music.timers.push(setTimeout(musicTick, 800)); return; } // 背景被暫停：等醒來再接
+    padChord(cfg, cfg.chords[music.bar % cfg.chords.length]); music.bar++;
+    music.timers.push(setTimeout(musicTick, cfg.bar * 1000));
+  }
+  function melTick() {
+    if (!music) return;
+    const cfg = music.cfg;
+    if (ctx.state === 'running' && musicRng() < cfg.mel) melNote(cfg);
+    music.timers.push(setTimeout(melTick, (1500 + musicRng() * 1500)));
+  }
+  // 對局開始叫 Sound.music(章號)、離開叫 Sound.music(null)。關著音樂時只記得「想放哪一章」，之後打開就接上
+  let musicWanted = null;
+  function startMusic() {
+    if (music || !musicWanted || !prefs.music) return;
+    const c = ensure(); if (!c || c.state === 'closed') return;
+    if (c.state !== 'running') wake();
+    music = { cfg: MUSIC[musicWanted] || MUSIC[1], timers: [], bar: 0, seed: 7 + musicWanted * 131 };
+    musicTick(); music.timers.push(setTimeout(melTick, 2500));
+  }
+  function stopMusic() { if (!music) return; for (const t of music.timers) clearTimeout(t); music = null; }
+  function setMusic(ch) { musicWanted = ch || null; if (musicWanted) { if (music && music.cfg !== (MUSIC[musicWanted] || MUSIC[1])) stopMusic(); startMusic(); } else stopMusic(); }
+  function musicChapter() { return music ? musicWanted : null; }
+
   // ====== 設定 ======
   function set(k, v) {
-    if (k === 'sfx') prefs.sfx = !!v; else if (k === 'amb') prefs.amb = !!v; else if (k === 'vol') prefs.vol = [0, 1, 2].includes(v) ? v : 1; else return;
+    if (k === 'sfx') prefs.sfx = !!v; else if (k === 'amb') prefs.amb = !!v; else if (k === 'music') prefs.music = !!v; else if (k === 'vol') prefs.vol = [0, 1, 2].includes(v) ? v : 1; else return;
     save();
     if (master) master.gain.setValueAtTime(prefs.sfx ? VOLS[prefs.vol] : 0, ctx.currentTime); // 立刻生效，切回來那一下的確認音才聽得到
-    if (k !== 'vol') { if (prefs.amb && prefs.sfx && ambWanted) startAmb(); else stopAmb(); }
+    if (mgain) mgain.gain.setValueAtTime(prefs.music ? VOLS[prefs.vol] * MUSIC_LEVEL : 0, ctx.currentTime);
+    if (k === 'sfx' || k === 'amb') { if (prefs.amb && prefs.sfx && ambWanted) startAmb(); else stopAmb(); }
+    if (k === 'music') { if (prefs.music) startMusic(); else stopMusic(); }
   }
   // 切到背景整個停掉（省電、也不會在口袋裡叫），回來再接上
   function suspend() { if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}); }
   function resume() { wake(); }
 
-  root.Sound = { unlock, play, ambient, set, suspend, resume, attach, prefs, names: Object.keys(SFX), state: () => (ctx ? ctx.state : 'none') };
+  root.Sound = { unlock, play, ambient, music: setMusic, musicChapter, set, suspend, resume, attach, prefs, names: Object.keys(SFX), state: () => (ctx ? ctx.state : 'none') };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -284,6 +284,18 @@
   #roster-detail .dt { flex: 1; min-width: 0; }
   #roster-detail .sub { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; margin: -2px 0 4px; }
   #lightbox { z-index: 20; background: #000d; cursor: zoom-out; }
+  /* ====== 高對比（期 5，2026-11-01）：字更白、面板更黑、框線更粗；棋盤那邊血條加白邊、提示框白色（render.js setContrast） ====== */
+  html.contrast { --text: #ffffff; --muted: #e0d9c6; --panel: #23221e; --bg: #141311; --card: #34312a; --card-on: #5a5236; --line: #000; --gold: #ffd166; }
+  html.contrast .card { border-color: #0008; }
+  html.contrast .card.selected { border-color: #fff; box-shadow: 0 0 0 2px var(--gold); }
+  html.contrast .btn.alt { border-width: 2px; color: var(--text); }
+  html.contrast .lv { box-shadow: inset 0 0 0 1px #fff3; }
+  html.contrast .lv.ach.locked { opacity: .7; }
+  html.contrast #frame { border-color: #fff; }
+  html.contrast #toast { color: var(--text); }
+  html.contrast .dialog .verse { border-left-width: 5px; }
+  .key-help { display: none; } /* 鍵盤說明只給有滑鼠的裝置看 */
+  @media (pointer: fine) { .key-help { display: block; } }
   /* ====== 成就（期 4，2026-11-01）：成就冊一列一條；解鎖走全螢幕卡片＋經文＋音效（藍圖 §2：James 的儀式感偏好） ====== */
   .lv.ach .n { font-size: 26px; width: 40px; }
   .lv.ach.locked { opacity: .5; }
@@ -491,11 +503,14 @@
     <div class="snd" id="snd-panel">
       <div class="snd-row"><span>大字</span><button id="big-btn">關</button></div>
       <div class="snd-row"><span>省效能</span><button id="lite-btn" title="畫面卡的電腦開這個：解析度降一級、雨和火花減量">關</button></div>
+      <div class="snd-row"><span>高對比</span><button id="contrast-btn" title="字更白、血條加白邊、提示框更粗">關</button></div>
+      <div class="snd-row"><span>音樂</span><button data-snd="music">開</button></div>
       <div class="snd-row"><span>音效</span><button data-snd="sfx">開</button></div>
       <div class="snd-row"><span>蟲鳴</span><button data-snd="amb">關</button></div>
       <div class="snd-row"><span>音量</span><div class="seg"><button data-vol="0">小</button><button data-vol="1">中</button><button data-vol="2">大</button></div></div>
     </div>
     <div class="snd-note">手機切到靜音時不會有聲音。</div>
+    <div class="snd-note key-help">鍵盤：1–9 選卡、0 鏟子、方向鍵移動、Enter 放下、Esc 取消（沒選卡就暫停）、空白鍵暫停</div>
     <button class="btn" id="resume-btn">繼續</button>
     <button class="btn alt" id="pause-codex">圖鑑</button>
     <button class="btn alt" id="pause-back">回關卡</button>
@@ -512,6 +527,7 @@
     <button class="btn" id="epilogue-btn" hidden>看尾聲</button>
     <button class="btn" id="next" hidden>下一夜</button>
     <button class="btn" id="retry">再守一夜</button>
+    <button class="btn alt" id="share-btn">存圖分享</button>
     <button class="btn alt" id="back">回關卡</button>
   </div>
 </div>
@@ -588,12 +604,12 @@
   </div>
 </div>
 
-<script src="data.js?v=20"></script>
-<script src="engine.js?v=25"></script>
-<script src="save.js?v=5"></script>
-<script src="sound.js?v=8"></script>
+<script src="data.js?v=21"></script>
+<script src="engine.js?v=26"></script>
+<script src="save.js?v=6"></script>
+<script src="sound.js?v=9"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=25"></script>
+<script src="render.js?v=26"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS、TRIALS、TRIAL_KINDS 由 data.js 直接提供
@@ -661,13 +677,23 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來', 3: '羊圈在山上，斜坡上的敵人直射打不到：要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛' };
-const HOME_UPDATE = '最近更新 10/31：守夜試煉第二章 20 題到了——另外的羊十夜各有守望與烈火，暴風夜拿滿星就開；第三章還在寫';
+const HOME_UPDATE = '最近更新 11/1：第三章 20 題試煉齊了、成就冊、第 30 夜後的尾聲、背景音樂、高對比、存圖分享；細節在設定頁的更新紀錄';
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.11.01', notes: [
+    '守夜試煉第三章 20 題到了：第 21 到 30 夜各一題「守望」一題「烈火」，三章 60 題齊了。坡地的題比前兩章軟一點（烈火的糧 1200 到 2600），第 30 夜的烈火一波 47 隻、兩隻迷羊半路上來',
+    '成就冊：九條（進度、技巧、收藏各三），首頁 🏆 看得到；解鎖時會有一張卡片、一句經文和一聲鈴。老玩家本來就符合的開頁就補上，首頁說一句',
+    '第 30 夜守過之後有「尾聲」：三章回顧、經文、製作名單；結算頁和首頁都進得去',
+    '頭目登場時棋盤上會出現牠的名字和稱號',
+    '背景音樂：三章各一段，暫停面板可以關；跟音效分開',
+    '暫停面板多了「高對比」：字更白、血條加白邊、提示框更粗',
+    '結算頁多了「存圖分享」：把這一夜的結果畫成一張圖，手機直接分享、電腦下載',
+    '電腦可以用鍵盤：1 到 9 選卡、方向鍵移動、Enter 放下、Esc 取消或暫停',
+  ] },
   { ver: '2026.10.31.2', notes: [
     '守夜試煉第二章 20 題：第 11 到 20 夜各一題「守望」一題「烈火」，那一夜暴風夜拿滿星就開。守望照各夜的特色加壓（豺狼第一波就來、野豬提早撞、迷羊更多、豹提早出來）；烈火拿掉那一夜的新卡與主答案，有羊的夜留著狗、拉班那一夜改成一筆糧自己買',
-    '第三章 20 題還在寫',
+    '第三章 20 題還在寫（11/1 到了）',
   ] },
   { ver: '2026.10.31', notes: [
     '首頁分成三層：主畫面只有「接著守」和「守夜」「守夜試煉」兩個入口，進去再選章、選夜，每一屏都不用捲；試煉一夜一列，進開場頁再選守望或烈火',
@@ -714,10 +740,11 @@ const ICON_IMG = {
 const CHAR_KEYS = new Set(['farmer', 'slinger', 'sling', 'dog', 'hireling', 'archer', 'horn', 'healer', 'patrol', 'volley', 'cradle', 'thrower', 'gatekeeper', 'ewe', 'wolf', 'bear', 'lion', 'thief', 'stealer', 'fox', 'locust', 'wilddog', 'eagle', 'boar', 'owl', 'leopard', 'bandit', 'ox', 'fastwolf', 'alphawolf', 'jackal', 'bird']);
 const icoKey = d => d.img || d.ico; // 單位／敵人的取圖鍵：有自己的圖就用 img，否則用 emoji
 function icoFile(e, use) { const f = ICON_IMG[e]; if (!f) return null; const k = f.replace(/^c-/, ''); if (use === 'big') return f.startsWith('c-') ? 'l-' + k : f; if (!CHAR_KEYS.has(k)) return f; return use === 'board' ? 'q-' + k : 'h-' + k; }
-function icoImg(e, alt = e) { const f = icoFile(e, 'head'); return f ? `<img class="ei" src="img/ico/${f}.webp" alt="${alt}" onerror="icoFail(this)">` : alt; } // alt＝圖載不到時顯示的 emoji（img 鍵不是 emoji，要另外給）
+function icoImg(e, alt = e) { const f = icoFile(e, 'head'); return f ? `<img class="ei" src="img/ico/${f}.webp" alt="${alt}" decoding="async" onerror="icoFail(this)">` : alt; } // alt＝圖載不到時顯示的 emoji（img 鍵不是 emoji，要另外給）
 function icoFail(img) { img.replaceWith(document.createTextNode(img.alt)); }
 // 開局就把圖先載進快取：狼第一次出現、第一次開圖鑑都不會閃一下空白
-(window.requestIdleCallback || setTimeout)(() => { for (const f of new Set(Object.keys(ICON_IMG).map(e => icoFile(e, 'head')))) { const i = new Image(); i.src = `img/ico/${f}.webp`; } });
+// 期 5 改成按需：只先載「已開的夜」會用到的單位與敵人頭像（第一章新玩家約 20 張，不是 48 張），其餘的卡片與圖鑑要用時再載；立繪本來就只在圖鑑點到才載
+(window.requestIdleCallback || setTimeout)(() => { const need = new Set(); for (const L of LEVELS) if (unlocked(L.id)) { for (const k of L.units) need.add(icoKey(UNITS[k])); for (const w of L.waves) for (const [t] of w.list) need.add(icoKey(ENEMIES[t])); } for (const e of need) { const f = icoFile(e, 'head'); if (f) { const i = new Image(); i.src = `img/ico/${f}.webp`; } } });
 
 // ====== 畫面建立 ======
 // 棋盤是 canvas（render.js）：點格子交給 tapCell；拿著卡滑過（桌機）或按住（手機）可放的格子，先亮出這張卡管得到的格子，放下後再亮 1.3 秒（tapCell）
@@ -1010,6 +1037,7 @@ function markHints() {
     const sw = !!selected && !tut.on && Engine.canSwap(G, r, col, selected); if (sw) swappable++;
     if (sw) hintMap.set(k, 'swap'); else if (selected && !G.units[k] && !G.rocks.has(k)) hintMap.set(k, 'hint');
   }
+  if (cursor) hintMap.set(cursor.join(','), 'cursor'); // 鍵盤游標（期 5）：白實線框，蓋在那一格的提示上
   Board.setHints(hintMap);
   return swappable;
 }
@@ -1224,7 +1252,7 @@ function showStars() {
   if (!devUsed) items.forEach(([k], i) => { if (st[k]) setTimeout(() => Sound.play('food'), 350 + i * 180 + 120); }); // 每顆星一聲叮，跟著跳出
 }
 function onWin() {
-  Sound.ambient(false); Sound.play('dawn');
+  Sound.ambient(false); Sound.music(null); Sound.play('dawn');
   const saved = recordBest(true);
   trackNightEnd('win');
   if (saved) clearCheckpoint(); // 紀錄沒存進去就不清檢查點：至少還能「繼續上次」重守最後一波，不會畫面說守過、重開卻什麼都沒有
@@ -1255,7 +1283,7 @@ function sheepSummary() {
   return `${head}圈裡剩 ${now} 隻。`;
 }
 function onLose(reason, by) {
-  Sound.ambient(false); Sound.play('lose');
+  Sound.ambient(false); Sound.music(null); Sound.play('lose');
   recordBest(false); clearCheckpoint();
   trackNightEnd('lose');
   const who = by && ENEMIES[by] ? ENEMIES[by].name : null; // 標題寫闖進來的那一隻的名字：夜鴞就是夜鴞、母熊就是母熊，不再一律翻成狼／鷙鳥
@@ -1304,12 +1332,12 @@ function startGame(fromCp) {
   if (!resumed && !trial && level.id === 1 && (!tutDone() || /[?&]tut/.test(location.search))) tutStart(); // 試煉第 1 題也在第 1 夜的地圖，不重教
   last = performance.now();
   raf = requestAnimationFrame(tick);
-  Sound.ambient(true);
+  Sound.ambient(true); Sound.music(chapterOf(level)); // 期 5：三章各一套生成式背景音樂
   nightStat = devUsed ? null : { placed: {}, t0: Date.now(), resumed }; // 開著開發者面板的那局整局不記
   if (nightStat) track('night_start', { night: Engine.posOf(level.id), level_id: level.id, diff, resumed: resumed ? 1 : 0, mode: trial ? 'trial' : 'story', ...(trial ? { trial_id: trial.id } : {}) }); // mode：報表照夜分組時先濾掉試煉，才不會把試煉算成那一夜的故事局
 }
 function backToLevels() {
-  clearBoard(); Sound.ambient(false);
+  clearBoard(); Sound.ambient(false); Sound.music(null);
   if (G && !G.over && nightStat) trackNightEnd('quit'); // 中途回關卡＝放棄這一夜（續玩再接的話會再來一筆 night_start，resumed=1）
   if (G) G.over = true; // 中途回關卡不清檢查點，之後可以「繼續上次」
   if (saveFailed && saveProgress()) toast('剛才沒存進去的紀錄，這次存好了'); // 上次寫失敗的永久進度再試一次（P 在記憶體裡還是對的）
@@ -1523,7 +1551,7 @@ function renderRosterDetail() {
   }
 }
 // 圖鑑角色頁的立繪：有 l-* 大圖就放，點一下開燈箱；大圖載不到就換成頭像（再載不到才拿掉，文字照排）
-function bigImg(d, tab, k) { const f = icoFile(icoKey(d), 'big'), h = icoFile(icoKey(d), 'head'); return f ? `<span class="bigw"><img class="big" src="img/ico/${f}.webp" alt="" data-tab="${tab}" data-key="${k}" data-fb="${h || ''}" onerror="bigFail(this)"><span class="zoom">🔍 點圖放大</span></span>` : ''; }
+function bigImg(d, tab, k) { const f = icoFile(icoKey(d), 'big'), h = icoFile(icoKey(d), 'head'); return f ? `<span class="bigw"><img class="big" src="img/ico/${f}.webp" alt="" loading="lazy" decoding="async" data-tab="${tab}" data-key="${k}" data-fb="${h || ''}" onerror="bigFail(this)"><span class="zoom">🔍 點圖放大</span></span>` : ''; }
 function bigFail(img) { const fb = img.dataset.fb; if (fb && !img.dataset.tried) { img.dataset.tried = '1'; img.src = `img/ico/${fb}.webp`; } else img.parentElement.remove(); } // 連頭像都載不到：整個圖框（含角標）拿掉，文字照排
 // 敵人出處行：經文＋第幾夜初登場（從關卡波次算，不靠本機紀錄）
 const FIRST_NIGHT = {}; LEVELS.forEach((l, i) => (l.waves || []).forEach(w => (w.list || []).forEach(([t]) => { if (FIRST_NIGHT[t] === undefined) FIRST_NIGHT[t] = i + 1; })));
@@ -1535,7 +1563,25 @@ $('#roster-detail').addEventListener('click', ev => {
   $('#lightbox').hidden = false;
 });
 $('#lightbox').addEventListener('click', () => { $('#lightbox').hidden = true; });
-document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#lightbox').hidden) $('#lightbox').hidden = true; });
+// ====== 鍵盤（期 5）：1–9 選卡、0／S 鏟子、方向鍵移游標、Enter 放下、Esc 取消（沒選卡就暫停／繼續）、空白鍵暫停；燈箱、成就卡、尾聲也吃 Esc／Enter ======
+let cursor = null; // [r, c]，只有鍵盤用過才出現；手機永遠不會有
+function setCursor(r, c) { cursor = [Math.max(0, Math.min(ROWS - 1, r)), Math.max(0, Math.min(COLS - 1, c))]; markHints(); }
+document.addEventListener('keydown', ev => {
+  const tag = (ev.target && ev.target.tagName) || ''; if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (!$('#lightbox').hidden) { if (ev.key === 'Escape') $('#lightbox').hidden = true; return; }
+  if (!$('#achv-card').hidden) { if (ev.key === 'Enter' || ev.key === 'Escape' || ev.key === ' ') { ev.preventDefault(); $('#achv-ok').click(); } return; }
+  if (!$('#epilogue').hidden) { if (ev.key !== 'Escape') { ev.preventDefault(); $('#epilogue').click(); } return; }
+  if (!G || G.over || !$('#result').hidden || !$('#roster').hidden || MENU_IDS.some(m => !$(m).hidden)) return;
+  const k = ev.key;
+  if (k === 'Escape') { ev.preventDefault(); if (paused) resumeGame(); else if (selected) { clearSelection(); toast('取消了，先點一張卡再點草地'); } else pauseGame(); return; }
+  if (k === ' ') { ev.preventDefault(); if (paused) resumeGame(); else pauseGame(); return; }
+  if (paused) return;
+  if (/^[1-9]$/.test(k)) { const el = document.querySelectorAll('#cards .card:not(.shovel)')[Number(k) - 1]; if (el) tapCard(el.dataset.key, el); return; }
+  if (k === '0' || k === 's' || k === 'S') { tapShovel(); return; }
+  const dr = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[k];
+  if (dr) { ev.preventDefault(); if (cursor) setCursor(cursor[0] + dr[0], cursor[1] + dr[1]); else setCursor(Math.floor(ROWS / 2), 0); return; }
+  if (k === 'Enter' && cursor) { ev.preventDefault(); tapCell(cursor[0], cursor[1]); markHints(); }
+});
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { roster.tab = b.dataset.tab; roster.focus = null; renderRoster(); }));
 $('#roster-go').addEventListener('click', () => { if (roster.picked.size < MIN_CARDS) return; saveLoadout(level, sortUnits([...roster.picked])); $('#roster').hidden = true; const cp = pendingCp; pendingCp = null; startGame(cp); });
 $('#roster-back').addEventListener('click', () => { $('#roster').hidden = true; if (roster.from === 'intro') { showIntroNew(level); $('#intro').hidden = false; } else if (roster.from === 'pause') $('#pause').hidden = false; else $('#levels').hidden = false; });
@@ -1608,7 +1654,7 @@ function syncSoundUI() {
   document.querySelectorAll('.snd-btn').forEach(b => { b.textContent = p.sfx ? '🔊' : '🔇'; b.title = p.sfx ? '聲音：開（點一下靜音）' : '聲音：關（點一下打開）'; });
   document.querySelectorAll('#snd-panel [data-snd]').forEach(b => { const on = !!p[b.dataset.snd]; b.textContent = on ? '開' : '關'; b.classList.toggle('on', on); });
   document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.classList.toggle('on', Number(b.dataset.vol) === p.vol));
-  document.querySelectorAll('#snd-panel .snd-row').forEach((row, i) => row.classList.toggle('off', i > 2 && !p.sfx)); // 第 0 列是大字、第 1 列是省效能、第 2 列是音效開關，之後的才跟著音效壓暗
+  document.querySelectorAll('#snd-panel .snd-row').forEach((row, i) => row.classList.toggle('off', i > 4 && !p.sfx)); // 前五列是大字、省效能、高對比、音樂、音效開關，之後的（蟲鳴、音量）才跟著音效壓暗；音樂自己一軌不受音效開關影響
 }
 document.querySelectorAll('.snd-btn').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); Sound.set('sfx', !Sound.prefs.sfx); syncSoundUI(); Sound.play('tap'); }));
 document.querySelectorAll('#snd-panel [data-snd]').forEach(b => b.addEventListener('click', () => { Sound.set(b.dataset.snd, !Sound.prefs[b.dataset.snd]); syncSoundUI(); Sound.play('tap'); }));
@@ -1619,6 +1665,10 @@ document.addEventListener('pointerdown', () => Sound.unlock(), { capture: true, 
 function applyBig(on, save = true) { document.documentElement.classList.toggle('big', !!on); const b = $('#big-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) { SD.prefs.big = !!on; SAVE.save(); } }
 $('#big-btn').addEventListener('click', () => { applyBig(!document.documentElement.classList.contains('big')); Sound.play('tap'); });
 applyBig(SD.prefs.big, false);
+// 高對比（期 5）：介面走 html.contrast 的 CSS 變數，棋盤走 render.js 的 setContrast（血條白邊、提示框白色加粗、範圍預覽更亮）
+function applyContrast(on, save = true) { document.documentElement.classList.toggle('contrast', !!on); if (Board.setContrast) Board.setContrast(!!on); const b = $('#contrast-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) { SD.prefs.contrast = !!on; SAVE.save(); } }
+$('#contrast-btn').addEventListener('click', () => { applyContrast(!document.documentElement.classList.contains('contrast')); Sound.play('tap'); });
+applyContrast(SD.prefs.contrast, false);
 // 省效能模式（2026-10-28 James：手機順、電腦卡）：暫停選單手動開（存 sheepfold-lite）；沒設過的電腦若 WebGL 是軟體模擬就自動開；玩到一半連續三秒掉到 30fps 以下也自動開、說一聲（每次開頁只自動切一次，不會來回跳）
 function applyLite(on, save = true) { Board.setLite(on); const b = $('#lite-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) { SD.prefs.lite = !!on; SAVE.save(); } }
 $('#lite-btn').addEventListener('click', () => { applyLite(!Board.lite); Sound.play('tap'); });
@@ -1833,6 +1883,37 @@ function closeEpilogue() { clearTimeout(epTimer); $('#epilogue').hidden = true; 
 $('#epilogue').addEventListener('click', () => { const sl = EPILOGUE[epIdx]; if (!sl || sl.end) return; epNext(); Sound.play('tap'); });
 $('#epilogue-btn').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('result'); });
 $('#levels-epilogue').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('home'); });
+
+// ====== 分享存圖（期 5）：結算頁一鍵把這一夜的結果畫成一張直式圖（1080×1350），手機走系統分享、電腦直接下載 ======
+async function shareImage() {
+  const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
+  const win = !!(G && G.result && G.result.win);
+  const grad = x.createLinearGradient(0, 0, 0, H); (win ? ['#f0c982', '#5a4a3a', '#2b2a26'] : ['#1a2238', '#2b2a26', '#2b2a26']).forEach((c, i) => grad.addColorStop(i / 2, c)); x.fillStyle = grad; x.fillRect(0, 0, W, H);
+  const img = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = 'img/cover-home.webp'; setTimeout(() => res(null), 1500); });
+  if (img) { x.drawImage(img, 0, 0, W, W / 2); const g2 = x.createLinearGradient(0, W / 2 - 160, 0, W / 2); g2.addColorStop(0, '#2b2a2600'); g2.addColorStop(1, '#2b2a26'); x.fillStyle = g2; x.fillRect(0, W / 2 - 160, W, 160); }
+  const font = (px, bold) => `${bold ? 'bold ' : ''}${px}px -apple-system, "PingFang TC", "Noto Sans TC", sans-serif`;
+  x.textAlign = 'center'; x.textBaseline = 'top';
+  let y = img ? W / 2 - 40 : 120;
+  x.font = font(40); x.fillStyle = '#e6b84a'; x.fillText('羊圈守夜', W / 2, y); y += 70;
+  x.font = font(64, true); x.fillStyle = '#f3ead8'; x.fillText(trial ? trial.title : `第 ${Engine.posOf(level.id)} 夜 ${level.name}`, W / 2, y); y += 100;
+  x.font = font(52); x.fillText($('#result-title').textContent, W / 2, y); y += 90;
+  x.font = font(40);
+  if (!trial && win) { const st = (G.result && G.result.stars) || {}; const items = [['win', '守過'], ['noLoss', '零損失'], ['gates', '看門的都在']].slice(0, Engine.starSlots(level)); x.fillStyle = '#e6b84a'; x.fillText(items.map(([k, n]) => (st[k] ? '★ ' : '☆ ') + n).join('　'), W / 2, y); }
+  else { x.fillStyle = '#b9b09c'; x.fillText(trial ? `${TRIAL_KINDS[trial.kind].name}${win ? '・過了' : `・撐到第 ${G.wave} 波`}` : `${DIFFS[diff].name}・撐到第 ${G.wave} 波`, W / 2, y); }
+  y += 80;
+  const text = $('#result-text').textContent.replace(SAVE_FAILED_NOTE, '').trim(); // 結語逐字排版換行（中文沒有空格可斷）
+  x.font = font(34); x.fillStyle = '#f3ead8'; const maxW = W - 160; let line = ''; const lines = [];
+  for (const chx of text) { if (x.measureText(line + chx).width > maxW) { lines.push(line); line = chx; } else line += chx; } if (line) lines.push(line);
+  for (const l of lines.slice(0, 7)) { x.fillText(l, W / 2, y); y += 50; }
+  x.font = font(30); x.fillStyle = '#b9b09c'; x.fillText(`${fmtDate(new Date().toISOString())}・${location.host || '羊圈守夜'}`, W / 2, H - 90);
+  const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+  if (!blob) { toast('這支瀏覽器畫不出圖'); return; }
+  const file = new File([blob], `sheepfold-${trial ? trial.id : 'n' + level.id}.png`, { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: '羊圈守夜' }); return; } catch (e) { if (e && e.name === 'AbortError') return; } } // 手機：系統分享（LINE、存到相簿都在裡面）；取消就取消
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('圖存好了，看瀏覽器的下載');
+}
+$('#share-btn').addEventListener('click', () => { Sound.play('tap'); shareImage().catch(() => toast('存圖失敗')); });
 
 // ====== 更新公告：版本變了、已經有存檔的玩家開頁時彈一次 ======
 function showUpdateNotice() {

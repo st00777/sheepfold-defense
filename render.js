@@ -29,7 +29,7 @@ const Board = (() => {
 
   const REDUCE = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
   const reduce = () => REDUCE.matches;
-  let lite = false, glName = '', fno = 0; // 省效能模式（2026-10-28 James：電腦卡）：解析度 1、粒子減量、雨量減、黑暗／光照離屏圖隔幀才重畫；glName 給 index.html 判斷是不是軟體繪圖
+  let lite = false, contrast = false, glName = '', fno = 0; // contrast 高對比（期 5）：血條加白邊、提示框白色加粗、範圍預覽更亮 // 省效能模式（2026-10-28 James：電腦卡）：解析度 1、粒子減量、雨量減、黑暗／光照離屏圖隔幀才重畫；glName 給 index.html 判斷是不是軟體繪圖
 
   // ====== 狀態 ======
   let app = null, el = null, ICONS = {}, ICON_TEXT = {}, tex = {}, radialTex, bandTex, vignetteTex, dotTex, rainTex, gradTex = {};
@@ -218,14 +218,15 @@ const Board = (() => {
     if (G) for (const k of G.rocks) { const [r, c] = unkey(k); const s = makeIcon('🪨', ch * .4); s.alpha = .7; s.x = (c + .5) * cw; s.y = yAt(r + .5, c + .5); s.isRock = true; L.cells.addChild(s); } }
     const h = L.hintG.clear();
     // 範圍預覽：淡金蓋底色
-    for (const k of state.range) { const [r, c] = unkey(k); h.poly(cellPts(r, c)).fill({ color: GOLD, alpha: .23 }); }
+    for (const k of state.range) { const [r, c] = unkey(k); h.poly(cellPts(r, c)).fill({ color: GOLD, alpha: contrast ? .4 : .23 }); if (contrast) h.poly(cellPts(r, c, 1)).stroke({ width: 1, color: 0xffffff, alpha: .7 }); }
     // 提示框：空地虛線金框、可直接換的金實線、鏟子時紅虛線
     for (const [k, kind] of state.hints) { const [r, c] = unkey(k); const pts = cellPts(r, c, 4);
-      if (kind === 'swap') h.poly(pts).stroke({ width: 2, color: GOLD }); else dashPoly(h, pts, kind === 'sell' ? DANGER : GOLD); }
+      if (kind === 'cursor') h.poly(cellPts(r, c, 2)).stroke({ width: contrast ? 4 : 3, color: 0xffffff, alpha: .95 }); // 鍵盤游標（期 5）：白實線
+      else if (kind === 'swap') h.poly(pts).stroke({ width: contrast ? 3 : 2, color: contrast ? 0xffffff : GOLD }); else dashPoly(h, pts, kind === 'sell' ? DANGER : (contrast ? 0xffffff : GOLD)); }
   }
   function dashPoly(g, p, color) { // Pixi 沒有虛線：自己一段一段畫（四個角的多邊形，坡上是斜的）
     const seg = 6, gap = 4; const edge = (x0, y0, x1, y1) => { const len = Math.hypot(x1 - x0, y1 - y0), n = Math.floor(len / (seg + gap)); for (let i = 0; i <= n; i++) { const a = i * (seg + gap) / len, b = Math.min(1, (i * (seg + gap) + seg) / len); if (a >= 1) break; g.moveTo(x0 + (x1 - x0) * a, y0 + (y1 - y0) * a).lineTo(x0 + (x1 - x0) * b, y0 + (y1 - y0) * b); } };
-    for (let i = 0; i < 4; i++) edge(p[i * 2], p[i * 2 + 1], p[(i * 2 + 2) % 8], p[(i * 2 + 3) % 8]); g.stroke({ width: 2, color });
+    for (let i = 0; i < 4; i++) edge(p[i * 2], p[i * 2 + 1], p[(i * 2 + 2) % 8], p[(i * 2 + 3) % 8]); g.stroke({ width: contrast ? 3 : 2, color });
   }
   function setHints(map) { state.hints = map || new Map(); state.cellsDirty = true; }
   function setRange(list) { state.range = new Set((list || []).map(([r, c]) => key(r, c))); state.cellsDirty = true; }
@@ -241,7 +242,7 @@ const Board = (() => {
     const t = new PIXI.Text({ text: String(text), style: { fontSize: size, fill, fontWeight: bold ? 'bold' : 'normal', fontFamily: '-apple-system, "PingFang TC", "Noto Sans TC", "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif', stroke: { color: 0x000000, width: 3 } } });
     t.anchor.set(.5); return t;
   }
-  function hpBar(g, w, y, f, color, thick) { g.clear().rect(-w / 2, y, w, thick ? 5 : 3).fill({ color: 0x000000, alpha: .4 }); if (f > 0) g.rect(-w / 2, y, w * f, thick ? 5 : 3).fill(color); }
+  function hpBar(g, w, y, f, color, thick) { const hh = thick ? 5 : 3; g.clear().rect(-w / 2, y, w, hh).fill({ color: 0x000000, alpha: contrast ? .7 : .4 }); if (f > 0) g.rect(-w / 2, y, w * f, hh).fill(color); if (contrast) g.rect(-w / 2 - 1, y - 1, w + 2, hh + 2).stroke({ width: 1, color: 0xffffff, alpha: .9 }); } // 高對比：底色更黑、外面加一圈白
 
   // ====== 單位（格子裡的）======
   function renderUnit(r, c) {
@@ -723,6 +724,7 @@ const Board = (() => {
       } catch (err) { report(err); }
     },
     setHints, setRange, setTeach, placed, squashUnit, lightning, dawn, lose,
+    setContrast(on) { contrast = !!on; state.cellsDirty = true; for (const M of [UN, EN, MV]) for (const v of M.values()) if (v && v.hp) v.hpLast = -1; }, get contrast() { return contrast; }, // 血條下一幀全部重畫
     setSpeed(n) { speed = n; }, setPaused(p) { paused = p; }, setStill(s) { still = s; },
     // 省效能模式：開關時把畫布解析度切到 1／回到裝置值，離屏圖跟著 layout 重建；software：WebGL 是軟體模擬（沒開硬體加速）的電腦一開始就該用省效能
     setLite(on) { lite = !!on; if (!app) return; try { const res = lite ? 1 : Math.min(2, window.devicePixelRatio || 1); if (app.renderer.resolution !== res) { app.renderer.resolution = res; app.resize(); W = H = 0; layout(); frame(G, 0); } } catch (e) { report(e); } },

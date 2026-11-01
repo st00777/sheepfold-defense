@@ -64,3 +64,17 @@
 
 ## 開發者模式
 網址加 `?all` 解鎖全部關卡；加 `?dev`（或遊戲中**長按**左上角「糧」1.5 秒；2026-10-20 前是連點五下，小孩手滑就會開）打開開發者列：速度 1×／2×／4×／8×、暫停、+500 糧、全卡（這一局所有卡都能用）、下一波、清場、「放敵人」選一種後點任一格就放一隻。調數值的流程：改 `data.js` → `node sim/simulate.js` 看勝率 → 開發者模式實際放敵人看手感。
+
+## 素材來源與授權（2026-11-01，藍圖 §3「素材來源表」）
+
+| 素材 | 來源 | 授權／備註 |
+|---|---|---|
+| 人物、道具、場景圖（`img/ico/*.webp`、`img/scene-*.webp`、`img/ground.webp`） | ChatGPT 圖像生成（2026 年 10 月，James 與小居／Codex 操作） | 自家生成；原圖（PNG，約 150 MB）在 James 的 `~/glc-work/sheepfold-char-src/`，不進 git |
+| 封面與分享預覽（`img/cover.jpg`、`img/cover-home.webp`、`img/icon-*.png`） | 同上，照遊戲內現役立繪重畫 | 同上；原檔位置見 docs/menu-redesign-2026-10-31.md |
+| 棋盤繪圖 `lib/pixi.min.js` | PixiJS 8.9.2 | MIT，授權全文在 `lib/LICENSE-pixi.txt` |
+| 音效與背景音樂 | `sound.js` 用 Web Audio 現場合成 | 沒有音檔、沒有授權問題 |
+| 字型 | 系統字（-apple-system／PingFang TC／Noto Sans TC） | 不內嵌字型檔 |
+| 經文 | 和合本（CUNP1），逐字對過 | 改寫處標「取材」；新加文字一律同一流程（`scripts/verify-scripture.js`） |
+| 圖示試跑 `proto/`（未採用） | game-icons.net（iconify API） | CC BY 3.0；正式版沒有用到 |
+
+素材備份：原圖只在 James 的 `~/glc-work`，repo 只放壓過的 webp；定期對帳 `ls ~/glc-work/sheepfold-char-src | wc -l` 跟 `img/ico` 的角色數。
