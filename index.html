@@ -744,6 +744,10 @@ const icoKey = d => d.img || d.ico; // 單位／敵人的取圖鍵：有自己�
 function icoFile(e, use) { const f = ICON_IMG[e]; if (!f) return null; const k = f.replace(/^c-/, ''); if (use === 'big') return f.startsWith('c-') ? 'l-' + k : f; if (!CHAR_KEYS.has(k)) return f; return use === 'board' ? 'q-' + k : 'h-' + k; }
 function icoImg(e, alt = e) { const f = icoFile(e, 'head'); return f ? `<img class="ei" src="img/ico/${f}.webp" alt="${alt}" decoding="async" onerror="icoFail(this)">` : alt; } // alt＝圖載不到時顯示的 emoji（img 鍵不是 emoji，要另外給）
 function icoFail(img) { img.replaceWith(document.createTextNode(img.alt)); }
+// 文案裡提到我方單位的 emoji 換成縮圖（2026-11-01 James：提示裡的拋石手等還是 emoji）。只換我方：單位本體、升級後的樣子（🦂🎺🫗⚙️…）、看門的、鏟子；敵人、羊、腳印、🌾 糧等照舊是 emoji
+// 用在選夜提示、「今晚有新夥伴」、提示列（toast）、看門的五格預覽；不用在試煉修飾詞（那裡的 🔥🕯️ 是烈火／守望，不是火盆／燈臺）
+const UNIT_EMOJI_RE = new RegExp('(?:' + [...new Set([...Object.values(UNITS).flatMap(u => [u.ico, u.upgrade && u.upgrade.ico]), '🧍', '⛏️'].filter(Boolean))].sort((a, b) => b.length - a.length).map(e => e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?!\\u200d)', 'gu'); // 後面不能接零寬連接符：🐕‍🦺 野狗裡的 🐕 不是牧羊犬
+function icoText(s) { return String(s).replace(UNIT_EMOJI_RE, e => icoImg(e)); }
 // 開局就把圖先載進快取：狼第一次出現、第一次開圖鑑都不會閃一下空白
 // 期 5 改成按需：只先載「已開的夜」會用到的單位與敵人頭像（第一章新玩家約 20 張，不是 48 張），其餘的卡片與圖鑑要用時再載；立繪本來就只在圖鑑點到才載
 (window.requestIdleCallback || setTimeout)(() => { const need = new Set(); for (const L of LEVELS) if (unlocked(L.id)) { for (const k of L.units) need.add(icoKey(UNITS[k])); for (const w of L.waves) for (const [t] of w.list) need.add(icoKey(ENEMIES[t])); } for (const e of need) { const f = icoFile(e, 'head'); if (f) { const i = new Image(); i.src = `img/ico/${f}.webp`; } } });
@@ -901,7 +905,7 @@ function openIntro(L, T) {
   }
   // 第一次玩第 1 夜：教學會手把手帶，開場頁只留台詞，不先丟一面字牆（2026-10-20 多視角審查 N4）
   const firstNight = !trial && L.id === 1 && !tutDone() && !/[?&]tut/.test(location.search);
-  if (!trial) $('#intro-tips').innerHTML = firstNight ? '<div class="new">按「開始守夜」，會一步一步帶你放下第一批人手。</div>' : L.fresh.map(k => `<div class="new">${icoImg(UNITS[k].ico)} ${UNITS[k].name}：${UNITS[k].desc}</div>`).join('') + [...new Set(L.tips || [])].map(x => `<div>${x}</div>`).join('');
+  if (!trial) $('#intro-tips').innerHTML = firstNight ? '<div class="new">按「開始守夜」，會一步一步帶你放下第一批人手。</div>' : L.fresh.map(k => `<div class="new">${icoImg(UNITS[k].ico)} ${UNITS[k].name}：${UNITS[k].desc}</div>`).join('') + [...new Set(L.tips || [])].map(x => `<div>${icoText(x)}</div>`).join('');
   showIntroNew(L, firstNight);
   $('#diffs').hidden = !!trial; // 試煉難度固定，不給選
   applyDiff(trial ? trial.diff : savedDiff(), !trial); // 回開場頁一律用平常的預設難度（續玩那一局可能臨時換過）；試煉用題目的難度、不寫進偏好
@@ -946,7 +950,7 @@ function showIntroNew(L, quiet) {
   if (fresh.length) parts.push(`今晚有新夥伴：${fresh.map(k => `${UNITS[k].ico} ${UNITS[k].name}`).join('、')}`);
   if (upg.length) parts.push(`${upg.map(k => `${UNITS[k].ico} ${UNITS[k].name}`).join('、')}學會新招：${upg.map(k => UNITS[k].upgrade.name).join('、')}`);
   if (gateNew) parts.push('🧍 看門的可替受保護的排救場一次，配置見下方');
-  $('#intro-new-text').textContent = parts.join('；') + '。完整能力與數值可在圖鑑查看。';
+  $('#intro-new-text').innerHTML = icoText(parts.join('；') + '。完整能力與數值可在圖鑑查看。'); // 單位 emoji 換縮圖；內容全是 data.js 的固定文字
   // 不管是按「先看圖鑑」還是直接「開始守夜」，這一夜的新夥伴介紹都只跳一次（2026-10-20 U3：以前只有按圖鑑才記）
   markIntroSeen = () => { try { const a = introSeen(); for (const k of [...fresh, ...upg]) if (!a.includes(`${L.id}:${k}`)) a.push(`${L.id}:${k}`); if (gateNew && !a.includes('gate')) a.push('gate'); SAVE.save(); } catch (e) {} };
   $('#intro-new-btn').onclick = () => {
@@ -983,7 +987,7 @@ function applyDiff(key, save = true) {
   document.querySelectorAll('#diffs .diff').forEach(b => b.classList.toggle('selected', b.dataset.key === key));
   $('#diff-hint').textContent = `${DIFFS[key].hint}。${gateAdvice(level, key)}`;
   const rows = Engine.gateRows(level, key);
-  $('#gate-preview').innerHTML = Array.from({ length: ROWS }, (_, r) => `<span class="${rows.includes(r) ? 'protected' : ''}" aria-label="第 ${r + 1} 排${rows.includes(r) ? '有看門的' : '沒有看門的'}">${r + 1} 排 ${rows.includes(r) ? '🧍' : '—'}</span>`).join('');
+  $('#gate-preview').innerHTML = Array.from({ length: ROWS }, (_, r) => `<span class="${rows.includes(r) ? 'protected' : ''}" aria-label="第 ${r + 1} 排${rows.includes(r) ? '有看門的' : '沒有看門的'}">${r + 1} 排 ${rows.includes(r) ? icoImg('🧍') : '—'}</span>`).join('');
   if (save && SD.prefs.diff !== key) { SD.prefs.diff = key; SAVE.save(); }
 }
 function showBest() {
@@ -1002,7 +1006,7 @@ function seenEnemy(t) { return SD.seen.enemies.includes(t); }
 function markSeenEnemy(t) { if (!SD.seen.enemies.includes(t)) { SD.seen.enemies.push(t); SAVE.save(); } }
 
 function toast(msg, tip) {
-  const t = $('#toast'); t.textContent = msg; t.classList.toggle('tip', !!tip);
+  const t = $('#toast'), s = msg == null ? '' : String(msg), h = icoText(s); if (h !== s) t.innerHTML = h; else t.textContent = s; t.classList.toggle('tip', !!tip); // 有單位 emoji 才走 innerHTML 換縮圖，其餘照舊純文字
   clearTimeout(toastTimer);
   if (tip) toastTimer = setTimeout(() => t.classList.remove('tip'), 5000);
 }
