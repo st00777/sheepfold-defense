@@ -1898,7 +1898,7 @@ $('#levels-epilogue').addEventListener('click', () => { Sound.play('dawn'); open
 // 11/2 James 真機按了沒反應，兩個原因一起修：(1) 原本先 await 載封面、再 await toBlob 才叫 navigator.share，手機瀏覽器（尤其 iOS）認定已經不是「使用者剛點的那一下」就拒絕分享；
 // 現在封面在結算頁出現時就先載，畫圖與轉檔全部同步做完，點下去第一個非同步動作就是 share。(2) 成功／失敗訊息原本走底下的提示列，被結算頁蓋住看不到，改寫在按鈕下方 #share-note
 let coverImg = null;
-function preloadCover() { if (!coverImg) { coverImg = new Image(); coverImg.src = 'img/cover-home.webp'; } }
+function preloadCover() { if (!coverImg) { coverImg = new Image(); coverImg.crossOrigin = 'anonymous'; coverImg.src = 'img/cover-home.webp'; } } // crossOrigin：githack 的 commit 網址會把圖 301 轉到 rawcdn 另一個網域，不加這個畫布會被鎖住、只能走不帶封面的備援（11/2 James 真機）；正式站與 githack 都回 Access-Control-Allow-Origin: *
 function shareNote(msg) { const n = $('#share-note'); n.textContent = msg; n.hidden = !msg; }
 function dataUrlToBlob(u) { const [head, b64] = u.split(','); const bin = atob(b64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return new Blob([arr], { type: /:(.*?);/.exec(head)[1] }); }
 function drawShareCard(useCover) { // 畫一張結果卡、回傳 canvas。useCover=false 是備援：封面圖若讓畫布被鎖住（SecurityError）就不畫封面再來一次
