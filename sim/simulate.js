@@ -55,10 +55,13 @@ function decide(G, skill) {
   // 第二章：無月夜先點燈（第 1、3 排各一盞就五排全亮）；邊排放牧人杖把狼趕進中間三排
   // 糧緊的夜（歌珊：開局糧少、牧人有上限）：燈和杖排在射手後面，手上要留得起一個投石手才買（2026-10-23 修好玩家暴風夜 7%）
   const spare = k => G.food >= UNITS[k].cost + UNITS.slinger.cost || Object.values(G.units).filter(u => kindOf(u) === 'shooter').length >= 3;
-  if (G.level.moonless && can('lamp') && spare('lamp') && count('lamp') < 2 && G.wave >= 1) { for (const r of [1, 3]) if (!has(G, r, u => u.type === 'lamp') && tryPlace(G, r, freeCell(G, r, 2), 'lamp')) return; }
+  const lampstand = UNITS.lamp.upgrade && E.posOf(G.level.id) >= UNITS.lamp.upgrade.from; // 學會燈臺：中間一盞升級就五排全亮，不再放兩盞
+  if (G.level.moonless && can('lamp') && spare('lamp') && count('lamp') < (lampstand ? 1 : 2) && G.wave >= 1) { for (const r of (lampstand ? [2] : [1, 3])) if (!has(G, r, u => u.type === 'lamp') && tryPlace(G, r, freeCell(G, r, 2), 'lamp')) return; }
   if (can('staff') && spare('staff') && G.wave >= 1) { for (const r of [0, 4]) if (!has(G, r, u => u.type === 'staff' || kindOf(u) === 'shooter') && tryPlace(G, r, freeCell(G, r, 3), 'staff')) return; }
   // 吹角手升銀號、荊棘以外的升級
   for (const k in G.units) { const u = G.units[k]; if (u.type === 'horn' && !u.upgraded && UNITS.horn.upgrade && E.posOf(G.level.id) >= UNITS.horn.upgrade.from && G.food >= UNITS.horn.upgrade.cost && E.tapUnit(G, u.r, u.c).ok) return; }
+  // 期 3 升級：雇工講定工價（糧到 50 就付）、火盆壇上的火、油燈燈臺（各留 50）。試過「投石手買不起先放雇工頂著」：第 5 夜起風 99→89%，是輸招，拿掉；通用玩家本來就不放雇工
+  for (const t of ['hireling', 'brazier', 'lamp']) { const up = UNITS[t].upgrade; if (!up || E.posOf(G.level.id) < up.from) continue; const keep = t === 'hireling' ? 25 : 50; for (const k in G.units) { const u = G.units[k]; if (u.type === t && !u.upgraded && G.food >= up.cost + keep && E.tapUnit(G, u.r, u.c).ok) return; } }
   // 第三章：投石機升巧匠的機器（手上留得起一道牆才升）
   for (const k in G.units) { const u = G.units[k]; if (u.type === 'catapult' && !u.upgraded && UNITS.catapult.upgrade && E.posOf(G.level.id) >= UNITS.catapult.upgrade.from && G.food >= UNITS.catapult.upgrade.cost + 50 && E.tapUnit(G, u.r, u.c).ok) return; }
   // 第三章：山坡。牆退到坡緣（hill-1）、石堆堆坡上、坑挖坡頂第一格、坡下有地面敵人就補拋石手
@@ -94,7 +97,7 @@ function decide(G, skill) {
     const types = new Set(es.map(e => e.type)); if (G.nextRow === r && G.nextType) types.add(G.nextType);
     // 投石隊顧上下三排：隔壁排有的也算這排有射手
     const volleyNear = [r - 1, r, r + 1].some(rr => rr >= 0 && rr < ROWS && has(G, rr, u => u.type === 'volley'));
-    const hasShooter = has(G, r, u => kindOf(u) === 'shooter' && !UNITS[u.type].flees) || volleyNear;
+    const hasShooter = has(G, r, u => kindOf(u) === 'shooter' && !(UNITS[u.type].flees && !u.upgraded)) || volleyNear;
     const hasSling = has(G, r, u => u.type === 'sling');
     const hasDog = has(G, r, u => u.type === 'dog' && !u.resting); // 休息中的狗不算，玩家會再放一隻
     const hasBlock = has(G, r, (u, c) => kindOf(u) === 'blocker' && c >= 3);
@@ -157,7 +160,7 @@ function decide(G, skill) {
   }
 
   // 有坡的夜：第一波過後每排都要有射手（坡吃掉三格射程，漏一排就補不回來），不等閒糧門檻
-  if (hill !== null && G.wave >= 1 && !G.level.noTrickle) for (const r of [2, 1, 3, 0, 4]) if (!has(G, r, u => kindOf(u) === 'shooter' && !UNITS[u.type].flees) && can('slinger') && tryPlace(G, r, freeCell(G, r, 1), 'slinger')) return;
+  if (hill !== null && G.wave >= 1 && !G.level.noTrickle) for (const r of [2, 1, 3, 0, 4]) if (!has(G, r, u => kindOf(u) === 'shooter' && !(UNITS[u.type].flees && !u.upgraded)) && can('slinger') && tryPlace(G, r, freeCell(G, r, 1), 'slinger')) return;
   // 一筆糧的夜（第 25 夜）：開場先把中間三排的射手和坡緣的牆擺好（不擺就不會開始倒數），之後只照威脅放，剩的留著修牆
   if (G.level.noTrickle) {
     for (const r of [2, 1, 3, 0, 4]) if (!has(G, r, u => kindOf(u) === 'shooter') && can('slinger') && tryPlace(G, r, freeCell(G, r, 1), 'slinger')) return;
@@ -167,7 +170,7 @@ function decide(G, skill) {
   // 有閒糧：火盆、第二射手、更多牧人、升老牧人
   if (G.food >= (S.shooterEveryRow ? 150 : 200)) { // 射手守線：閒糧門檻低一點，先把每排射手補齊
     if (can('brazier')) for (let r = 0; r < ROWS; r++) if (has(G, r, (u, c) => kindOf(u) === 'shooter' && c <= 1) && !has(G, r, u => u.type === 'brazier') && !G.units[key(r, 2)]) { if (tryPlace(G, r, 2, 'brazier')) return; }
-    for (const r of [2, 1, 3, 0, 4]) if (!has(G, r, u => kindOf(u) === 'shooter' && !UNITS[u.type].flees) && can('slinger')) { if (tryPlace(G, r, freeCell(G, r, 1), 'slinger')) return; }
+    for (const r of [2, 1, 3, 0, 4]) if (!has(G, r, u => kindOf(u) === 'shooter' && !(UNITS[u.type].flees && !u.upgraded)) && can('slinger')) { if (tryPlace(G, r, freeCell(G, r, 1), 'slinger')) return; }
     if (count('shepherd') < 5 && can('shepherd')) { for (const r of [0, 4]) if (tryPlace(G, r, freeCell(G, r, 0), 'shepherd')) return; }
     if (G.food >= 250) for (const k in G.units) { const u = G.units[k]; if (u.type === 'shepherd' && !u.elder) { E.tapUnit(G, u.r, u.c); return; } }
     if (G.food >= 300) for (const r of [2, 1, 3, 0, 4]) if (Object.values(G.units).filter(u => u.r === r && kindOf(u) === 'shooter').length < 2 && can('slinger')) { if (tryPlace(G, r, freeCell(G, r, 2), 'slinger')) return; }

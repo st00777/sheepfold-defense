@@ -21,7 +21,9 @@ const UNITS = {
   dog:      { name: '牧羊犬', title: '追賊的，不要命的',   ico: '🐕',   cost: 75,  hp: 220, kind: 'dog', dps: 10, hunt: 30, run: 1.6, rest: 10,
               desc: '抓賊的。追咬賊、偷羊人、狐狸、野狗；大傢伙也能拖幾秒。同排幾隻狗會分頭咬，敵人少就一起上。受傷回窩休息，不會死', ref: '伯 30:1' },
   hireling: { name: '雇工', title: '見狼來就撇下羊逃走',     ico: '🤾',   cost: 25,  hp: 40,  kind: 'shooter', every: 0.9, dmg: 10, shot: 'stone', range: 2.5, flees: 1.0,
-              desc: '低費短射程投石手，敵人一靠近就逃跑', ref: '約 10:12' },
+              desc: '低費短射程投石手，敵人一靠近就逃跑。第 {from} 夜起再點一下講定工價，他就不逃了', ref: '約 10:12',
+              // 升級（期 3，2026-10-30）：講定工價，flees 0＝不再逃跑（獅子吼只僵住）、hp 40→60（engine 升級時把 maxHp 一起補上）；射程 2.5 不變，定位仍是「要牆擋的短射程」。工價 25 不是 50：模擬過 50 要攢到 150 才付得起、狼第 2 波就到他早逃了；25＋25＝50 糧是投石手的一半，六成多傷害、三分之一射程，這才是真的取捨
+              upgrade: { name: '講定工價', ico: '🪙', cost: 25, fromId: 16, flees: 0, hp: 60, desc: '講定一天一錢銀子，他就不再逃跑，血量也多了', ref: '太 20:2' } },
   tower:    { name: '守望樓', title: '葡萄園中的樓，賊也翻不過',   ico: '🗼',   cost: 125, hp: 600, kind: 'blocker', tall: true,
               desc: '高血量防線，賊也翻不過', ref: '賽 5:2' },
   archer:   { name: '弓箭手', title: '在曠野長大的弓箭手',   ico: '🏹',   cost: 125, hp: 60,  kind: 'shooter', every: 1.8, dmg: 26, shot: 'arrow', pierce: true, falloff: 0.8,
@@ -31,7 +33,9 @@ const UNITS = {
               // 升級：再點一下花糧撒蠍子進去，踩入的敵人中毒（from＝第幾夜起學會）；持續有效，每隻敵人同一片荊棘只叮一次
               upgrade: { name: '荊棘蠍窩', ico: '🦂', cost: 50, fromId: 5, poison: 8, desc: '撒蠍子進荊棘，踩入的敵人中毒，持續有效', ref: '申 8:15' } },
   brazier:  { name: '火盆', title: '夜間按著更次看守羊群',     ico: '🔥',   cost: 75,  hp: 100, kind: 'support', ignite: true,
-              desc: '點燃穿過的石子與箭矢，燃燒會傳給隔壁敵人', ref: '路 2:8' },
+              desc: '點燃穿過的石子與箭矢，燃燒會傳給隔壁敵人。第 {from} 夜起再點一下，上下兩排的也點得著', ref: '路 2:8',
+              // 升級（期 3）：壇上的火常常燒著，lanes 1＝上下各一排穿過這一欄的石子與箭矢也點燃（跟投石隊的 lanes 同一個字彙）；燃燒數值不變
+              upgrade: { name: '壇上的火', ico: '🎇', cost: 50, fromId: 17, lanes: 1, desc: '火常常燒著，上下兩排穿過的石子和箭矢也點燃', ref: '利 6:13' } },
   jar:      { name: '瓦瓶火把', title: '打破瓦瓶，火把一亮', ico: '🏺',   cost: 100, hp: 0,   kind: 'instant', dmg: 30, panic: 2.5,
               desc: '一次性。九格範圍傷害，並嚇退敵人', ref: '士 7:19' },
   horn:     { name: '吹角手', title: '吹角，你們就蒙記念',   ico: '📯',   cost: 100, hp: 60,  kind: 'support', every: 20, push: 1, stun: 2,
@@ -50,7 +54,9 @@ const UNITS = {
   staff:    { name: '牧人杖', title: '你的杖、你的竿，都安慰我',   ico: '🦯',   cost: 50,  hp: 150, kind: 'deflector', deflect: 10, deflectCd: 4,
               desc: '不攻擊。地面敵人走到它面前就被趕到隔壁排，放在沒有射手的排，把敵人趕進有射手的那排。頭目趕不動', ref: '詩 23:4' },
   lamp:     { name: '油燈', title: '她的燈終夜不滅',     ico: '🪔',   cost: 50,  hp: 60,  kind: 'support', light: 1,
-              desc: '不攻擊。照亮自己這排和上下兩排：光裡的敵人不換排（豺狼不繞路、豹不跳排、夜鴞不飄），無月夜裡那三排的腳印預告也會回來。放中間那排最划算', ref: '箴 31:18' },
+              desc: '不攻擊。照亮自己這排和上下兩排：光裡的敵人不換排（豺狼不繞路、豹不跳排、夜鴞不飄），無月夜裡那三排的腳印預告也會回來。放中間那排最划算；第 {from} 夜起再點一下放上燈臺，照得更遠', ref: '箴 31:18',
+              // 升級（期 3）：放在燈臺上，light 1→2＝照亮上下各兩排，放中間那排五排全亮（一盞升級＝一格，對上第 2、4 排各一盞＝兩格）
+              upgrade: { name: '燈臺', ico: '🕯️', cost: 50, fromId: 12, light: 2, desc: '放在燈臺上，照亮上下各兩排；放中間那排，五排全亮', ref: '太 5:15' } },
   patrol:   { name: '巡夜人', title: '晝夜作我們的保障',   ico: '🚶',   cost: 125, hp: 140, kind: 'patrol', every: 0.8, dmg: 18, walk: 1.2, reach: 1.3,
               desc: '在本排與上下鄰排巡邏，空閒時優先趕往近戰範圍內受威脅的排；接敵後留在那排攻擊。站在哪排就擋哪排的狼；鄰排那格有東西就走不進去', ref: '撒上 25:16' },
   volley:   { name: '投石隊', title: '左右兩手都能甩石',   ico: '🥌',   cost: 175, hp: 60,  kind: 'shooter', every: 1.6, dmg: 14, shot: 'stone', lanes: 1,
