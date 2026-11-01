@@ -8,7 +8,7 @@
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.Save = factory();
 })(typeof window !== 'undefined' ? window : globalThis, function () {
-  const VERSION = 5;                  // 存檔結構版本。v1 best-v2（只有第一關）、v2 progress-v3、v3 檢查點每關一份：都是舊的散放 key；v4 起單一結構；v5 加 trials（守夜試煉，期 2）
+  const VERSION = 6;                  // 存檔結構版本。v1 best-v2（只有第一關）、v2 progress-v3、v3 檢查點每關一份：都是舊的散放 key；v4 起單一結構；v5 加 trials（守夜試煉，期 2）；v6 加 achievements（成就，期 4）與 prefs.contrast／prefs.sound.music
   const KEY = 'sheepfold-save', BAK = KEY + '-bak', BROKEN = KEY + '-broken';
   const CP_RE = /^sheepfold-checkpoint-(\d+)$/;
   const LEGACY = ['sheepfold-progress-v3', 'sheepfold-best-v2', 'sheepfold-checkpoint', 'sheepfold-loadout', 'sheepfold-intro-seen', 'sheepfold-seen-cards', 'sheepfold-seen-enemies', 'sheepfold-tutorial-done', 'sheepfold-diff', 'sheepfold-speed', 'sheepfold-bigtext', 'sheepfold-lite', 'sheepfold-sound'];
@@ -27,8 +27,9 @@
       loadouts: {},                                      // 夜 id → 帶的卡
       seen: { intro: [], cards: [], enemies: [] },       // 開場頁介紹過的、新卡閃光點過的、弱點提示跳過的
       tutorial: false,
-      prefs: { diff: 'calm', speed: 1, big: false, lite: null, sound: { sfx: true, amb: false, vol: 1 }, analytics: true }, // lite null＝沒設過，由電腦是不是軟體繪圖決定
+      prefs: { diff: 'calm', speed: 1, big: false, lite: null, contrast: false, sound: { sfx: true, amb: false, music: true, vol: 1 }, analytics: true }, // lite null＝沒設過，由電腦是不是軟體繪圖決定；contrast 高對比（期 5）；sound.music 背景音樂（期 5）
       trials: emptyTrials(),                             // 守夜試煉（v5）：cleared[題 id]=true、best[題 id]={wave,cleared,food}、checkpoints[題 id]=快照、loadouts[題 id]=帶的卡；跟故事模式分開，試煉打到一半不會蓋掉那一夜的檢查點
+      achievements: {},                                  // 成就（v6）：id → 解鎖日期（ISO 字串）；規則在 Engine.achievementsEarned，這裡只記「哪一天拿到」
       announced: '',                                     // 看過哪一版的更新公告
       playerKind: '',                                    // 第一次接統計時：有通關紀錄＝returning、沒有＝new（之後不變）
     };
@@ -76,6 +77,7 @@
   // ====== 遷移鏈：STEPS[n] 把第 n 版改成第 n+1 版。v4 是第一個單一結構，之後改欄位就在這裡加一步 ======
   const STEPS = {};
   STEPS[4] = d => { if (!isObj(d.trials)) d.trials = emptyTrials(); }; // v4 → v5：多一欄 trials，其餘不動
+  STEPS[5] = d => { if (!isObj(d.achievements)) d.achievements = {}; if (isObj(d.prefs)) { if (typeof d.prefs.contrast !== 'boolean') d.prefs.contrast = false; if (isObj(d.prefs.sound) && typeof d.prefs.sound.music !== 'boolean') d.prefs.sound.music = true; } }; // v5 → v6：成就＋高對比＋音樂開關，其餘不動
   function migrate(d) { while (d.version < VERSION && STEPS[d.version]) { STEPS[d.version](d); d.version++; } return d; }
 
   // ====== 檢查與補齊：缺的欄位補預設、型別不對的丟掉；檢查點交給 opts.check（Engine.checkSnapshot）驗，壞的只丟那一份 ======
@@ -120,8 +122,13 @@
     if (pr.speed === 2) d.prefs.speed = 2;
     d.prefs.big = !!pr.big;
     d.prefs.lite = typeof pr.lite === 'boolean' ? pr.lite : null;
-    if (isObj(pr.sound)) d.prefs.sound = { sfx: pr.sound.sfx !== false, amb: !!pr.sound.amb, vol: [0, 1, 2].includes(pr.sound.vol) ? pr.sound.vol : 1 };
+    if (isObj(pr.sound)) d.prefs.sound = { sfx: pr.sound.sfx !== false, amb: !!pr.sound.amb, music: pr.sound.music !== false, vol: [0, 1, 2].includes(pr.sound.vol) ? pr.sound.vol : 1 };
+    d.prefs.contrast = !!pr.contrast;
     d.prefs.analytics = pr.analytics !== false;
+    if (isObj(input.achievements)) { // 成就：只收認得的 id（opts.achievementIds 有給的話）與像日期的字串；壞的那條丟掉
+      const known = Array.isArray(opts.achievementIds) ? new Set(opts.achievementIds) : null;
+      for (const id in input.achievements) { const v = input.achievements[id]; if ((!known || known.has(id)) && typeof v === 'string' && v.length >= 4 && v.length <= 40) d.achievements[id] = v; }
+    }
     if (typeof input.announced === 'string') d.announced = input.announced;
     if (input.playerKind === 'new' || input.playerKind === 'returning') d.playerKind = input.playerKind;
     return { data: migrate(d), problems };
@@ -214,7 +221,7 @@
   function summary(d) {
     const nights = Object.keys(d.progress.cleared).filter(id => Object.keys(d.progress.cleared[id]).length).length;
     const t = isObj(d.trials) ? d.trials : emptyTrials();
-    return { nights, checkpoints: Object.keys(d.checkpoints).length, trials: Object.keys(t.cleared || {}).length, trialCheckpoints: Object.keys(t.checkpoints || {}).length, updated: d.updated, created: d.created };
+    return { nights, checkpoints: Object.keys(d.checkpoints).length, trials: Object.keys(t.cleared || {}).length, trialCheckpoints: Object.keys(t.checkpoints || {}).length, achievements: Object.keys(isObj(d.achievements) ? d.achievements : {}).length, updated: d.updated, created: d.created };
   }
 
   // ====== 儲存介面：瀏覽器 localStorage；測試用記憶體版 ======

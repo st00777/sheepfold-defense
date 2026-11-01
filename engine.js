@@ -73,6 +73,45 @@
     if (!(cleared[gate.id] && cleared[gate.id].storm)) return false;
     return !!(st.noLoss && (st.gates || starSlots(gate) === 2));
   }
+  // ====== 成就（期 4，2026-11-01）：純看存檔算，哪些條件已經成立。progress＝save 的 progress（cleared／stars）、trials＝save 的 trials（cleared）======
+  // 星的算法跟畫面同一套：守過 1 顆、零損失 1 顆、看門的都在 1 顆（沒看門的夜只有兩顆）；任一難度守過就算「守過」
+  const ACH = D.ACHIEVEMENTS || [];
+  function starsOfNight(progress, id) {
+    const c = (progress.cleared || {})[id], st = (progress.stars || {})[id] || {}, L = levelById(id);
+    const win = !!(c && Object.keys(c).length);
+    return (win ? 1 : 0) + (win && st.noLoss ? 1 : 0) + (win && st.gates && L && starSlots(L) === 3 ? 1 : 0);
+  }
+  function achievementsEarned(progress, trials) {
+    const P = progress || {}, cleared = P.cleared || {}, stars = P.stars || {}, T = (trials && trials.cleared) || {};
+    const won = id => !!(cleared[id] && Object.keys(cleared[id]).length);
+    const ch1 = LEVELS.filter(L => chapterOf(L) === 1), tot = LEVELS.reduce((a, L) => a + starSlots(L), 0);
+    const got = LEVELS.reduce((a, L) => a + starsOfNight(P, L.id), 0);
+    const rules = {
+      first_night: () => won(LEVELS[0].id),
+      chapter_one: () => ch1.every(L => won(L.id)),
+      thirty_nights: () => LEVELS.every(L => won(L.id)),
+      no_loss: () => LEVELS.some(L => L.sheep && won(L.id) && stars[L.id] && stars[L.id].noLoss),
+      storm_full: () => LEVELS.some(L => cleared[L.id] && cleared[L.id].storm && starsOfNight(P, L.id) === starSlots(L)),
+      fire_one: () => TRIALS.some(t => t.kind === 'fire' && T[t.id]),
+      stars_30: () => got >= 30,
+      stars_all: () => got >= tot,
+      trials_20: () => TRIALS.filter(t => T[t.id]).length >= 20,
+    };
+    return ACH.filter(a => rules[a.id] && rules[a.id]()).map(a => a.id);
+  }
+  // 跟存檔裡已經解鎖的（have：id → 日期）比，回新成立的 id（照 ACHIEVEMENTS 的順序）
+  function achievementsNew(have, progress, trials) { const h = have || {}; return achievementsEarned(progress, trials).filter(id => !h[id]); }
+  function validateAchievements() {
+    const bad = [], seen = new Set(), groups = {};
+    for (const a of ACH) {
+      if (!a.id || seen.has(a.id)) bad.push(`成就 ${a.id} 的 id 重複或沒有`); seen.add(a.id);
+      for (const f of ['ico', 'name', 'desc', 'verse', 'ref']) if (typeof a[f] !== 'string' || !a[f]) bad.push(`成就 ${a.id} 缺 ${f}`);
+      if (!D.ACHIEVEMENT_GROUPS || !D.ACHIEVEMENT_GROUPS[a.group]) bad.push(`成就 ${a.id} 的分組 ${a.group} 不認識`);
+      groups[a.group] = (groups[a.group] || 0) + 1;
+    }
+    return bad;
+  }
+
   // 到這一夜為止（含這一夜）故事裡出現過的敵人種類：守望／烈火只准用這些（James 10/31：不把後面的敵人提前）
   function enemiesSeenBy(levelId) {
     const i = idxOf(levelId), seen = new Set();
@@ -1334,6 +1373,6 @@
   for (const msg of validateLevels()) console.error(msg);
   for (const msg of validateTrials()) console.error(msg);
 
-  const Engine = { create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, trialById, trialGate, isTrialUnlocked, enemiesSeenBy, trialLevel, dailyTrial, validateTrials, sameMods, rowLit, starSlots, validateLevels, onHillCell, dev, effOf };
+  const Engine = { achievementsEarned, achievementsNew, validateAchievements, starsOfNight, create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, trialById, trialGate, isTrialUnlocked, enemiesSeenBy, trialLevel, dailyTrial, validateTrials, sameMods, rowLit, starSlots, validateLevels, onHillCell, dev, effOf };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);

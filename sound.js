@@ -96,6 +96,8 @@
     eagle:   () => { tone({ type: 'sawtooth', f0: 1500, f1: 900, dur: 0.28, g: 0.12, a: 0.02, lp: 3200 }); tone({ type: 'sawtooth', f0: 1600, f1: 1000, dur: 0.32, g: 0.12, a: 0.02, lp: 3200, at: 0.3 }); }, // 大鷹：兩聲尖嘯（飛進來時打不到，先聽到）
     aurochs: () => { tone({ type: 'sawtooth', f0: 110, f1: 60, dur: 0.8, g: 0.28, a: 0.04, lp: 700, vib: [14, 12] }); [0, 0.18, 0.36, 0.54].forEach(t => noise({ f0: 160, dur: 0.08, g: 0.3, at: t })); }, // 野牛：低吼＋四下蹄聲
     throw:   () => noise({ filt: 'bandpass', f0: 2200, q: 2, dur: 0.04, g: 0.16 }),                                 // 強盜丟石：跟石子射出同款、音高低一點
+    // ====== 期 4：成就解鎖——四聲上行琶音＋高處一聲長鈴＋一點閃光噪音 ======
+    achieve: () => { [523, 659, 784, 1047].forEach((f, i) => tone({ type: 'triangle', f0: f, dur: 0.5, g: 0.18, a: 0.01, at: i * 0.11 })); tone({ f0: 2093, dur: 1.2, g: 0.08, a: 0.02, at: 0.45 }); noise({ filt: 'highpass', f0: 6000, dur: 0.4, g: 0.05, a: 0.05, at: 0.45 }); },
   };
 
   function play(name) {

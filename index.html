@@ -284,6 +284,45 @@
   #roster-detail .dt { flex: 1; min-width: 0; }
   #roster-detail .sub { display: block; color: var(--muted); font-size: 12px; line-height: 1.3; margin: -2px 0 4px; }
   #lightbox { z-index: 20; background: #000d; cursor: zoom-out; }
+  /* ====== 成就（期 4，2026-11-01）：成就冊一列一條；解鎖走全螢幕卡片＋經文＋音效（藍圖 §2：James 的儀式感偏好） ====== */
+  .lv.ach .n { font-size: 26px; width: 40px; }
+  .lv.ach.locked { opacity: .5; }
+  .lv.ach .t span { white-space: normal; line-height: 1.4; }
+  .ach-group { text-align: left; color: var(--gold); font-size: 13px; margin: 12px 0 2px; }
+  .ach-note { margin-top: 8px; font-size: 13px; color: var(--gold); }
+  #achv-card { z-index: 30; background: #000c; }
+  #achv-card .dialog { border: 2px solid var(--gold); box-shadow: 0 0 0 6px #e6b84a22, 0 0 48px 8px #e6b84a55; }
+  #achv-card .ach-ico { font-size: 64px; line-height: 1; margin: 6px 0 4px; }
+  #achv-card .ach-kicker { color: var(--gold); letter-spacing: .3em; font-size: 13px; }
+  #achv-card h1 { font-size: 28px; margin: 4px 0; }
+  #achv-card .ach-desc { color: var(--muted); font-size: 14px; }
+  #achv-card .verse { margin: 12px 0 2px; text-align: left; line-height: 1.7; font-size: 15px; }
+  #achv-card .ach-ref { color: var(--muted); font-size: 13px; text-align: right; }
+  #achv-card .ach-more { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  @keyframes ach-in { from { opacity: 0; transform: scale(.6) rotate(-6deg); } 60% { transform: scale(1.06) rotate(1deg); } to { opacity: 1; transform: none; } }
+  @keyframes ach-glow { 0%, 100% { box-shadow: 0 0 0 6px #e6b84a22, 0 0 48px 8px #e6b84a55; } 50% { box-shadow: 0 0 0 10px #e6b84a33, 0 0 72px 16px #e6b84a88; } }
+  #achv-card:not([hidden]) .dialog { animation: ach-in 520ms var(--ease-out) both, ach-glow 2.4s ease-in-out 520ms infinite; }
+  #achv-card:not([hidden]) .ach-ico { animation: ach-in 700ms var(--ease-out) 120ms both; }
+  @media (prefers-reduced-motion: reduce) { #achv-card .dialog, #achv-card .ach-ico { animation: none !important; } }
+  /* ====== 尾聲（期 4）：第 30 夜守過後的結局——三章回顧、經文、製作名單；點一下換頁 ====== */
+  #epilogue { z-index: 25; background: #000; padding: 0; cursor: pointer; }
+  #epilogue .ep { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px 20px; }
+  #epilogue .ep-bg { position: absolute; inset: 0; background: center / cover no-repeat; opacity: 0; transition: opacity 1.2s; }
+  #epilogue .ep-bg.on { opacity: .55; }
+  #epilogue .ep-body { position: relative; max-width: 420px; opacity: 0; transition: opacity 1s; }
+  #epilogue .ep-body.on { opacity: 1; }
+  #epilogue .ep-kicker { color: var(--gold); letter-spacing: .3em; font-size: 13px; }
+  #epilogue h1 { font-size: 28px; margin: 6px 0 10px; }
+  #epilogue p { line-height: 1.9; font-size: 16px; text-align: center; margin: 0 0 8px; }
+  #epilogue .ep-small { color: var(--muted); font-size: 13px; line-height: 1.8; }
+  #epilogue .ep-hint { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; color: var(--muted); font-size: 12px; }
+  #epilogue .btn { margin-top: 18px; }
+  @media (prefers-reduced-motion: reduce) { #epilogue .ep-bg, #epilogue .ep-body { transition: none; } }
+  /* ====== 頭目登場橫幅（期 4）：名字＋稱號從右邊滑進來、停一下、往左淡出；外框的震動與金邊照舊 ====== */
+  #boss-banner { position: absolute; left: 0; right: 0; top: 38%; z-index: 3; pointer-events: none; text-align: center; opacity: 0; }
+  #boss-banner .bb { display: inline-block; background: #000b; border-top: 2px solid var(--gold); border-bottom: 2px solid var(--gold); padding: 8px 22px; }
+  #boss-banner .bb b { display: block; font-size: 22px; color: var(--gold); letter-spacing: .1em; }
+  #boss-banner .bb span { font-size: 13px; color: var(--text); }
   .lb { text-align: center; max-width: 92vw; }
   .lb img { width: min(80vw, 360px, 55dvh); aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 10px 18px #000a); -webkit-user-drag: none; -webkit-touch-callout: none; } /* 55dvh：手機橫放時圖＋三行字還塞得進畫面 */
   .lb .n { font-size: 24px; color: var(--gold); font-weight: bold; margin-top: 6px; }
@@ -343,7 +382,7 @@
 </div>
 
 <div id="board-wrap"><div id="stage">
-  <div id="scene"><div id="shell"><div id="lane"></div><div id="board"><div id="board-fail">這支瀏覽器開不了棋盤畫面（需要 WebGL）。請換 Chrome 或 Safari 試試，或把瀏覽器更新到最新版。</div></div><div id="frame"></div></div></div>
+  <div id="scene"><div id="boss-banner"><div class="bb"><b></b><span></span></div></div><div id="shell"><div id="lane"></div><div id="board"><div id="board-fail">這支瀏覽器開不了棋盤畫面（需要 WebGL）。請換 Chrome 或 Safari 試試，或把瀏覽器更新到最新版。</div></div><div id="frame"></div></div></div>
   <!-- 提示列貼在棋盤正下方（2026-10-21 James 實機回饋：放頁面最底下根本不會看到） -->
   <div id="bottom">
     <div id="bar"><i></i></div>
@@ -363,7 +402,8 @@
     <div id="save-note" hidden></div>
     <button class="btn" id="continue-btn" hidden></button>
     <div id="modes"></div>
-    <div class="home-btns"><button class="btn alt small" id="levels-codex">📖 圖鑑</button></div>
+    <div class="home-btns"><button class="btn alt small" id="levels-codex">📖 圖鑑</button><button class="btn alt small" id="levels-achv">🏆 成就</button><button class="btn alt small" id="levels-epilogue" hidden>🌅 尾聲</button></div>
+    <div class="ach-note" id="achv-note" hidden></div>
     <div class="upd" id="home-upd"></div>
     <div class="ref credit">人物、道具與場景圖由 ChatGPT 生成（2026 年 10 月）</div>
   </div>
@@ -469,12 +509,39 @@
     <p id="result-text"></p>
     <div id="stars"></div><div id="stars-note"></div>
     <div id="psalm"></div>
+    <button class="btn" id="epilogue-btn" hidden>看尾聲</button>
     <button class="btn" id="next" hidden>下一夜</button>
     <button class="btn" id="retry">再守一夜</button>
     <button class="btn alt" id="back">回關卡</button>
   </div>
 </div>
 
+<!-- 成就冊（首頁 🏆）：九條，進度／技巧／收藏各三；鎖著的壓暗 -->
+<div class="overlay" id="achv" hidden>
+  <div class="dialog home">
+    <button class="corner left back" id="achv-back">‹ 首頁</button>
+    <h1>成就</h1>
+    <div class="ref" id="achv-sub"></div>
+    <div id="achv-list"></div>
+  </div>
+</div>
+<!-- 成就解鎖：全螢幕卡片＋經文，一次一條，「收下」才下一條 -->
+<div class="overlay" id="achv-card" hidden>
+  <div class="dialog">
+    <div class="ach-kicker">成就解鎖</div>
+    <div class="ach-ico" id="achv-ico"></div>
+    <h1 id="achv-name"></h1>
+    <div class="ach-desc" id="achv-desc"></div>
+    <p class="verse" id="achv-verse"></p>
+    <div class="ach-ref" id="achv-ref"></div>
+    <div class="ach-more" id="achv-more"></div>
+    <button class="btn" id="achv-ok">收下</button>
+  </div>
+</div>
+<!-- 尾聲：第 30 夜守過後（結算頁「看尾聲」、首頁 🌅） -->
+<div class="overlay" id="epilogue" hidden>
+  <div class="ep"><div class="ep-bg" id="ep-bg"></div><div class="ep-body" id="ep-body"></div><div class="ep-hint" id="ep-hint"></div></div>
+</div>
 <!-- 設定（首頁左上 ⚙️）：存檔碼匯出／匯入、匿名統計開關、版本與更新紀錄 -->
 <div class="overlay" id="settings" hidden>
   <div class="dialog">
@@ -572,7 +639,7 @@ const CP_BROKEN = '上次的存檔讀不出來，這一夜要從頭守。';
 // ====== 存檔（只存在這支手機）======
 // 2026-10-29 期 0：整支手機的紀錄放在一份 `sheepfold-save`（save.js，v4）——進度、星、每關檢查點、隊伍、看過的介紹、教學、設定。
 // 以前十幾個散放的 key 第一次開新版會自動搬進來、搬成功才刪；主檔讀不出來會先試上次開頁抄的備份、再不行才從頭，原文留在 -broken，首頁會說一聲
-const SAVE_OPTS = { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS), trialIds: TRIALS.map(t => t.id) }; // 匯入時也用同一組
+const SAVE_OPTS = { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS), trialIds: TRIALS.map(t => t.id), achievementIds: ACHIEVEMENTS.map(a => a.id) }; // 匯入時也用同一組
 const SAVE = Save.open(Save.localStore(), SAVE_OPTS);
 const SD = SAVE.data;
 Sound.attach(SD.prefs.sound, () => SAVE.save()); // 音效設定也住在存檔裡
@@ -722,6 +789,7 @@ function buildLevels() {
   tr.addEventListener('click', () => { openChapters('trial'); track('open_trials', {}); Sound.play('tap'); });
   box.append(story, tr);
   $('#home-upd').textContent = HOME_UPDATE;
+  $('#levels-epilogue').hidden = !P.cleared[LAST_NIGHT.id]; // 第 30 夜守過才有「尾聲」可以再看
   const sn = $('#save-note'); sn.hidden = !SAVE.problems.length; sn.textContent = SAVE.problems.join('；'); // 存檔搬移／接回／壞掉的說明，首頁說一次（不靜默）
   showMenu('#levels');
 }
@@ -998,7 +1066,17 @@ function tapCell(r, c) {
 const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 const EASE_OUT = 'cubic-bezier(.23, 1, .32, 1)';
 // 頭目登場：只震外框一次（2px、350ms）＋金邊閃一下；棋盤格子不動
-function bossEnter() {
+let bannerAnim = null, bannerTimer = 0;
+function bossBanner(type) {
+  const e = ENEMIES[type], b = $('#boss-banner'); if (!e || !b) return;
+  b.querySelector('b').textContent = e.name; b.querySelector('span').textContent = e.title || '';
+  clearTimeout(bannerTimer); if (bannerAnim) { try { bannerAnim.cancel(); } catch (err) {} bannerAnim = null; }
+  if (REDUCE_MOTION.matches || !b.animate) { b.style.opacity = 1; bannerTimer = setTimeout(() => { b.style.opacity = 0; }, 1400); return; } // 減少動態：直接出現、1.4 秒後消失
+  bannerAnim = b.animate([{ opacity: 0, transform: 'translateX(40px)' }, { opacity: 1, transform: 'translateX(0)', offset: .18 }, { opacity: 1, transform: 'translateX(0)', offset: .8 }, { opacity: 0, transform: 'translateX(-24px)' }], { duration: 2000 / (speed > 1 ? 1.6 : 1), easing: 'ease-out', fill: 'forwards' });
+  bannerAnim.onfinish = () => { b.style.opacity = 0; bannerAnim = null; };
+}
+function bossEnter(type) {
+  if (type) bossBanner(type);
   const f = $('#frame'); if (!f) return;
   if (!REDUCE_MOTION.matches && speed <= 1) f.animate([{ transform: 'translate(0, 0)' }, { transform: 'translate(-2px, 1px)', offset: .2 }, { transform: 'translate(2px, -1px)', offset: .45 }, { transform: 'translate(-1px, 0)', offset: .7 }, { transform: 'translate(0, 0)' }], { duration: 350, easing: 'ease-out' });
   f.animate([{ boxShadow: '0 0 0 2px #e6b84a, 0 0 18px 4px #e6b84a88' }, { boxShadow: '0 0 0 0 #e6b84a00, 0 0 0 0 #e6b84a00' }], { duration: 700, easing: 'ease-out' });
@@ -1020,7 +1098,7 @@ function flushEvents() {
   const spawned = [];
   for (const e of G.events) {
     switch (e.t) {
-      case 'spawn': spawned.push(e.e.type); if (SPAWN_SFX[e.e.type]) Sound.play(SPAWN_SFX[e.e.type]); if (ENEMIES[e.e.type].boss) bossEnter(); break;
+      case 'spawn': spawned.push(e.e.type); if (SPAWN_SFX[e.e.type]) Sound.play(SPAWN_SFX[e.e.type]); if (ENEMIES[e.e.type].boss) bossEnter(e.e.type); break;
       case 'toast': toast(e.msg); break;
       case 'die': Sound.play('die'); Board.event(e, G); break;
       case 'hit': Board.event(e, G); break;
@@ -1157,6 +1235,8 @@ function onWin() {
     endGame('天亮了 🌅', trial ? `${TRIAL_KINDS[trial.kind].name}過了。${sheepSummary()}${left}${trial.win}${devUsed ? '（開著開發者模式，這題不記過關）' : ''}${saved ? '' : ' ' + SAVE_FAILED_NOTE}` : `${DIFFS[diff].name}守過了。${sheepSummary()}${left}${level.outroWin}${saved ? '' : ' ' + SAVE_FAILED_NOTE}`);
     if (!trial) showStars(); // 試煉不記星（藍圖：星只在故事模式顯示與統計）
     $('#next').hidden = !next; $('#retry').textContent = trial ? '再打這一題' : '再守這一夜';
+    $('#epilogue-btn').hidden = !(!trial && level.id === LAST_NIGHT.id); // 第 30 夜：結算頁多一顆「看尾聲」（期 4）
+    if (!devUsed) setTimeout(() => grantAchievements(true), 900); // 成就：結算頁出來後再跳卡片，一次一條
     if (level.psalm && !trial) {
       const box = $('#psalm');
       if (level.psalmTitle) { const h = document.createElement('div'); h.className = 'ref'; h.textContent = level.psalmTitle; box.appendChild(h); setTimeout(() => h.classList.add('on'), 300); } // 不認識的人也知道這是哪一篇（2026-10-20 G2）
@@ -1183,7 +1263,7 @@ function onLose(reason, by) {
   const titles = { wolf: `${who || '狼'}闖進羊圈了`, bird: `${who || '鷙鳥'}飛進羊圈了`, sheep: '羊被偷光了', sheepLost: allow ? `失了 ${allow + 1} 隻羊` : '失了一隻羊' };
   const text = trial ? (reason === 'sheepLost' ? (allow ? `這一題最多只能失 ${allow} 隻羊。` : '這一題失一隻羊就算輸。') : '') + TRIAL_KINDS[trial.kind].lose : (level.outroLose && (level.outroLose[reason] || level.outroLose.wolf)) || '';
   nightfall();
-  setTimeout(() => { endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`); $('#next').hidden = true; $('#retry').textContent = trial ? '再打這一題' : '再守一夜'; }, REDUCE_MOTION.matches ? 0 : 900);
+  setTimeout(() => { endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}`); $('#next').hidden = true; $('#epilogue-btn').hidden = true; $('#retry').textContent = trial ? '再打這一題' : '再守一夜'; }, REDUCE_MOTION.matches ? 0 : 900);
 }
 
 // ====== 開始／重來 ======
@@ -1651,7 +1731,7 @@ let importPending = null; // 讀取過、等按「確定匯入」的那份
 function syncSettingsUI() {
   const on = SD.prefs.analytics !== false, b = $('#ga-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', on);
   const sm = Save.summary(SD);
-  $('#set-save-state').textContent = `這支手機：守過 ${sm.nights} 夜、${sm.checkpoints} 份檢查點${sm.trials ? `、試煉過了 ${sm.trials} 題` : ''}${sm.nights || sm.checkpoints || sm.trials ? `，最後更新 ${fmtDate(sm.updated)}` : ''}${SAVE.problems.length ? '。' + SAVE.problems.join('；') : ''}`;
+  $('#set-save-state').textContent = `這支手機：守過 ${sm.nights} 夜、${sm.checkpoints} 份檢查點${sm.trials ? `、試煉過了 ${sm.trials} 題` : ''}${sm.achievements ? `、成就 ${sm.achievements} 條` : ''}${sm.nights || sm.checkpoints || sm.trials ? `，最後更新 ${fmtDate(sm.updated)}` : ''}${SAVE.problems.length ? '。' + SAVE.problems.join('；') : ''}`;
   $('#set-version').textContent = `版本 ${APP_VERSION}`;
   fillNotes($('#set-notes'));
 }
@@ -1677,7 +1757,7 @@ $('#set-import-read').addEventListener('click', () => {
   if (r.error) { importPending = null; $('#set-import-preview').textContent = r.error; $('#set-import-go').hidden = true; Sound.play('tap'); return; }
   importPending = r.data;
   const sm = Save.summary(r.data), mine = Save.summary(SD);
-  $('#set-import-preview').textContent = `這份存檔：守過 ${sm.nights} 夜、${sm.checkpoints} 份檢查點${sm.trials ? `、試煉過了 ${sm.trials} 題` : ''}，最後更新 ${fmtDate(sm.updated)}。${r.problems.length ? r.problems.join('；') + '。' : ''}匯入會整份蓋掉這支手機目前的紀錄（守過 ${mine.nights} 夜）。確定的話再按一次下面的按鈕。`;
+  $('#set-import-preview').textContent = `這份存檔：守過 ${sm.nights} 夜、${sm.checkpoints} 份檢查點${sm.trials ? `、試煉過了 ${sm.trials} 題` : ''}${sm.achievements ? `、成就 ${sm.achievements} 條` : ''}，最後更新 ${fmtDate(sm.updated)}。${r.problems.length ? r.problems.join('；') + '。' : ''}匯入會整份蓋掉這支手機目前的紀錄（守過 ${mine.nights} 夜）。確定的話再按一次下面的按鈕。`;
   $('#set-import-go').hidden = false; Sound.play('tap');
 });
 $('#set-import-go').addEventListener('click', () => {
@@ -1686,6 +1766,73 @@ $('#set-import-go').addEventListener('click', () => {
   else $('#set-import-preview').textContent = '寫不進這支手機（空間不足或無痕瀏覽），沒有匯入。';
 });
 $('#ga-btn').addEventListener('click', () => { setAnalytics(SD.prefs.analytics === false); Sound.play('tap'); });
+
+// ====== 成就（期 4，2026-11-01）：規則在 Engine.achievementsEarned（純看存檔），這裡只管「哪一天拿到」與儀式 ======
+// 解鎖儀式＝全螢幕卡片＋經文＋音效，一次一條、「收下」才下一條（James 的儀式感偏好）。開頁時補發的（老玩家本來就符合的）不走儀式，首頁說一句就好，不然一開頁連跳九張
+const LAST_NIGHT = LEVELS[LEVELS.length - 1];
+const achvQueue = [];
+const achvById = id => ACHIEVEMENTS.find(a => a.id === id);
+function grantAchievements(ceremony) {
+  const fresh = Engine.achievementsNew(SD.achievements, P, SD.trials);
+  if (!fresh.length) return [];
+  const now = new Date().toISOString();
+  for (const id of fresh) SD.achievements[id] = now;
+  SAVE.save();
+  track('achievement', { ids: fresh.join(',') });
+  if (ceremony) { achvQueue.push(...fresh); showAchvCard(); }
+  return fresh;
+}
+function showAchvCard() {
+  if (!$('#achv-card').hidden || !achvQueue.length) return;
+  const a = achvById(achvQueue.shift()); if (!a) { showAchvCard(); return; }
+  $('#achv-ico').textContent = a.ico; $('#achv-name').textContent = a.name; $('#achv-desc').textContent = a.desc; $('#achv-verse').textContent = a.verse; $('#achv-ref').textContent = fullRef(a.ref);
+  $('#achv-more').textContent = achvQueue.length ? `還有 ${achvQueue.length} 條` : '';
+  $('#achv-card').hidden = false; Sound.play('achieve');
+}
+$('#achv-ok').addEventListener('click', () => { $('#achv-card').hidden = true; Sound.play('tap'); if (achvQueue.length) setTimeout(showAchvCard, 180); });
+function openAchievements() {
+  const box = $('#achv-list'); box.innerHTML = '';
+  const have = SD.achievements || {};
+  for (const g in ACHIEVEMENT_GROUPS) {
+    const h = document.createElement('div'); h.className = 'ach-group'; h.textContent = ACHIEVEMENT_GROUPS[g]; box.appendChild(h);
+    for (const a of ACHIEVEMENTS.filter(x => x.group === g)) {
+      const got = have[a.id];
+      box.appendChild(row(got ? a.ico : '🔒', a.name, got ? `${a.desc}・${a.verse}（${fullRef(a.ref)}）` : a.desc, got ? `<span class="cp">${fmtDate(got)}</span>` : '', 'ach' + (got ? '' : ' locked')));
+    }
+  }
+  $('#achv-sub').textContent = `${Object.keys(have).length}/${ACHIEVEMENTS.length} 條。解鎖的時候會有一張卡片和一句經文。`;
+  $('#levels').hidden = true; $('#achv').hidden = false;
+}
+$('#levels-achv').addEventListener('click', () => { openAchievements(); Sound.play('tap'); });
+$('#achv-back').addEventListener('click', () => { $('#achv').hidden = true; $('#levels').hidden = false; Sound.play('tap'); });
+
+// ====== 尾聲（期 4）：第 30 夜守過後的結局——三章回顧、經文、製作名單；點一下換頁 ======
+const EPILOGUE = [
+  { bg: 'img/scene-moon.webp', kicker: '第一章', title: CHAPTER_NAMES[1], lines: ['從雅各替拉班看守羊群的那一夜開始。', '十夜，學會了牧人、射手、牆、狗；最後一夜兩隻獅子。'] },
+  { bg: 'img/scene-dark.webp', kicker: '第二章', title: CHAPTER_NAMES[2], lines: ['沒有月亮的夜，看不到腳印，敵人會換排。', '山上還有別人家的羊，一隻隻帶回來。'] },
+  { bg: 'img/scene-dawn.webp', kicker: '第三章', title: CHAPTER_NAMES[3], lines: ['羊圈搬到山上，斜坡上的敵人直射打不到。', '要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛。'] },
+  { kicker: '三十夜', title: '天亮了', lines: ['「我是好牧人；好牧人為羊捨命。」（約 10:11）', '「你出你入，耶和華要保護你，從今時直到永遠。」（詩 121:8）'] },
+  { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：James', '程式與關卡：Claude Code', '審查與生圖：小居（Codex）', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '經文：和合本（CUNP）', '2026 年 10 月'], end: true },
+];
+let epIdx = -1, epTimer = 0, epFrom = '';
+function openEpilogue(from) { epFrom = from; epIdx = -1; $('#epilogue').hidden = false; epNext(); }
+function epNext() {
+  epIdx++; const sl = EPILOGUE[epIdx]; if (!sl) { closeEpilogue(); return; }
+  const bg = $('#ep-bg'), body = $('#ep-body');
+  bg.classList.remove('on'); body.classList.remove('on');
+  clearTimeout(epTimer);
+  epTimer = setTimeout(() => {
+    bg.style.backgroundImage = sl.bg ? `url(${sl.bg})` : 'none';
+    body.innerHTML = `<div class="ep-kicker">${sl.kicker}</div><h1>${sl.title}</h1>${(sl.lines || []).map(l => `<p>${l}</p>`).join('')}${sl.small ? `<div class="ep-small">${sl.small.join('<br>')}</div>` : ''}${sl.end ? '<button class="btn" id="ep-done">回首頁</button>' : ''}`;
+    $('#ep-hint').textContent = sl.end ? '' : '點一下繼續';
+    if (sl.bg) bg.classList.add('on'); body.classList.add('on');
+    if (sl.end) $('#ep-done').addEventListener('click', ev => { ev.stopPropagation(); closeEpilogue(); });
+  }, REDUCE_MOTION.matches ? 0 : 350);
+}
+function closeEpilogue() { clearTimeout(epTimer); $('#epilogue').hidden = true; Sound.play('tap'); if (epFrom === 'result') backToLevels(); }
+$('#epilogue').addEventListener('click', () => { const sl = EPILOGUE[epIdx]; if (!sl || sl.end) return; epNext(); Sound.play('tap'); });
+$('#epilogue-btn').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('result'); });
+$('#levels-epilogue').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('home'); });
 
 // ====== 更新公告：版本變了、已經有存檔的玩家開頁時彈一次 ======
 function showUpdateNotice() {
@@ -1700,6 +1847,7 @@ function showUpdateNotice() {
 $('#notice-ok').addEventListener('click', () => { $('#notice').hidden = true; Sound.play('tap'); });
 
 buildBoard(); buildLevels(); // buildBoard 是非同步的（載圖）；開始守夜前會確認棋盤已就緒
+{ const back = grantAchievements(false); if (back.length) { const n = $('#achv-note'); n.hidden = false; n.textContent = `成就冊補上了 ${back.length} 條：${back.map(id => achvById(id).name).join('、')}`; } } // 老玩家本來就符合的成就：開頁補發，首頁說一句、不跳卡片
 diff = SD.prefs.diff || 'calm';
 if (!DIFFS[diff]) diff = 'calm';
 document.querySelectorAll('#diffs .diff').forEach(b => b.addEventListener('click', () => applyDiff(b.dataset.key))); // 守望／烈火那兩顆也是 .diff，點了是換題（openIntro 裡掛），不是換難度
