@@ -74,6 +74,7 @@
   .snd-row button.on { border-color: var(--gold); background: var(--card-on); }
   .snd-row.off { opacity: .4; pointer-events: none; } /* 音效關著時，蟲鳴與音量先壓暗 */
   .snd-note { font-size: 13px; color: var(--muted); margin-top: 6px; text-align: left; }
+  #share-note { text-align: center; margin: 2px 0 6px; }
   /* 開場頁右上角的喇叭：第一次進來就看得到，聲音響起前就能關 */
   .corner { position: absolute; right: 12px; top: 12px; font: inherit; font-size: 18px; background: var(--card); color: var(--text); border: 1px solid #0006; border-radius: 8px; padding: 3px 9px; cursor: pointer; }
   #resume-line { margin-top: 10px; }
@@ -469,6 +470,7 @@
     <div id="gate-preview" aria-label="各排看門的配置"></div>
     <div id="diff-hint"></div>
     <div class="tips" id="resume-line" hidden><span class="new" id="resume-text"></span></div>
+    <div class="snd-note key-help">電腦可用鍵盤：1–9 選卡、方向鍵移動、Enter 放下、Esc 取消、空白鍵暫停（暫停面板也有這行）</div><!-- 只給有滑鼠的裝置看；11/2 James：玩家怎麼知道有快捷鍵 -->
     <div class="intro-buttons">
     <button class="btn" id="resume-cp" hidden>繼續上次</button>
     <button class="btn" id="start">開始守夜</button>
@@ -530,6 +532,7 @@
     <button class="btn" id="next" hidden>下一夜</button>
     <button class="btn" id="retry">再守一夜</button>
     <button class="btn alt" id="share-btn">存圖分享</button>
+    <div class="snd-note" id="share-note" hidden></div><!-- 存圖的結果寫在這裡：結算頁蓋在棋盤上，底下的提示列看不到（11/2 James 真機：按了沒反應） -->
     <button class="btn alt" id="back">回關卡</button>
   </div>
 </div>
@@ -1222,6 +1225,7 @@ function endGame(title, text) {
   $('#result-title').textContent = title;
   $('#result-text').textContent = text;
   $('#psalm').innerHTML = ''; $('#stars').innerHTML = ''; $('#stars-note').textContent = '';
+  shareNote(''); preloadCover(); // 存圖用的封面先載好，按「存圖分享」時才不用等（等了手機就不准分享）
   $('#result').hidden = false;
 }
 function recordBest(cleared) {
@@ -1891,11 +1895,17 @@ $('#epilogue-btn').addEventListener('click', () => { Sound.play('dawn'); openEpi
 $('#levels-epilogue').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('home'); });
 
 // ====== 分享存圖（期 5）：結算頁一鍵把這一夜的結果畫成一張直式圖（1080×1350），手機走系統分享、電腦直接下載 ======
+// 11/2 James 真機按了沒反應，兩個原因一起修：(1) 原本先 await 載封面、再 await toBlob 才叫 navigator.share，手機瀏覽器（尤其 iOS）認定已經不是「使用者剛點的那一下」就拒絕分享；
+// 現在封面在結算頁出現時就先載，畫圖與轉檔全部同步做完，點下去第一個非同步動作就是 share。(2) 成功／失敗訊息原本走底下的提示列，被結算頁蓋住看不到，改寫在按鈕下方 #share-note
+let coverImg = null;
+function preloadCover() { if (!coverImg) { coverImg = new Image(); coverImg.src = 'img/cover-home.webp'; } }
+function shareNote(msg) { const n = $('#share-note'); n.textContent = msg; n.hidden = !msg; }
+function dataUrlToBlob(u) { const [head, b64] = u.split(','); const bin = atob(b64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return new Blob([arr], { type: /:(.*?);/.exec(head)[1] }); }
 async function shareImage() {
   const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
   const win = !!(G && G.result && G.result.win);
   const grad = x.createLinearGradient(0, 0, 0, H); (win ? ['#f0c982', '#5a4a3a', '#2b2a26'] : ['#1a2238', '#2b2a26', '#2b2a26']).forEach((c, i) => grad.addColorStop(i / 2, c)); x.fillStyle = grad; x.fillRect(0, 0, W, H);
-  const img = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = 'img/cover-home.webp'; setTimeout(() => res(null), 1500); });
+  preloadCover(); const img = coverImg.complete && coverImg.naturalWidth ? coverImg : null; // 還沒載好就不等了，少一條封面橫幅而已
   if (img) { x.drawImage(img, 0, 0, W, W / 2); const g2 = x.createLinearGradient(0, W / 2 - 160, 0, W / 2); g2.addColorStop(0, '#2b2a2600'); g2.addColorStop(1, '#2b2a26'); x.fillStyle = g2; x.fillRect(0, W / 2 - 160, W, 160); }
   const font = (px, bold) => `${bold ? 'bold ' : ''}${px}px -apple-system, "PingFang TC", "Noto Sans TC", sans-serif`;
   x.textAlign = 'center'; x.textBaseline = 'top';
@@ -1912,14 +1922,17 @@ async function shareImage() {
   for (const chx of text) { if (x.measureText(line + chx).width > maxW) { lines.push(line); line = chx; } else line += chx; } if (line) lines.push(line);
   for (const l of lines.slice(0, 7)) { x.fillText(l, W / 2, y); y += 50; }
   x.font = font(30); x.fillStyle = '#b9b09c'; x.fillText(`${fmtDate(new Date().toISOString())}・${location.host || '羊圈守夜'}`, W / 2, H - 90);
-  const blob = await new Promise(res => cv.toBlob(res, 'image/jpeg', 0.9)); // JPEG 約 200 KB，PNG 要 1.4 MB，LINE 分享差很多
-  if (!blob) { toast('這支瀏覽器畫不出圖'); return; }
+  let blob = null; try { blob = dataUrlToBlob(cv.toDataURL('image/jpeg', 0.9)); } catch (e) {} // 同步轉檔（toBlob 是非同步，會讓手機認定不是剛點的那一下）；JPEG 約 200 KB，PNG 要 1.4 MB，LINE 分享差很多
+  if (!blob) { shareNote('這支瀏覽器畫不出圖'); return; }
   const file = new File([blob], `sheepfold-${trial ? trial.id : 'n' + level.id}.jpg`, { type: 'image/jpeg' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: '羊圈守夜' }); return; } catch (e) { if (e && e.name === 'AbortError') return; } } // 手機：系統分享（LINE、存到相簿都在裡面）；取消就取消
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) { // 手機：系統分享（LINE、存到相簿都在裡面）；取消就取消
+    try { await navigator.share({ files: [file], title: '羊圈守夜' }); shareNote('分享出去了'); return; }
+    catch (e) { if (e && e.name === 'AbortError') { shareNote(''); return; } shareNote('系統分享開不了，改成下載'); }
+  }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  toast('圖存好了，看瀏覽器的下載');
+  if ($('#share-note').textContent === '…') shareNote('圖存好了，看瀏覽器的下載'); // 分享失敗轉下載的那句留著
 }
-$('#share-btn').addEventListener('click', () => { Sound.play('tap'); shareImage().catch(() => toast('存圖失敗')); });
+$('#share-btn').addEventListener('click', () => { Sound.play('tap'); shareNote('…'); shareImage().catch(() => shareNote('存圖失敗')); });
 
 // ====== 更新公告：版本變了、已經有存檔的玩家開頁時彈一次 ======
 function showUpdateNotice() {
