@@ -13,13 +13,13 @@ const run = (G, sec, dt = 0.1) => { for (let t = 0; t < sec; t += dt) { E.step(G
 const full = id => ({ cleared: { [id]: { storm: true } }, stars: { [id]: { noLoss: true, gates: true } } }); // 那一夜暴風三星
 const WO = [{ list: [['wolf', 6]], gap: 2, rows: [1, 2, 3] }, { list: [['wolf', 8], ['fast', 4]], gap: 1, rows: [0, 1, 2, 3, 4], hpMul: 1.8, ordered: true, say: '來了' }];
 
-test('資料：第一、二章各十夜各兩題（守望 w<夜>、烈火 f<夜>），validateTrials 乾淨，題目文字齊全，每題的敵人與卡都是那一夜以前見過的', () => {
-  assert.strictEqual(TRIALS.length, 40);
+test('資料：三章三十夜各兩題（守望 w<夜>、烈火 f<夜>），validateTrials 乾淨，題目文字齊全，每題的敵人與卡都是那一夜以前見過的', () => {
+  assert.strictEqual(TRIALS.length, 60);
   assert.deepStrictEqual(E.validateTrials(), []);
   const kinds = {}; for (const t of TRIALS) kinds[t.kind] = (kinds[t.kind] || 0) + 1;
-  assert.deepStrictEqual(kinds, { watch: 20, fire: 20 });
-  const ch12 = LEVELS.filter(l => (l.chapter || 1) <= 2).map(l => l.id);
-  assert.strictEqual(ch12.length, 20);
+  assert.deepStrictEqual(kinds, { watch: 30, fire: 30 });
+  const ch12 = LEVELS.map(l => l.id);
+  assert.strictEqual(ch12.length, 30);
   for (const id of ch12) { assert.ok(E.trialById('w' + id), 'w' + id); assert.ok(E.trialById('f' + id), 'f' + id); }
   for (const t of TRIALS) {
     assert.ok(TRIAL_KINDS[t.kind] && E.trialById(t.id) === t && t.diff === 'storm', t.id);
@@ -170,7 +170,7 @@ test('每題用模擬器的 good 玩家跑 10 局都能建局、打得完（不�
     assert.deepStrictEqual(G.mods, E.normalizeMods(E.levelById(t.levelId), t.mods).mods);
     assert.deepStrictEqual(G.gates, [], t.id + ' 沒看門的');
     if (t.kind === 'fire') { assert.ok(G.level.noShepherd); assert.strictEqual(G.food, t.mods.startFood); assert.ok(!G.level.units.includes('shepherd')); assert.strictEqual(G.waves.length, 1); }
-    else { assert.ok(!G.level.noShepherd && (G.level.units.includes('shepherd') || G.level.conveyor), t.id + ' 守望有牧人（送卡夜除外）'); assert.strictEqual(G.waves.length, E.levelById(t.levelId).waves.length); }
+    else { const base = E.levelById(t.levelId); if (base.noShepherd) assert.ok(G.level.noShepherd && !G.level.units.includes('shepherd') && G.food === t.mods.startFood, t.id + ' 一筆糧的夜（第 25 夜）守望照舊沒牧人、糧照題目'); else assert.ok(!G.level.noShepherd && (G.level.units.includes('shepherd') || G.level.conveyor), t.id + ' 守望有牧人（送卡夜除外）'); assert.strictEqual(G.waves.length, base.waves.length); }
     let timeouts = 0;
     for (let i = 0; i < 10; i++) { const r = SIM.play(t.levelId, t.diff, 1000 + i, 'good', t.mods); if (r.reason === 'timeout') timeouts++; }
     assert.strictEqual(timeouts, 0, `${t.id} 有局超時`);
