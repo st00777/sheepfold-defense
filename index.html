@@ -1872,7 +1872,7 @@ const EPILOGUE = [
   { bg: 'img/scene-dark.webp', kicker: '第二章', title: CHAPTER_NAMES[2], lines: ['沒有月亮的夜，看不到腳印，敵人會換排。', '山上還有別人家的羊，一隻隻帶回來。'] },
   { bg: 'img/scene-dawn.webp', kicker: '第三章', title: CHAPTER_NAMES[3], lines: ['羊圈搬到山上，斜坡上的敵人直射打不到。', '要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛。'] },
   { kicker: '三十夜', title: '天亮了', lines: ['「我是好牧人；好牧人為羊捨命。」（約 10:11）', '「你出你入，耶和華要保護你，從今時直到永遠。」（詩 121:8）'] },
-  { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：James', '程式與關卡：Claude Code', '審查與生圖：小居（Codex）', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '經文：和合本（CUNP）', '2026 年 10 月'], end: true },
+  { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：葉真旭', '程式與關卡：Claude Code', '審查與生圖：Codex', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '經文：和合本（CUNP）', '2026 年 10 月'], end: true },
 ];
 let epIdx = -1, epTimer = 0, epFrom = '';
 function openEpilogue(from) { for (const s of EPILOGUE) if (s.bg) { const i = new Image(); i.src = s.bg; } epFrom = from; epIdx = -1; $('#epilogue').hidden = false; epNext(); } // 三張場景圖先載，淡入時不會黑底先亮
