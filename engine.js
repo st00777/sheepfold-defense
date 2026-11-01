@@ -56,7 +56,7 @@
     return LEVELS.slice(i + 1).some(l => !!(cleared && cleared[l.id]));
   }
 
-  // ====== 守夜試煉（期 2）：題目在 data.js TRIALS；解鎖＝那一夜所在的章守過最後一夜（任一難度，不看星）======
+  // ====== 守夜試煉（期 2）：題目在 data.js TRIALS；解鎖＝那一夜暴風夜守過＋星全拿（James 10/31 定案，isTrialUnlocked；舊註解寫「章通關任一難度」是 10/29 的第一版，11/1 審查改正）======
   const TRIALS = D.TRIALS;
   const chapterOf = L => L.chapter || 1;
   function trialById(id) { return TRIALS.find(t => t.id === id) || null; }
@@ -102,12 +102,11 @@
   // 跟存檔裡已經解鎖的（have：id → 日期）比，回新成立的 id（照 ACHIEVEMENTS 的順序）
   function achievementsNew(have, progress, trials) { const h = have || {}; return achievementsEarned(progress, trials).filter(id => !h[id]); }
   function validateAchievements() {
-    const bad = [], seen = new Set(), groups = {};
+    const bad = [], seen = new Set();
     for (const a of ACH) {
       if (!a.id || seen.has(a.id)) bad.push(`成就 ${a.id} 的 id 重複或沒有`); seen.add(a.id);
       for (const f of ['ico', 'name', 'desc', 'verse', 'ref']) if (typeof a[f] !== 'string' || !a[f]) bad.push(`成就 ${a.id} 缺 ${f}`);
       if (!D.ACHIEVEMENT_GROUPS || !D.ACHIEVEMENT_GROUPS[a.group]) bad.push(`成就 ${a.id} 的分組 ${a.group} 不認識`);
-      groups[a.group] = (groups[a.group] || 0) + 1;
     }
     return bad;
   }
@@ -1138,7 +1137,7 @@
       const prev = s.x;
       s.x += SHOT_SPEED[s.kind] * dt;
       // 穿過火盆就著火
-      for (const k in G.units) { const u = G.units[k]; if (!UNITS[u.type].ignite) continue; const lanes = (u.upgraded && UNITS[u.type].upgrade && UNITS[u.type].upgrade.lanes) || 0; if (Math.abs(u.r - s.r) <= lanes && prev < u.c + 0.5 && s.x >= u.c + 0.5) s.burn = true; } // 壇上的火（升級）lanes 1：上下排的石子箭矢也點燃
+      for (const k in G.units) { const u = G.units[k]; if (!UNITS[u.type].ignite || u.hp <= 0) continue; const lanes = (u.upgraded && UNITS[u.type].upgrade && UNITS[u.type].upgrade.lanes) || 0; if (Math.abs(u.r - s.r) <= lanes && prev < u.c + 0.5 && s.x >= u.c + 0.5) s.burn = true; } // 壇上的火（升級）lanes 1：上下排的石子箭矢也點燃
       for (const e of G.enemies) {
         if (e.r !== s.r || !targetable(e) || s.hit.has(e.id) || e.high) continue; // 飛得高的大鷹，什麼投射物都打不到
         if (Math.abs(e.x + 0.5 - s.x) >= 0.35) continue;

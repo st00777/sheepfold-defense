@@ -313,13 +313,15 @@
   #achv-card .ach-more { color: var(--muted); font-size: 12px; margin-top: 6px; }
   @keyframes ach-in { from { opacity: 0; transform: scale(.6) rotate(-6deg); } 60% { transform: scale(1.06) rotate(1deg); } to { opacity: 1; transform: none; } }
   @keyframes ach-glow { 0%, 100% { box-shadow: 0 0 0 6px #e6b84a22, 0 0 48px 8px #e6b84a55; } 50% { box-shadow: 0 0 0 10px #e6b84a33, 0 0 72px 16px #e6b84a88; } }
-  #achv-card:not([hidden]) .dialog { animation: ach-in 520ms var(--ease-out) both, ach-glow 2.4s ease-in-out 520ms infinite; }
+  #achv-card:not([hidden]) .dialog { animation: ach-in 520ms var(--ease-out) both, ach-glow 2.4s ease-in-out 520ms 4; } /* 光暈跑四輪就停，不要一直重繪陰影（動畫 review 11/1） */
   #achv-card:not([hidden]) .ach-ico { animation: ach-in 700ms var(--ease-out) 120ms both; }
-  @media (prefers-reduced-motion: reduce) { #achv-card .dialog, #achv-card .ach-ico { animation: none !important; } }
+  @keyframes ach-fade { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { #achv-card:not([hidden]) .dialog { animation: ach-fade 200ms both !important; } #achv-card .ach-ico { animation: none !important; } } /* 減少動態：只留 200ms 淡入，跟其他對話框一致 */
+  @media (max-height: 540px) { #achv-card .ach-ico { font-size: 40px; margin: 2px 0; } #achv-card .verse { margin: 6px 0 2px; } }
   /* ====== 尾聲（期 4）：第 30 夜守過後的結局——三章回顧、經文、製作名單；點一下換頁 ====== */
   #epilogue { z-index: 25; background: #000; padding: 0; cursor: pointer; }
-  #epilogue .ep { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px 20px; }
-  #epilogue .ep-bg { position: absolute; inset: 0; background: center / cover no-repeat; opacity: 0; transition: opacity 1.2s; }
+  #epilogue .ep { position: relative; width: 100%; min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px 20px; } /* min-height 不是 height：手機橫放最後一頁超出時往下捲得到（動畫 review 11/1） */
+  #epilogue .ep-bg { position: fixed; inset: 0; background: center / cover no-repeat; opacity: 0; transition: opacity 1.2s; }
   #epilogue .ep-bg.on { opacity: .55; }
   #epilogue .ep-body { position: relative; max-width: 420px; opacity: 0; transition: opacity 1s; }
   #epilogue .ep-body.on { opacity: 1; }
@@ -506,8 +508,8 @@
       <div class="snd-row"><span>高對比</span><button id="contrast-btn" title="字更白、血條加白邊、提示框更粗">關</button></div>
       <div class="snd-row"><span>音樂</span><button data-snd="music">開</button></div>
       <div class="snd-row"><span>音效</span><button data-snd="sfx">開</button></div>
-      <div class="snd-row"><span>蟲鳴</span><button data-snd="amb">關</button></div>
-      <div class="snd-row"><span>音量</span><div class="seg"><button data-vol="0">小</button><button data-vol="1">中</button><button data-vol="2">大</button></div></div>
+      <div class="snd-row" data-dep="sfx"><span>蟲鳴</span><button data-snd="amb">關</button></div>
+      <div class="snd-row" data-dep="sfx"><span>音量</span><div class="seg"><button data-vol="0">小</button><button data-vol="1">中</button><button data-vol="2">大</button></div></div>
     </div>
     <div class="snd-note">手機切到靜音時不會有聲音。</div>
     <div class="snd-note key-help">鍵盤：1–9 選卡、0 鏟子、方向鍵移動、Enter 放下、Esc 取消（沒選卡就暫停）、空白鍵暫停</div>
@@ -790,7 +792,7 @@ const chapterOf = L => L.chapter || 1;
 // nav.mode：'story' 故事模式、'trial' 守夜試煉；nav.chapter：停在哪一章。三屏各自一個 overlay，回上一層時重畫一次（進度可能變了）
 const nav = { mode: 'story', chapter: 0 };
 const MENU_IDS = ['#levels', '#chapters', '#nights', '#intro']; // 選單類的畫面，一次只開一個
-function showMenu(id) { for (const m of MENU_IDS) $(m).hidden = m !== id; $('#result').hidden = true; }
+function showMenu(id) { for (const m of MENU_IDS) $(m).hidden = m !== id; $('#result').hidden = true; if (typeof achvQueue !== 'undefined' && achvQueue.length) setTimeout(showAchvCard, 300); } // 結算頁沒等到的成就卡片，回到任一選單補跳（期 4）
 const CH_NUM = c => ['', '一', '二', '三', '四'][c] || String(c);
 const chapterList = () => [...new Set(LEVELS.map(chapterOf))];
 const nightsOf = c => LEVELS.filter(L => chapterOf(L) === c);
@@ -1037,14 +1039,13 @@ function markHints() {
     const sw = !!selected && !tut.on && Engine.canSwap(G, r, col, selected); if (sw) swappable++;
     if (sw) hintMap.set(k, 'swap'); else if (selected && !G.units[k] && !G.rocks.has(k)) hintMap.set(k, 'hint');
   }
-  if (cursor) hintMap.set(cursor.join(','), 'cursor'); // 鍵盤游標（期 5）：白實線框，蓋在那一格的提示上
-  Board.setHints(hintMap);
+  Board.setHints(hintMap); // 鍵盤游標另外走 Board.setCursor，疊在提示上、不蓋掉那一格的金框／紅框（動畫 review 11/1）
   return swappable;
 }
 function clearSelection() {
   selected = null;
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
-  hintMap = new Map(); if (cursor) hintMap.set(cursor.join(','), 'cursor'); Board.setHints(hintMap.size ? hintMap : null); // 鍵盤游標留著（期 5）
+  hintMap = new Map(); Board.setHints(null); // 鍵盤游標是另一層（Board.setCursor），不受影響
   if (!rangeTimer) clearRange(); // 放下後的 1.3 秒預覽留著，只清滑過的那種
 }
 // ====== 範圍預覽（2026-10-21 小居第 5 項：選卡看得到範圍） ======
@@ -1101,7 +1102,7 @@ function bossBanner(type) {
   clearTimeout(bannerTimer); if (bannerAnim) { try { bannerAnim.cancel(); } catch (err) {} bannerAnim = null; }
   if (REDUCE_MOTION.matches || !b.animate) { b.style.opacity = 1; bannerTimer = setTimeout(() => { b.style.opacity = 0; }, 1400); return; } // 減少動態：直接出現、1.4 秒後消失
   bannerAnim = b.animate([{ opacity: 0, transform: 'translateX(40px)' }, { opacity: 1, transform: 'translateX(0)', offset: .18 }, { opacity: 1, transform: 'translateX(0)', offset: .8 }, { opacity: 0, transform: 'translateX(-24px)' }], { duration: 2000 / (speed > 1 ? 1.6 : 1), easing: 'ease-out', fill: 'forwards' });
-  bannerAnim.onfinish = () => { b.style.opacity = 0; bannerAnim = null; };
+  bannerAnim.onfinish = () => { b.style.opacity = 0; try { bannerAnim.cancel(); } catch (err) {} bannerAnim = null; }; // fill forwards 的終態要 cancel 掉，之後減少動態那條路的 style.opacity 才壓得過
 }
 function bossEnter(type) {
   if (type) bossBanner(type);
@@ -1254,6 +1255,7 @@ function showStars() {
 function onWin() {
   Sound.ambient(false); Sound.music(null); Sound.play('dawn');
   const saved = recordBest(true);
+  const fresh = devUsed ? [] : grantAchievements(false); if (fresh.length) achvQueue.push(...fresh); // 成就在贏的當下就寫進存檔，卡片等結算頁出來再跳
   trackNightEnd('win');
   if (saved) clearCheckpoint(); // 紀錄沒存進去就不清檢查點：至少還能「繼續上次」重守最後一波，不會畫面說守過、重開卻什麼都沒有
   const next = trial ? null : Engine.nextOf(level.id); // 試煉沒有「下一夜」，回試煉的選夜挑下一題
@@ -1264,7 +1266,7 @@ function onWin() {
     if (!trial) showStars(); // 試煉不記星（藍圖：星只在故事模式顯示與統計）
     $('#next').hidden = !next; $('#retry').textContent = trial ? '再打這一題' : '再守這一夜';
     $('#epilogue-btn').hidden = !(!trial && level.id === LAST_NIGHT.id); // 第 30 夜：結算頁多一顆「看尾聲」（期 4）
-    if (!devUsed) setTimeout(() => grantAchievements(true), 900); // 成就：結算頁出來後再跳卡片，一次一條
+    if (fresh.length) setTimeout(showAchvCard, 900); // 成就卡片：結算頁出來後再跳，一次一條；0.9 秒內離開的話，佇列留著、回首頁再跳（Spec 審查 11/1）
     if (level.psalm && !trial) {
       const box = $('#psalm');
       if (level.psalmTitle) { const h = document.createElement('div'); h.className = 'ref'; h.textContent = level.psalmTitle; box.appendChild(h); setTimeout(() => h.classList.add('on'), 300); } // 不認識的人也知道這是哪一篇（2026-10-20 G2）
@@ -1565,12 +1567,12 @@ $('#roster-detail').addEventListener('click', ev => {
 $('#lightbox').addEventListener('click', () => { $('#lightbox').hidden = true; });
 // ====== 鍵盤（期 5）：1–9 選卡、0／S 鏟子、方向鍵移游標、Enter 放下、Esc 取消（沒選卡就暫停／繼續）、空白鍵暫停；燈箱、成就卡、尾聲也吃 Esc／Enter ======
 let cursor = null; // [r, c]，只有鍵盤用過才出現；手機永遠不會有
-function setCursor(r, c) { cursor = [Math.max(0, Math.min(ROWS - 1, r)), Math.max(0, Math.min(COLS - 1, c))]; markHints(); }
+function setCursor(r, c) { cursor = [Math.max(0, Math.min(ROWS - 1, r)), Math.max(0, Math.min(COLS - 1, c))]; Board.setCursor(cursor[0], cursor[1]); }
 document.addEventListener('keydown', ev => {
   const tag = (ev.target && ev.target.tagName) || ''; if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   if (!$('#lightbox').hidden) { if (ev.key === 'Escape') $('#lightbox').hidden = true; return; }
   if (!$('#achv-card').hidden) { if (ev.key === 'Enter' || ev.key === 'Escape' || ev.key === ' ') { ev.preventDefault(); $('#achv-ok').click(); } return; }
-  if (!$('#epilogue').hidden) { if (ev.key !== 'Escape') { ev.preventDefault(); $('#epilogue').click(); } return; }
+  if (!$('#epilogue').hidden) { const sl = EPILOGUE[epIdx]; if (ev.key === 'Tab') return; if (ev.key === 'Escape' || ((ev.key === 'Enter' || ev.key === ' ') && sl && sl.end)) { ev.preventDefault(); closeEpilogue(); } else if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'ArrowRight') { ev.preventDefault(); epNext(); Sound.play('tap'); } return; } // 審查 11/1（動畫路＋小居）：Esc 隨時可離開、最後一頁 Enter 關、Tab 照常走到按鈕
   if (!G || G.over || !$('#result').hidden || !$('#roster').hidden || MENU_IDS.some(m => !$(m).hidden)) return;
   const k = ev.key;
   if (k === 'Escape') { ev.preventDefault(); if (paused) resumeGame(); else if (selected) { clearSelection(); toast('取消了，先點一張卡再點草地'); } else pauseGame(); return; }
@@ -1580,7 +1582,7 @@ document.addEventListener('keydown', ev => {
   if (k === '0' || k === 's' || k === 'S') { tapShovel(); return; }
   const dr = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[k];
   if (dr) { ev.preventDefault(); if (cursor) setCursor(cursor[0] + dr[0], cursor[1] + dr[1]); else setCursor(Math.floor(ROWS / 2), 0); return; }
-  if (k === 'Enter' && cursor) { ev.preventDefault(); tapCell(cursor[0], cursor[1]); markHints(); }
+  if (k === 'Enter' && cursor) { ev.preventDefault(); tapCell(cursor[0], cursor[1]); }
 });
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { roster.tab = b.dataset.tab; roster.focus = null; renderRoster(); }));
 $('#roster-go').addEventListener('click', () => { if (roster.picked.size < MIN_CARDS) return; saveLoadout(level, sortUnits([...roster.picked])); $('#roster').hidden = true; const cp = pendingCp; pendingCp = null; startGame(cp); });
@@ -1654,7 +1656,7 @@ function syncSoundUI() {
   document.querySelectorAll('.snd-btn').forEach(b => { b.textContent = p.sfx ? '🔊' : '🔇'; b.title = p.sfx ? '聲音：開（點一下靜音）' : '聲音：關（點一下打開）'; });
   document.querySelectorAll('#snd-panel [data-snd]').forEach(b => { const on = !!p[b.dataset.snd]; b.textContent = on ? '開' : '關'; b.classList.toggle('on', on); });
   document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.classList.toggle('on', Number(b.dataset.vol) === p.vol));
-  document.querySelectorAll('#snd-panel .snd-row').forEach((row, i) => row.classList.toggle('off', i > 4 && !p.sfx)); // 前五列是大字、省效能、高對比、音樂、音效開關，之後的（蟲鳴、音量）才跟著音效壓暗；音樂自己一軌不受音效開關影響
+  document.querySelectorAll('#snd-panel .snd-row[data-dep="sfx"]').forEach(row => row.classList.toggle('off', !p.sfx)); // 標了 data-dep=sfx 的列（蟲鳴、音量）跟著音效壓暗；音樂自己一軌不受影響（Standards 審查 11/1：不靠列序號）
 }
 document.querySelectorAll('.snd-btn').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); Sound.set('sfx', !Sound.prefs.sfx); syncSoundUI(); Sound.play('tap'); }));
 document.querySelectorAll('#snd-panel [data-snd]').forEach(b => b.addEventListener('click', () => { Sound.set(b.dataset.snd, !Sound.prefs[b.dataset.snd]); syncSoundUI(); Sound.play('tap'); }));
@@ -1865,7 +1867,7 @@ const EPILOGUE = [
   { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：James', '程式與關卡：Claude Code', '審查與生圖：小居（Codex）', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '經文：和合本（CUNP）', '2026 年 10 月'], end: true },
 ];
 let epIdx = -1, epTimer = 0, epFrom = '';
-function openEpilogue(from) { epFrom = from; epIdx = -1; $('#epilogue').hidden = false; epNext(); }
+function openEpilogue(from) { for (const s of EPILOGUE) if (s.bg) { const i = new Image(); i.src = s.bg; } epFrom = from; epIdx = -1; $('#epilogue').hidden = false; epNext(); } // 三張場景圖先載，淡入時不會黑底先亮
 function epNext() {
   epIdx++; const sl = EPILOGUE[epIdx]; if (!sl) { closeEpilogue(); return; }
   const bg = $('#ep-bg'), body = $('#ep-body');

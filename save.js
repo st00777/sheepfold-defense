@@ -1,7 +1,7 @@
 // 羊圈守夜 · 存檔。整支手機的紀錄放在一份結構裡（版本欄、遷移鏈、匯出匯入），純邏輯、無 DOM，node 測試也能跑。
 // 2026-10-29 期 0 之前是十幾個散放的 localStorage key（progress-v3、每關一份 checkpoint、loadout、seen-*、diff、speed、bigtext、lite、sound），
 // 第一次開新版會全部搬進 `sheepfold-save`，搬成功才刪舊 key。
-// 用法：const SAVE = Save.open(Save.localStore(), { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS), trialIds: TRIALS.map(t => t.id) });
+// 用法：const SAVE = Save.open(Save.localStore(), { check: Engine.checkSnapshot, diffs: Object.keys(DIFFS), trialIds: TRIALS.map(t => t.id), achievementIds: ACHIEVEMENTS.map(a => a.id) });
 //       SAVE.data.progress.cleared …改完叫 SAVE.save()（回傳有沒有真的寫進去）；Save.encode(SAVE.data) 出存檔碼；Save.decode(code, opts) 讀回來
 'use strict';
 (function (root, factory) {

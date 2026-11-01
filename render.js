@@ -29,7 +29,8 @@ const Board = (() => {
 
   const REDUCE = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
   const reduce = () => REDUCE.matches;
-  let lite = false, contrast = false, glName = '', fno = 0; // contrast 高對比（期 5）：血條加白邊、提示框白色加粗、範圍預覽更亮 // 省效能模式（2026-10-28 James：電腦卡）：解析度 1、粒子減量、雨量減、黑暗／光照離屏圖隔幀才重畫；glName 給 index.html 判斷是不是軟體繪圖
+  let contrast = false; // 高對比（期 5）：血條加白邊、提示框白色加粗、範圍預覽更亮
+  let lite = false, glName = '', fno = 0; // 省效能模式（2026-10-28 James：電腦卡）：解析度 1、粒子減量、雨量減、黑暗／光照離屏圖隔幀才重畫；glName 給 index.html 判斷是不是軟體繪圖
 
   // ====== 狀態 ======
   let app = null, el = null, ICONS = {}, ICON_TEXT = {}, tex = {}, radialTex, bandTex, vignetteTex, dotTex, rainTex, gradTex = {};
@@ -44,7 +45,7 @@ const Board = (() => {
   const holes = new Map();   // 無月夜油燈挖出的亮帶：單位 key → 兩個 erase 精靈
   const mounds = new Map();  // 鑽地的土堆：敵人 id → 圖
   const particles = [], tweens = [];
-  const state = { hints: new Map(), range: new Set(), teach: null, litRows: [false, false, false, false, false], dark: false, cellsDirty: true, dusk: 0, dawn: 0, lose: 0, flash: 0, bolt: null, dust: 0 };
+  const state = { hints: new Map(), range: new Set(), cursor: null, teach: null, litRows: [false, false, false, false, false], dark: false, cellsDirty: true, dusk: 0, dawn: 0, lose: 0, flash: 0, bolt: null, dust: 0 };
   let marker = null, strayMark = null, rainAcc = 0, shake = 0;
 
   // ====== 啟動：載圖、建圖層 ======
@@ -221,14 +222,15 @@ const Board = (() => {
     for (const k of state.range) { const [r, c] = unkey(k); h.poly(cellPts(r, c)).fill({ color: GOLD, alpha: contrast ? .4 : .23 }); if (contrast) h.poly(cellPts(r, c, 1)).stroke({ width: 1, color: 0xffffff, alpha: .7 }); }
     // 提示框：空地虛線金框、可直接換的金實線、鏟子時紅虛線
     for (const [k, kind] of state.hints) { const [r, c] = unkey(k); const pts = cellPts(r, c, 4);
-      if (kind === 'cursor') h.poly(cellPts(r, c, 2)).stroke({ width: contrast ? 4 : 3, color: 0xffffff, alpha: .95 }); // 鍵盤游標（期 5）：白實線
-      else if (kind === 'swap') h.poly(pts).stroke({ width: contrast ? 3 : 2, color: contrast ? 0xffffff : GOLD }); else dashPoly(h, pts, kind === 'sell' ? DANGER : (contrast ? 0xffffff : GOLD)); }
+      if (kind === 'swap') h.poly(pts).stroke({ width: contrast ? 3 : 2, color: contrast ? 0xffffff : GOLD }); else dashPoly(h, pts, kind === 'sell' ? DANGER : (contrast ? 0xffffff : GOLD)); }
+    if (state.cursor) { const [r, c] = unkey(state.cursor); h.poly(cellPts(r, c, 2)).stroke({ width: contrast ? 4 : 3, color: 0xffffff, alpha: .95 }); } // 鍵盤游標：白實線，疊在那一格原本的金框／紅框上
   }
   function dashPoly(g, p, color) { // Pixi 沒有虛線：自己一段一段畫（四個角的多邊形，坡上是斜的）
     const seg = 6, gap = 4; const edge = (x0, y0, x1, y1) => { const len = Math.hypot(x1 - x0, y1 - y0), n = Math.floor(len / (seg + gap)); for (let i = 0; i <= n; i++) { const a = i * (seg + gap) / len, b = Math.min(1, (i * (seg + gap) + seg) / len); if (a >= 1) break; g.moveTo(x0 + (x1 - x0) * a, y0 + (y1 - y0) * a).lineTo(x0 + (x1 - x0) * b, y0 + (y1 - y0) * b); } };
     for (let i = 0; i < 4; i++) edge(p[i * 2], p[i * 2 + 1], p[(i * 2 + 2) % 8], p[(i * 2 + 3) % 8]); g.stroke({ width: contrast ? 3 : 2, color });
   }
   function setHints(map) { state.hints = map || new Map(); state.cellsDirty = true; }
+  function setCursor(r, c) { state.cursor = r === null || r === undefined ? null : key(r, c); state.cellsDirty = true; } // 鍵盤游標（期 5）：獨立一層，畫在提示框上面
   function setRange(list) { state.range = new Set((list || []).map(([r, c]) => key(r, c))); state.cellsDirty = true; }
   function setTeach(rc) { state.teach = rc || null; }
 
@@ -723,7 +725,7 @@ const Board = (() => {
         }
       } catch (err) { report(err); }
     },
-    setHints, setRange, setTeach, placed, squashUnit, lightning, dawn, lose,
+    setHints, setCursor, setRange, setTeach, placed, squashUnit, lightning, dawn, lose,
     setContrast(on) { contrast = !!on; state.cellsDirty = true; for (const M of [UN, EN, MV]) for (const v of M.values()) if (v && v.hp) v.hpLast = -1; }, get contrast() { return contrast; }, // 血條下一幀全部重畫
     setSpeed(n) { speed = n; }, setPaused(p) { paused = p; }, setStill(s) { still = s; },
     // 省效能模式：開關時把畫布解析度切到 1／回到裝置值，離屏圖跟著 layout 重建；software：WebGL 是軟體模擬（沒開硬體加速）的電腦一開始就該用省效能

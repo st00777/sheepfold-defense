@@ -1046,7 +1046,7 @@ const TRIALS = [
     mods: { units: ['slinger', 'wall', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle'], oneBudget: true, startFood: 1200, gates: 0, waveOverride: [
       { list: [['fast', 9], ['wolf', 34], ['jackal', 7]], gap: 1.15, rows: ALL, hpMul: 1.29, ordered: true },
     ] },
-    text: '沒有拋石手、沒有投石手。五十隻一波從山下上來，1300 糧。斜坡上的打不到，等牠們上了坡緣再打，牆要擋得住。',
+    text: '沒有拋石手、沒有投石手。五十隻一波從山下上來，1200 糧。斜坡上的打不到，等牠們上了坡緣再打，牆要擋得住。',
     win: '石子落不到山下，你就在坡緣等。羊一隻沒少。' },
   // ── 第 22 夜 拋擲有時，堆聚有時（id 22）──
   { id: 'w22', kind: 'watch', levelId: 22, diff: 'storm', title: '拋擲有時，堆聚有時・守望',
@@ -1107,10 +1107,10 @@ const TRIALS = [
     text: '還是沒有牧人、糧不會自己來，這次只有 1500 糧，鷹和熊都提早來。沒有看門的，失一隻羊就輸，每一塊糧都要算。',
     win: '天亮了，餅還有剩。亞比該說：「求你饒恕婢女的罪過。」今晚沒有什麼要饒恕的。' },
   { id: 'f25', kind: 'fire', levelId: 25, diff: 'storm', title: '亞比該的禮物・烈火',
-    mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle', 'lobber'], oneBudget: true, startFood: 1700, gates: 0, maxSheepLost: 0, waveOverride: [
+    mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle', 'lobber'], oneBudget: true, startFood: 1600, gates: 0, maxSheepLost: 0, waveOverride: [
       { list: [['bear', 1], ['eagle', 1], ['boar', 1], ['robber', 4], ['wolf', 30], ['jackal', 5], ['fast', 7]], gap: 1.15, rows: ALL, hpMul: 1.08, ordered: true },
     ] },
-    text: '沒有石堆、沒有陷坑。熊和鷹帶著四十九隻一波來，1700 糧，失一隻羊就輸。便宜的牆沒了，牆就是牆。',
+    text: '沒有石堆、沒有陷坑。熊和鷹帶著四十九隻一波來，1600 糧，失一隻羊就輸。便宜的牆沒了，牆就是牆。',
     win: '就這些了，也夠了。亞比該的禮物沒有白帶。' },
   // ── 第 26 夜 多坍的羊群（id 26）──
   { id: 'w26', kind: 'watch', levelId: 26, diff: 'storm', title: '多坍的羊群・守望',

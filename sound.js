@@ -1,7 +1,7 @@
 // 羊圈守夜 · 音效與音樂。全部用 Web Audio 現場合成，沒有音檔、沒有授權問題。
 // 期 5（2026-11-01）：背景音樂也是生成式——三章各一套音階與和弦，慢慢鋪的墊底和弦＋稀疏的五聲音階旋律，跟音效分軌（prefs.music 開關）
 // 用法：Sound.unlock() 在第一次點擊時叫（iOS 要有手勢才出聲）；Sound.play('howl')；Sound.set('vol', 2)
-// 設定 { sfx 音效開關, amb 蟲鳴開關, vol 音量 0 小 1 中 2 大 } 住在存檔裡（save.js 的 prefs.sound）：頁面開好後叫 Sound.attach(存檔裡那個物件, 寫回存檔的函式)；attach 之前用預設值（2026-10-29 期 0 以前自己存 localStorage 'sheepfold-sound'）
+// 設定 { sfx 音效開關, amb 蟲鳴開關, music 背景音樂開關, vol 音量 0 小 1 中 2 大 } 住在存檔裡（save.js 的 prefs.sound）：頁面開好後叫 Sound.attach(存檔裡那個物件, 寫回存檔的函式)；attach 之前用預設值（2026-10-29 期 0 以前自己存 localStorage 'sheepfold-sound'）
 'use strict';
 (function (root) {
   const VOLS = [0.35, 0.6, 1.0];
@@ -27,7 +27,7 @@
     master = ctx.createGain(); master.gain.value = prefs.sfx ? VOLS[prefs.vol] : 0;
     comp = ctx.createDynamicsCompressor(); comp.threshold.value = -12; comp.ratio.value = 6; // 好幾個音疊在一起不爆音
     master.connect(comp); comp.connect(ctx.destination);
-    mgain = ctx.createGain(); mgain.gain.value = prefs.music ? VOLS[prefs.vol] * MUSIC_LEVEL : 0; mgain.connect(comp);
+    mgain = ctx.createGain(); mgain.gain.value = prefs.music ? VOLS[prefs.vol] * MUSIC_LEVEL : 0; mgain.connect(ctx.destination); // 音樂不進壓縮器：鋪底和弦疊起來會把壓縮器一直壓著，音效一響整個鋪底就「抽一下」（動畫 review 11/1）
     return ctx;
   }
   // context 沒在跑就叫它跑（iOS 第一次手勢後是 suspended；來電、Siri 之後是 interrupted）
@@ -142,23 +142,23 @@
   // ====== 背景音樂（期 5）：生成式，三章各一套 ======
   // 每一「小節」（bar 秒）換一個和弦：三個略微失諧的三角波經低通慢慢推上來、慢慢收；旋律每 1.5–3 秒有六成機率從五聲音階裡挑一個音，短而輕
   // 不用音檔：沒有授權問題、檔案 0 KB；想換真曲子的話在這裡換成 AudioBufferSource 就好
-  const MUSIC_LEVEL = 0.55; // 音樂相對音效的比例（音效 1.0）
+  const MUSIC_LEVEL = 0.45; // 音樂相對音效的比例（音效 1.0）；不進壓縮器所以壓低一點
   const MUSIC = {
     1: { root: 146.83, scale: [0, 3, 5, 7, 10], chords: [[0, 3, 7], [3, 7, 10], [7, 10, 14], [10, 14, 17]], bar: 6, lp: 700, pad: 0.11, mel: 0.6, note: 1.4 },   // 守夜：D 小調五聲，溫的
     2: { root: 123.47, scale: [0, 3, 5, 8, 10], chords: [[0, 3, 7], [0, 3, 7, 10], [5, 8, 12], [3, 7, 10]], bar: 7, lp: 450, pad: 0.12, mel: 0.4, note: 1.8 }, // 另外的羊：更低、更暗、旋律更少
     3: { root: 164.81, scale: [0, 2, 4, 7, 9], chords: [[0, 7, 12], [5, 12, 17], [7, 14, 19], [0, 7, 12]], bar: 5.5, lp: 900, pad: 0.1, mel: 0.7, note: 1.2 },  // 諸山間：空五度、大調五聲，開闊
   };
-  let music = null; // { cfg, timers, bar, seed }
+  let music = null; // { cfg, timers, bar, seed, out }：out 是這一局音樂自己的 gain，停的時候淡出再斷線，已經排出去的和弦尾巴才不會拖進結算頁（小居 11/1）
   const semi = (root, n) => root * Math.pow(2, n / 12);
   function musicRng() { music.seed = (music.seed * 1664525 + 1013904223) >>> 0; return music.seed / 4294967296; }
   function padChord(cfg, chord) {
     const t = now(), dur = cfg.bar + 2.5;
-    for (const n of chord) for (const d of [-6, 0, 7]) tone({ type: 'triangle', f0: semi(cfg.root, n), dur, g: cfg.pad / 3, a: 2.2, lp: cfg.lp, out: mgain, detune: d });
+    for (const n of chord) for (const d of [-6, 0, 7]) tone({ type: 'triangle', f0: semi(cfg.root, n), dur, g: cfg.pad / 3, a: 2.2, lp: cfg.lp, out: music.out, detune: d });
   }
   function melNote(cfg) {
     const n = cfg.scale[Math.floor(musicRng() * cfg.scale.length)] + (musicRng() < 0.5 ? 12 : 24);
-    tone({ type: 'sine', f0: semi(cfg.root, n), dur: cfg.note, g: 0.07, a: 0.04, out: mgain });
-    tone({ type: 'triangle', f0: semi(cfg.root, n), dur: cfg.note * 0.6, g: 0.03, a: 0.04, lp: 1800, out: mgain });
+    tone({ type: 'sine', f0: semi(cfg.root, n), dur: cfg.note, g: 0.07, a: 0.04, out: music.out });
+    tone({ type: 'triangle', f0: semi(cfg.root, n), dur: cfg.note * 0.6, g: 0.03, a: 0.04, lp: 1800, out: music.out });
   }
   function musicTick() {
     if (!music) return;
@@ -179,12 +179,16 @@
     if (music || !musicWanted || !prefs.music) return;
     const c = ensure(); if (!c || c.state === 'closed') return;
     if (c.state !== 'running') wake();
-    music = { cfg: MUSIC[musicWanted] || MUSIC[1], timers: [], bar: 0, seed: 7 + musicWanted * 131 };
+    const out = c.createGain(); out.gain.value = 1; out.connect(mgain);
+    music = { cfg: MUSIC[musicWanted] || MUSIC[1], timers: [], bar: 0, seed: 7 + musicWanted * 131, out };
     musicTick(); music.timers.push(setTimeout(melTick, 2500));
   }
-  function stopMusic() { if (!music) return; for (const t of music.timers) clearTimeout(t); music = null; }
+  function stopMusic() {
+    if (!music) return;
+    const m = music; music = null; for (const t of m.timers) clearTimeout(t);
+    try { m.out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.3); setTimeout(() => { try { m.out.disconnect(); } catch (e) {} }, 1500); } catch (e) {} // 淡出一秒再斷線：已排出去的振盪器跟著這個節點一起沒聲音
+  }
   function setMusic(ch) { musicWanted = ch || null; if (musicWanted) { if (music && music.cfg !== (MUSIC[musicWanted] || MUSIC[1])) stopMusic(); startMusic(); } else stopMusic(); }
-  function musicChapter() { return music ? musicWanted : null; }
 
   // ====== 設定 ======
   function set(k, v) {
@@ -199,5 +203,5 @@
   function suspend() { if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {}); }
   function resume() { wake(); }
 
-  root.Sound = { unlock, play, ambient, music: setMusic, musicChapter, set, suspend, resume, attach, prefs, names: Object.keys(SFX), state: () => (ctx ? ctx.state : 'none') };
+  root.Sound = { unlock, play, ambient, music: setMusic, set, suspend, resume, attach, prefs, names: Object.keys(SFX), state: () => (ctx ? ctx.state : 'none') };
 })(typeof window !== 'undefined' ? window : globalThis);
