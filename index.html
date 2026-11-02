@@ -410,7 +410,7 @@
 <div class="overlay" id="levels">
   <div class="dialog home">
     <button class="corner snd-btn" id="snd-btn-levels" title="音效">🔊</button>
-    <button class="corner left" id="settings-btn" title="設定：存檔碼、統計">⚙️</button>
+    <button class="corner left" id="settings-btn" title="設定：音效、畫面、存檔碼、統計">⚙️</button>
     <img class="cover" src="img/cover-home.webp" alt="" onerror="this.remove()">
     <h1>羊圈守夜</h1>
     <div class="ref">今晚，羊群交給你了。帶上夥伴、排好防線，循著聖經故事，一起守到天亮。</div>
@@ -563,11 +563,13 @@
 <div class="overlay" id="epilogue" hidden>
   <div class="ep"><div class="ep-bg" id="ep-bg"></div><div class="ep-body" id="ep-body"></div><div class="ep-hint" id="ep-hint"></div></div>
 </div>
-<!-- 設定（首頁左上 ⚙️）：存檔碼匯出／匯入、匿名統計開關、版本與更新紀錄 -->
+<!-- 設定（首頁左上 ⚙️）：遊戲偏好（跟暫停面板共用同一塊 #snd-panel，開設定頁時搬進 #set-prefs-slot、暫停時搬回去，按鈕事件只綁一次）、存檔碼匯出／匯入、使用統計開關、版本與更新紀錄（11/2 James：首頁也要能調音效、效能） -->
 <div class="overlay" id="settings" hidden>
   <div class="dialog">
     <h1>設定</h1>
     <div class="ref" id="set-save-state"></div>
+    <div id="set-prefs-slot"></div>
+    <div class="snd-note">手機切到靜音時不會有聲音。</div>
     <div class="snd">
       <div class="snd-row"><span>存檔碼 <small>換手機、備份用</small></span><div class="seg"><button id="set-export">匯出</button><button id="set-import">匯入</button></div></div>
       <div class="set-box" id="set-export-box" hidden>
@@ -581,7 +583,7 @@
         <div class="set-note" id="set-import-preview"></div>
         <button class="btn small warn" id="set-import-go" hidden>確定匯入，蓋掉目前紀錄</button>
       </div>
-      <div class="snd-row"><span>匿名統計 <small>只記遊戲事件：玩到第幾夜、用了哪些卡、勝負與耗時，不記姓名帳號</small></span><button id="ga-btn">開</button></div>
+      <div class="snd-row"><span>使用統計 <small>用 Google Analytics 記遊戲事件：玩到第幾夜、用了哪些卡、勝負與耗時。不要求填姓名帳號，隨時可關</small></span><button id="ga-btn">開</button></div>
     </div>
     <div class="set-note" id="set-version"></div>
     <div class="set-notes" id="set-notes"></div>
@@ -686,6 +688,10 @@ const HOME_UPDATE = '最近更新 11/1：第三章 20 題試煉齊了、成就�
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.11.02', notes: [
+    '首頁左上 ⚙️ 設定裡也能調大字、省效能、高對比、音樂、音效、蟲鳴、音量了，不用進遊戲按暫停才改',
+    '開場故事、波間提示、章節尾聲的文案順了一輪；純經文開場前面標了是誰說的',
+  ] },
   { ver: '2026.11.01', notes: [
     '守夜試煉第三章 20 題到了：第 21 到 30 夜各一題「守望」一題「烈火」，三章 60 題齊了。坡地的題比前兩章軟一點（烈火的糧 1200 到 2600），第 30 夜的烈火一波 47 隻、兩隻迷羊半路上來',
     '成就冊：九條（進度、技巧、收藏各三），首頁 🏆 看得到；解鎖時會有一張卡片、一句經文和一聲鈴。老玩家本來就符合的開頁就補上，首頁說一句',
@@ -720,7 +726,7 @@ const CHANGELOG = [
   { ver: '2026.10.29', notes: [
     '首頁左上多了 ⚙️ 設定：可以把全部紀錄匯出成一串存檔碼，換手機時貼回去就接著玩',
     '存檔整理成一份、有版本號：讀不出來會先用備份接回、再不行才從頭，而且會說一聲，不會默默清掉',
-    '加了匿名統計，只記玩到第幾夜、用了哪些卡，不記姓名帳號；不想被記就在設定裡關掉',
+    '加了使用統計，用 Google Analytics 記玩到第幾夜、用了哪些卡、勝負與耗時，不要求填姓名帳號；不想被記就在設定裡關掉',
   ] },
 ];
 const APP_VERSION = CHANGELOG[0].ver;
@@ -1643,7 +1649,7 @@ function syncPause() {
 function pauseGame() {
   if (!G || G.over || paused) return;
   if (!$('#result').hidden || !$('#roster').hidden || MENU_IDS.some(m => !$(m).hidden)) return;
-  paused = true; $('#pause').hidden = false; syncPause(); syncSoundUI();
+  paused = true; $('#pause').hidden = false; $('#pause-note').after($('#snd-panel')); syncPause(); syncSoundUI();
   $('#pause-note').textContent = `狼也在等。回來再按繼續。${checkpointNote()}`;
 }
 function resumeGame() {
@@ -1797,6 +1803,7 @@ function syncSettingsUI() {
 }
 function openSettings() {
   $('#levels').hidden = true; $('#settings').hidden = false;
+  $('#set-prefs-slot').appendChild($('#snd-panel')); syncSoundUI();
   $('#set-export-box').hidden = true; $('#set-import-box').hidden = true; $('#set-import-preview').textContent = ''; $('#set-import-go').hidden = true; importPending = null;
   syncSettingsUI();
 }
