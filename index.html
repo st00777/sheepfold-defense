@@ -704,6 +704,7 @@ const CHANGELOG = [
     '尾聲雅各數羊那一頁：三十夜都沒失過羊才說「你也沒少過一隻」，失過羊的會聽到另一句',
     '提示列固定兩行高；太長的提示會把字縮小塞進去，不裁掉也不把棋盤往下推',
     '圖鑑和波間提示裡的「再點一下升級」改成「點兩下」，跟現在第一下只看、第二下才扣糧的操作一致',
+    '結算頁「存圖分享」的卡片：封面圖沒載到時不再留一大片空底，底色也換成字看得清的暖棕；分享完的訊息會說這張有沒有帶到封面',
   ] },
   { ver: '2026.11.02.2', notes: [ // 11/2 收尾前多角色評估（docs/review-multiview-2026-11-02.md）第 4 節 1–10 項
     '點棋盤上的牧人、牆、可升級的夥伴：第一下只亮範圍、提示要花多少糧，4 秒內再點一下才真的升級或修補，不會再一碰就扣糧',
@@ -1987,14 +1988,21 @@ function preloadCover() { if (!coverImg) { coverImg = new Image(); coverImg.cros
 function shareNote(msg) { const n = $('#share-note'); n.textContent = msg; n.hidden = !msg; }
 function dataUrlToBlob(u) { const [head, b64] = u.split(','); const bin = atob(b64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return new Blob([arr], { type: /:(.*?);/.exec(head)[1] }); }
 function drawShareCard(useCover) { // 畫一張結果卡、回傳 canvas。useCover=false 是備援：封面圖若讓畫布被鎖住（SecurityError）就不畫封面再來一次
-  const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
+  const W = 1080, cv = document.createElement('canvas'); cv.width = W; cv.height = 1350; const x = cv.getContext('2d');
   const win = !!(G && G.result && G.result.win);
-  const grad = x.createLinearGradient(0, 0, 0, H); (win ? ['#f0c982', '#5a4a3a', '#2b2a26'] : ['#1a2238', '#2b2a26', '#2b2a26']).forEach((c, i) => grad.addColorStop(i / 2, c)); x.fillStyle = grad; x.fillRect(0, 0, W, H);
   preloadCover(); const img = useCover && coverImg.complete && coverImg.naturalWidth ? coverImg : null; // 還沒載好就不等了，少一條封面橫幅而已
-  if (img) { x.drawImage(img, 0, 0, W, W / 2); const g2 = x.createLinearGradient(0, W / 2 - 160, 0, W / 2); g2.addColorStop(0, '#2b2a2600'); g2.addColorStop(1, '#2b2a26'); x.fillStyle = g2; x.fillRect(0, W / 2 - 160, W, 160); }
   const font = (px, bold) => `${bold ? 'bold ' : ''}${px}px -apple-system, "PingFang TC", "Noto Sans TC", sans-serif`;
+  // 先把結語逐字排好行（中文沒有空格可斷），算出卡片要多高再畫：沒封面時不再留 1350 高的空底（11/2 James 截圖：卡片下面六成是空的）
+  const text = $('#result-text').textContent.replace(SAVE_FAILED_NOTE, '').trim();
+  x.font = font(34); const maxW = W - 160; let line = ''; const lines = [];
+  for (const chx of text) { if (x.measureText(line + chx).width > maxW) { lines.push(line); line = chx; } else line += chx; } if (line) lines.push(line);
+  const top = img ? W / 2 - 40 : 120, H = top + 340 + Math.min(lines.length, 7) * 50 + 170;
+  cv.height = H; // 改高度會把畫布清空、字型等狀態歸零，所以到這裡才真的開始畫
+  // 沒封面的勝利卡不用淺金色打底：金色小標與米色標題壓在淺金上看不見（11/2 James 截圖），改成暖棕往下漸深
+  const grad = x.createLinearGradient(0, 0, 0, H); (win ? (img ? ['#f0c982', '#5a4a3a', '#2b2a26'] : ['#7a6244', '#3a3128', '#2b2a26']) : ['#1a2238', '#2b2a26', '#2b2a26']).forEach((c, i) => grad.addColorStop(i / 2, c)); x.fillStyle = grad; x.fillRect(0, 0, W, H);
+  if (img) { x.drawImage(img, 0, 0, W, W / 2); const g2 = x.createLinearGradient(0, W / 2 - 160, 0, W / 2); g2.addColorStop(0, '#2b2a2600'); g2.addColorStop(1, '#2b2a26'); x.fillStyle = g2; x.fillRect(0, W / 2 - 160, W, 160); }
   x.textAlign = 'center'; x.textBaseline = 'top';
-  let y = img ? W / 2 - 40 : 120;
+  let y = top;
   x.font = font(40); x.fillStyle = '#e6b84a'; x.fillText('羊圈守夜', W / 2, y); y += 70;
   x.font = font(64, true); x.fillStyle = '#f3ead8'; x.fillText(trial ? trial.title : `第 ${Engine.posOf(level.id)} 夜 ${level.name}`, W / 2, y); y += 100;
   x.font = font(52); x.fillText($('#result-title').textContent, W / 2, y); y += 90;
@@ -2002,23 +2010,23 @@ function drawShareCard(useCover) { // 畫一張結果卡、回傳 canvas。useCo
   if (!trial && win) { const st = (G.result && G.result.stars) || {}; const items = [['win', '守過'], ['noLoss', '零損失'], ['gates', '看門的都在']].slice(0, Engine.starSlots(level)); x.fillStyle = '#e6b84a'; x.fillText(items.map(([k, n]) => (st[k] ? '★ ' : '☆ ') + n).join('　'), W / 2, y); }
   else { x.fillStyle = '#b9b09c'; x.fillText(trial ? `${TRIAL_KINDS[trial.kind].name}${win ? '・過了' : `・撐到第 ${G.wave} 波`}` : `${DIFFS[diff].name}・撐到第 ${G.wave} 波`, W / 2, y); }
   y += 80;
-  const text = $('#result-text').textContent.replace(SAVE_FAILED_NOTE, '').trim(); // 結語逐字排版換行（中文沒有空格可斷）
-  x.font = font(34); x.fillStyle = '#f3ead8'; const maxW = W - 160; let line = ''; const lines = [];
-  for (const chx of text) { if (x.measureText(line + chx).width > maxW) { lines.push(line); line = chx; } else line += chx; } if (line) lines.push(line);
+  x.font = font(34); x.fillStyle = '#f3ead8';
   for (const l of lines.slice(0, 7)) { x.fillText(l, W / 2, y); y += 50; }
   x.font = font(30); x.fillStyle = '#b9b09c'; x.fillText(`${fmtDate(new Date().toISOString())}・${location.host || '羊圈守夜'}`, W / 2, H - 90);
+  cv.coverUsed = !!img; // 給 shareImage 寫進訊息：真機回報時才分得出「封面沒載到」和「畫布被鎖住」
   return cv;
 }
 async function shareImage() {
   // 同步轉檔（toBlob 是非同步，會讓手機認定不是剛點的那一下）；JPEG 約 200 KB，PNG 要 1.4 MB，LINE 分享差很多
   // 11/2 James 的 Android 第一次就看到「畫不出圖」：帶封面失敗就改不帶封面再試一次，還是不行就把錯誤名稱印在訊息裡，下次不用猜
   const encode = cv => dataUrlToBlob(cv.toDataURL('image/jpeg', 0.9));
-  let blob = null, err = null;
-  try { blob = encode(drawShareCard(true)); } catch (e) { err = e; try { blob = encode(drawShareCard(false)); } catch (e2) { err = e2; } }
+  let blob = null, err = null, cover = false;
+  try { const cv = drawShareCard(true); cover = cv.coverUsed; blob = encode(cv); } catch (e) { err = e; try { blob = encode(drawShareCard(false)); } catch (e2) { err = e2; } }
   if (!blob) { shareNote(`這支瀏覽器畫不出圖（${(err && (err.name || err.message)) || '不明'}）`); return; }
+  const noCover = cover ? '' : err ? '（封面圖讓畫布被鎖住，這張沒封面）' : '（封面圖還沒載好，這張沒封面）'; // 11/2 James 的截圖沒封面，分不出是哪種；寫進訊息下次就知道
   const file = new File([blob], `sheepfold-${trial ? trial.id : 'n' + level.id}.jpg`, { type: 'image/jpeg' });
   if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) { // 手機：系統分享（LINE、存到相簿都在裡面）；取消就取消
-    try { await navigator.share({ files: [file], title: '羊圈守夜' }); shareNote('分享出去了'); return; }
+    try { await navigator.share({ files: [file], title: '羊圈守夜' }); shareNote('分享出去了' + noCover); return; }
     catch (e) { if (e && e.name === 'AbortError') { shareNote(''); return; } shareNote('系統分享開不了，改成下載'); }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
