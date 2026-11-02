@@ -47,7 +47,7 @@ const UNITS = {
               // 升級：再點一下花糧膏油，範圍 1 格→2 格（5×5 共 24 格）、回血 8→12；brave＝獅子咆哮嚇不停它
               upgrade: { name: '膏油', ico: '🫗', cost: 50, fromId: 7, heal: 12, range: 2, desc: '膏油後周圍 5×5 共 24 格的夥伴每秒回復 12 血量，一位顧整條防線', ref: '詩 23:5' } },
   catapult: { name: '投石機', title: '巧匠所設計的機器',   ico: '🛞',   cost: 200, hp: 80,  kind: 'shooter', every: 4, dmg: 45, shot: 'lob', splash: 1.2,
-              desc: '攻擊同排最遠的敵人，濺射傷害波及落點周圍。拋射飛得過山坡。第 {from} 夜起再點一下換巧匠的機器，裝填快一半、濺射更大', ref: '代下 26:15',
+              desc: '攻擊同排最遠的敵人，濺射傷害波及落點周圍。拋射飛得過山坡。第 {from} 夜起再點一下換巧匠的機器，裝填更快、濺射更大', ref: '代下 26:15',
               // 升級（第三章）：巧匠的機器，裝填 4 秒→2.6 秒、濺射 1.2→1.5 格；every／splash 蓋過原本的
               upgrade: { name: '巧匠的機器', ico: '⚙️', cost: 100, fromId: 28, every: 2.6, splash: 1.5, desc: '裝填 4 秒變 2.6 秒、濺射 1.2 格變 1.5 格，斜坡上擠成串的狼一砸一片', ref: '代下 26:15' } },
   // ====== 第二章「另外的羊」 ======
@@ -92,7 +92,7 @@ const PICK_ORDER = ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'lobber', 'ca
 // 特殊欄位：flying 飛的／dodge 閃避率／digs 鑽地／vaults 翻牆／steals 偷羊／enrage 狂暴／howl 嚎叫秒數／roar 咆哮秒數
 // 偷雞摸狗的（dodge／vaults／steals／digs 任一）＝狗的獵物，狗對牠們用 hunt 傷害
 // boss 頭目：腳印預告用牠的圖示並放大；同一波第二隻頭目走不同排
-// thick 厚皮：石子和箭只打 THICK_MUL（35%），機弦、投石機、火、毒全額（所以「石子打不痛牠」）；prio 狗優先咬誰（越大越先）
+// thick 厚皮：石子和箭只打 THICK_MUL（35%），機弦、投石機、拋石手、火、毒全額（所以「石子打不痛牠」）；prio 狗優先咬誰（越大越先）
 const ENEMIES = {
   // ref：經文出處（圖鑑敵方頁顯示；正本對照表在 docs/roster.md）
   // img：跟別的敵人共用同一個 emoji 時，自己那套圖的鍵（index.html 的 ICON_IMG／CHAR_KEYS 有對應）；ico 仍是文字備援與提示用的 emoji（10/28）
@@ -107,7 +107,7 @@ const ENEMIES = {
   thief:   { name: '賊', title: '從別處爬進去的',     ico: '🥷', hp: 70,  speed: 0.25, bite: 10, cls: 'human', vaults: true, prio: 3, ref: '約 10:1',
              tip: '會翻過石牆，改用守望樓攔截' },
   rustler: { name: '偷羊人', title: '抱了羊就跑', ico: '🧔', hp: 90,  speed: 0.30, bite: 4,  cls: 'human light', steals: true, fleeSpeed: 0.45, prio: 5, ref: '創 31:39',
-             tip: '不攻擊，走到底就抱羊逃跑。派牧羊犬追捕救羊' },
+             tip: '一心只想偷羊，擋路的牆也會咬；走到底就抱羊逃跑。派牧羊犬追捕救羊' },
   fox:     { name: '小狐狸', title: '毀壞葡萄園的小狐狸', ico: '🦊', hp: 30,  speed: 0.35, bite: 6,  cls: 'small', dodge: 0.7, prio: 3, ref: '歌 2:15',
              tip: '十顆石子閃掉七顆。改用牧羊犬或荊棘' },
   locust:  { name: '蝗群', title: '沒有君王，卻分隊而出',   ico: '🦗', hp: 8,   speed: 0.30, bite: 2,  cls: 'swarm', ref: '箴 30:27',
@@ -575,7 +575,7 @@ const LEVELS = [
     waves: [
       { list: [['wolf', 6]],                                                 gap: 4.5, rows: [1, 2, 3], hpMul: 1,    say: '第 1 波，狼' },
       { list: [['boar', 1], ['wolf', 7], ['fast', 3]],                       gap: 2.4, rows: ALL5,      hpMul: 1.3,  ordered: true, say: '野豬上山了', hint: '野豬撞牆第一下很重，牆放在斜坡上就白白被撞。守望樓放坡緣（第 4 格），坑挖它前面那格' },
-      { list: [['bear', 1], ['wolf', 6], ['robber', 2]],                     gap: 2.8, rows: ALL5,      hpMul: 1.5,  ordered: true, say: '熊來了', hint: '熊在斜坡上走得慢，拋石手先砸；坑挖在牆前面，牠掉進去卡在坡緣的那兩秒半，機弦手別停' },
+      { list: [['bear', 1], ['wolf', 6], ['robber', 2]],                     gap: 2.8, rows: ALL5,      hpMul: 1.5,  ordered: true, say: '熊來了', hint: '熊在斜坡上走得慢，拋石手先砸；坑挖在牆前面，牠掉進去卡在坡緣的那兩秒半，正好讓機弦手多打幾發' },
       { list: [['bear', 2], ['wolf', 9], ['jackal', 3], ['fast', 4]],        gap: 1.8, rows: ALL5,      hpMul: 1.75, ordered: true, say: '兩隻熊，最後一波', hint: '兩隻熊走不同排。兩個坑、兩個機弦手；拋石手只打自己這排，熊走哪排就放哪排' },
     ],
     outroWin: '天亮了。隱基底的牧人說：掃羅帶了三千人來找一個人（撒上 24:2），你一個人守住了一群羊。',
@@ -646,7 +646,7 @@ const LEVELS = [
     speaker: '烏西雅的牧人',
     intro: '王的巧匠又改了機器，裝得更快、砸得更遠。今晚狼群從山下擠著上來，斜坡正好是機器的靶場。',
     units: [...CH3, 'lobber', 'cairn', 'pit', 'waterskin'], fresh: [], must: ['catapult', 'lobber'],
-    tips: ['⚙️ 投石機放下後再點一下花 100 糧換巧匠的機器，裝填快一半、濺射更大。拋射從哪裡都打得到斜坡上', '🐺 狼擠在斜坡上走得慢，正好一砸一片'],
+    tips: ['⚙️ 投石機放下後再點一下花 100 糧換巧匠的機器，裝填 4 秒變 2.6 秒、濺射更大。拋射從哪裡都打得到斜坡上', '🐺 狼擠在斜坡上走得慢，正好一砸一片'],
     waves: [
       { list: [['wolf', 7]],                                                                  gap: 3.5, rows: [1, 2, 3], hpMul: 1,   say: '第 1 波，狼' },
       { list: [['wolf', 14], ['locust', 16]],                                                 gap: 0.9, rows: [2],       hpMul: 1.3, say: '擠成一串', hint: '這波擠在中排，投石機升級後一砸一片。斜坡上走得慢，砸得到更多' },
@@ -682,7 +682,7 @@ const LEVELS = [
       { list: [['wolf', 8], ['fast', 3]],                                                         gap: 3.0, rows: ALL5, hpMul: 1.3, say: '第 1 波' },
       { list: [['robber', 3], ['jackal', 4], ['wolf', 10], ['boar', 1]],                          gap: 1.8, rows: ALL5, hpMul: 1.5, ordered: true, say: '強盜、豺狼、野豬', hint: '強盜站著丟，狗跑過去；豺狼繞牆換排，隔壁排也要有牆。第 4 波山上的羊會回來，先留一隻狗' }, // 10/24 模擬：這波原有迷羊 2 隻，連第 4 波共 4 隻，好玩家寧靜夜 1/3 的局失羊輸；迷羊集中到第 4 波
       { list: [['eagle', 2], ['owl', 3], ['wolf', 10], ['locust', 16]],                           gap: 1.4, rows: ALL5, hpMul: 1.6, say: '天上滿了', hint: '大鷹和夜鴞一起來，投石隊三排盯著、守望樓那排鷹飛不高；蝗群交給弓箭手' },
-      { list: [['bear', 2], ['leopard', 1], ['alpha', 2], ['wolf', 10]],                          gap: 1.6, rows: ALL5, hpMul: 1.8, ordered: true, strays: [12, 30], say: '熊、豹、領頭狼', hint: '兩隻熊兩個坑，豹交給狗和守望樓，銀號留給嚎叫那一刻' },
+      { list: [['bear', 2], ['leopard', 1], ['alpha', 2], ['wolf', 10]],                          gap: 1.6, rows: ALL5, hpMul: 1.8, ordered: true, strays: [12, 30], say: '熊、豹、領頭狼', hint: '兩隻熊兩個坑，豹交給狗和守望樓，銀號先擺好，領頭狼一嚎就有角聲壓回去' },
       { list: [['aurochs', 2], ['robber', 4], ['wolf', 12], ['fast', 8], ['eagle', 1]],           gap: 1.4, rows: ALL5, hpMul: 2.1, ordered: true, say: '兩隻野牛，最後一波', hint: '最後一波兩隻野牛走不同排。坑挖在守望樓前面，一隻野牛至少一個坑，機器和機弦手輪著打' },
     ],
     outroWin: '天亮了。',
@@ -1078,7 +1078,7 @@ const TRIALS = [
     mods: { units: ['slinger', 'wall', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle', 'lobber', 'cairn'], oneBudget: true, startFood: 1800, gates: 0, waveOverride: [
       { list: [['bear', 3], ['boar', 1], ['robber', 2], ['wolf', 32], ['jackal', 4], ['fast', 7]], gap: 1.15, rows: ALL, hpMul: 1.12, ordered: true },
     ] },
-    text: '沒有陷坑、沒有機弦手。三隻熊帶著四十九隻一波來，1500 糧。沒有坑困牠，拋石手要在牠上坡前多砸幾下。',
+    text: '沒有陷坑、沒有機弦手。三隻熊帶著四十九隻一波來，1800 糧。沒有坑困牠，拋石手要在牠上坡前多砸幾下。',
     win: '沒有坑也守住了。隱基底的牧人說：磐石上的野羊，今晚也安穩。' },
   // ── 第 24 夜 諸山間（id 24）──
   { id: 'w24', kind: 'watch', levelId: 24, diff: 'storm', title: '諸山間・守望',
@@ -1094,7 +1094,7 @@ const TRIALS = [
     mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'cradle', 'lobber', 'cairn', 'pit'], oneBudget: true, startFood: 1600, gates: 0, maxSheepLost: 0, waveOverride: [
       { list: [['eagle', 3], ['robber', 2], ['wolf', 34], ['jackal', 6], ['fast', 6]], gap: 1.15, rows: ALL, hpMul: 1.12, ordered: true },
     ] },
-    text: '沒有投石隊、沒有守望樓。三隻鷹帶著五十一隻一波來，1500 糧，失一隻羊就輸。鷹飛得高打不到，只能等牠抓了羊飛低那幾秒。',
+    text: '沒有投石隊、沒有守望樓。三隻鷹帶著五十一隻一波來，1600 糧，失一隻羊就輸。鷹飛得高打不到，只能等牠抓了羊飛低那幾秒。',
     win: '鷹飛出去前都打下來了，羊落地自己走回圈。「引導牠們歸回故土」（結 34:13）。' },
   // ── 第 25 夜 亞比該的禮物（id 25）──
   { id: 'w25', kind: 'watch', levelId: 25, diff: 'storm', title: '亞比該的禮物・守望',
@@ -1104,7 +1104,7 @@ const TRIALS = [
       { list: [['boar', 1], ['wolf', 8], ['fast', 4], ['bear', 1]], gap: 1.5, rows: ALL, hpMul: 1.23, ordered: true, say: '熊和野豬' },
       { list: [['robber', 3], ['wolf', 10], ['jackal', 3], ['fast', 4], ['bear', 1], ['eagle', 1]], gap: 1.2, rows: ALL, hpMul: 1.39, ordered: true, say: '最後一波' },
     ] },
-    text: '還是沒有牧人、糧不會自己來，這次只有 1500 糧，鷹和熊都提早來。沒有看門的，失一隻羊就輸，每一塊糧都要算。',
+    text: '還是沒有牧人、糧不會自己來，這次只有 1800 糧，鷹和熊都提早來。沒有看門的，失一隻羊就輸，每一塊糧都要算。',
     win: '天亮了，餅還有剩。亞比該說：「求你饒恕婢女的罪過。」今晚沒有什麼要饒恕的。' },
   { id: 'f25', kind: 'fire', levelId: 25, diff: 'storm', title: '亞比該的禮物・烈火',
     mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle', 'lobber'], oneBudget: true, startFood: 1600, gates: 0, maxSheepLost: 0, waveOverride: [
@@ -1142,7 +1142,7 @@ const TRIALS = [
     mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle', 'lobber', 'cairn', 'waterskin'], oneBudget: true, startFood: 2200, gates: 0, waveOverride: [
       { list: [['aurochs', 1], ['bear', 1], ['boar', 2], ['robber', 2], ['wolf', 30], ['jackal', 4], ['fast', 8]], gap: 1.15, rows: ALL, hpMul: 1.08, ordered: true },
     ] },
-    text: '沒有陷坑、沒有守望樓。野牛和熊帶著四十八隻一波來，1700 糧。沒有坑困野牛，荊棘減速、所有人一起打。',
+    text: '沒有陷坑、沒有守望樓。野牛和熊帶著四十八隻一波來，2200 糧。沒有坑困野牛，荊棘減速、所有人一起打。',
     win: '沒有坑也擋下了野牛。巴珊的牧人說：牠撞牆像撞土，今晚土沒倒。' },
   // ── 第 28 夜 巧匠的機器（id 28）──
   { id: 'w28', kind: 'watch', levelId: 28, diff: 'storm', title: '巧匠的機器・守望',
@@ -1174,7 +1174,7 @@ const TRIALS = [
     mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle', 'cairn', 'waterskin'], oneBudget: true, startFood: 1800, gates: 0, maxSheepLost: 0, waveOverride: [
       { list: [['bear', 1], ['leopard', 1], ['eagle', 2], ['boar', 1], ['robber', 4], ['wolf', 30], ['jackal', 4], ['fast', 7]], gap: 1.15, rows: ALL, hpMul: 1.08, ordered: true },
     ] },
-    text: '沒有拋石手、沒有陷坑。熊、豹、兩隻鷹帶著五十隻一波來，準備只有 12 秒，1600 糧，失一隻羊就輸。',
+    text: '沒有拋石手、沒有陷坑。熊、豹、兩隻鷹帶著五十隻一波來，準備只有 12 秒，1800 糧，失一隻羊就輸。',
     win: '來不及擺的你都擺上了。放羊的兒子今晚沒有走。' },
   // ── 第 30 夜 往山裏去（id 30）──
   { id: 'w30', kind: 'watch', levelId: 30, diff: 'storm', title: '往山裏去・守望',
@@ -1191,7 +1191,7 @@ const TRIALS = [
     mods: { units: ['slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'staff', 'lamp', 'patrol', 'volley', 'cradle', 'cairn', 'pit', 'waterskin'], oneBudget: true, startFood: 2600, gates: 0, maxSheepLost: 0, waveOverride: [
       { list: [['aurochs', 1], ['bear', 1], ['leopard', 1], ['alpha', 1], ['boar', 1], ['robber', 3], ['wolf', 26], ['jackal', 4], ['fast', 5], ['owl', 3], ['eagle', 1]], gap: 1.15, rows: ALL, hpMul: 1, ordered: true, strays: [25, 50] },
     ] },
-    text: '沒有投石機、沒有拋石手。第三章所有敵人一波來，六十六隻，野牛帶頭，兩隻迷羊半路上來；1800 糧，失一隻羊就輸。',
+    text: '沒有投石機、沒有拋石手。第三章所有敵人一波來，四十七隻，野牛帶頭，兩隻迷羊半路上來；2600 糧，失一隻羊就輸。',
     win: '一夜，一筆糧，山上的羊都回來了。「我要向山舉目；我的幫助從何而來？」（詩 121:1）' },
 ];
 
@@ -1205,7 +1205,7 @@ const ACHIEVEMENTS = [
   { id: 'thirty_nights', group: 'progress', ico: '🌅', name: '三十夜', desc: '三章三十夜全守過', verse: '他必不叫你的腳搖動；保護你的必不打盹！', ref: '詩 121:3' },
   // 技巧
   { id: 'no_loss', group: 'skill', ico: '🐑', name: '一隻沒少', desc: '有羊的夜守過，一隻羊也沒失去', verse: '「找著了，就歡歡喜喜地扛在肩上。」', ref: '路 15:5' },
-  { id: 'storm_full', group: 'skill', ico: '⛈️', name: '暴風夜滿星', desc: '任一夜暴風夜拿到全部的星', verse: '「他們在營的四圍各站各的地方。」', ref: '士 7:21' },
+  { id: 'storm_full', group: 'skill', ico: '⛈️', name: '暴風夜滿星', desc: '任一夜在暴風夜通關，而且那一夜的星集滿', verse: '「他們在營的四圍各站各的地方。」', ref: '士 7:21' },
   { id: 'fire_one', group: 'skill', ico: '🔥', name: '一筆糧', desc: '過任一題烈火試煉', verse: '「他們晝夜作我們的保障。」', ref: '撒上 25:16' },
   // 收藏
   { id: 'stars_30', group: 'collect', ico: '⭐', name: '三十顆星', desc: '三章合計拿到 30 顆星', verse: '「我未來之先，你所有的很少，現今卻發大眾多」', ref: '創 30:30' },

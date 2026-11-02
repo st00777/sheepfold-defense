@@ -1217,7 +1217,7 @@
         const p = Math.min(1, 1 - e.vaulting / VAULT_TIME);
         e.x = e.vaultFrom + (e.vaultTo - e.vaultFrom) * p; // 連續越過牆，不是瞬移
         e.lift = Math.sin(p * Math.PI);                     // 離地高度 0→1→0，畫面層畫弧線
-        if (e.vaulting <= 0) { e.x = e.vaultTo; e.lift = 0; e.vaulted = true; ev(G, { t: 'toast', msg: '賊翻過牆了！' }); }
+        if (e.vaulting <= 0) { e.x = e.vaultTo; e.lift = 0; e.vaulted = true; ev(G, { t: 'toast', msg: `${def.name}翻過牆了！` }); }
         continue;
       }
 
@@ -1274,14 +1274,14 @@
           if (def.slam && bk === 'blocker' && e.slamTarget !== b.id) {
             e.slamTarget = b.id; b.hp -= def.slam; e.st.stun = def.slamStun; e.dashLeft = 0;
             ev(G, { t: 'fx', kind: 'slam', r: e.r, x: frontCol }); ev(G, { t: 'unit', r: b.r, c: b.c });
-            if (b.hp <= 0) { removeUnit(G, b, true); ev(G, { t: 'toast', msg: '野豬一撞，牆垮了' }); }
+            if (b.hp <= 0) { removeUnit(G, b, true); ev(G, { t: 'toast', msg: `${def.name}一撞，牆垮了` }); }
             continue;
           }
           blocked = true;
           const mul = (def.wallMul && UNITS[b.type].kind === 'blocker') ? def.wallMul : 1;
           b.hp -= biteOf(e) * mul * dt;
           e.biting = b.id;
-          if (b.hp <= 0) { removeUnit(G, b, true); e.biting = null; if (def.wallMul && UNITS[b.type].kind === 'blocker') ev(G, { t: 'toast', msg: '獅子一口咬碎了牆' }); }
+          if (b.hp <= 0) { removeUnit(G, b, true); e.biting = null; if (def.wallMul && UNITS[b.type].kind === 'blocker') ev(G, { t: 'toast', msg: `${def.name}一口咬碎了牆` }); }
           else if (G.rng() < dt * 4) ev(G, { t: 'unit', r: e.r, c: frontCol });
         }
       }

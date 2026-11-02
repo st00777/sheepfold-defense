@@ -379,7 +379,7 @@
 <div id="top">
   <span>🌾 糧 <b id="food">0</b></span>
   <span id="sheep" hidden>🐑 <b id="sheep-n">3</b></span>
-  <span><span id="wave-info">準備中</span><button id="fast-btn" title="加速">⏩</button><button id="snd-btn" class="snd-btn" title="聲音">🔊</button><button id="pause-btn" title="暫停">⏸</button></span>
+  <span><span id="wave-info">準備中</span><button id="fast-btn" title="加速">⏩</button><button id="snd-btn" class="snd-btn" title="音效">🔊</button><button id="pause-btn" title="暫停">⏸</button></span>
 </div>
 
 <div id="cards-wrap"><div id="cards"></div></div>
@@ -409,7 +409,7 @@
 <!-- 主畫面：只放「接著守」和兩個模式入口（守夜／守夜試煉）；選章、選夜各自一屏（2026-10-31 James：一屏塞太多，試煉看起來像附屬按鈕） -->
 <div class="overlay" id="levels">
   <div class="dialog home">
-    <button class="corner snd-btn" id="snd-btn-levels" title="聲音">🔊</button>
+    <button class="corner snd-btn" id="snd-btn-levels" title="音效">🔊</button>
     <button class="corner left" id="settings-btn" title="設定：存檔碼、統計">⚙️</button>
     <img class="cover" src="img/cover-home.webp" alt="" onerror="this.remove()">
     <h1>羊圈守夜</h1>
@@ -581,7 +581,7 @@
         <div class="set-note" id="set-import-preview"></div>
         <button class="btn small warn" id="set-import-go" hidden>確定匯入，蓋掉目前紀錄</button>
       </div>
-      <div class="snd-row"><span>匿名統計 <small>只記玩到第幾夜、用了哪些卡，不記姓名帳號</small></span><button id="ga-btn">開</button></div>
+      <div class="snd-row"><span>匿名統計 <small>只記遊戲事件：玩到第幾夜、用了哪些卡、勝負與耗時，不記姓名帳號</small></span><button id="ga-btn">開</button></div>
     </div>
     <div class="set-note" id="set-version"></div>
     <div class="set-notes" id="set-notes"></div>
@@ -609,8 +609,8 @@
   </div>
 </div>
 
-<script src="data.js?v=21"></script>
-<script src="engine.js?v=26"></script>
+<script src="data.js?v=22"></script>
+<script src="engine.js?v=27"></script>
 <script src="save.js?v=6"></script>
 <script src="sound.js?v=9"></script>
 <script src="lib/pixi.min.js"></script>
@@ -1028,7 +1028,7 @@ function tapCard(key, el) {
   document.querySelectorAll('.card').forEach(c => c.classList.toggle('selected', c.dataset.key === selected));
   const swappable = markHints();
   // 同類更貴的卡：點原單位直接換掉，實付＝全價－退一半（跟鏟子一樣）
-  toast(selected ? (u.kind === 'instant' ? `點敵人密集處，${u.name}就打破在那裡，範圍傷害並嚇退` : swappable ? `點一格草地放下${u.name}；點亮金框的${UNITS[selected].kind === 'blocker' ? '牆' : '投手'}可直接換成${u.name}，退一半糧` : `點一格草地放下${u.name}`) : '先點一張卡，再點草地放下去');
+  toast(selected ? (u.kind === 'instant' ? (u.healAll ? `點要救的那一格，${u.name}倒下去，九格內的夥伴回滿血、不再害怕` : `點敵人密集處，${u.name}就打破在那裡，範圍傷害並嚇退`) : swappable ? `點一格草地放下${u.name}；點亮金框的${UNITS[selected].kind === 'blocker' ? '牆' : '投手'}可直接換成${u.name}，退一半糧` : `點一格草地放下${u.name}`) : '先點一張卡，再點草地放下去');
 }
 function tapShovel() {
   if (!G || G.over || tut.on) return;
@@ -1495,7 +1495,7 @@ function unitNums(k) {
 function enemyNums(k) {
   const e = ENEMIES[k], sp = e.speed >= SPEED_FAST ? '快' : e.speed <= SPEED_SLOW ? '慢' : '普通';
   const s = [`血量 ${e.hp}`, e.bite ? `每秒傷害 ${e.bite}` : '不攻擊', `移動速度 ${sp}`];
-  if (e.thick) s.push(`厚皮：石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%，機弦、投石機、火、毒全額`);
+  if (e.thick) s.push(`厚皮：石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%，機弦、投石機、拋石手、火、毒全額`);
   if (e.howl) s.push(`每 ${e.howl} 秒嚎叫：2 格內的狼速度 ×${STATUS.howl.mul}，持續 ${STATUS.howl.t} 秒`);
   if (e.roar) s.push(`每 ${e.roar} 秒咆哮：2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走（講定工價的只僵住）`);
   if (e.wallMul) s.push(`咬牆傷害 ×${e.wallMul}`);
@@ -1523,11 +1523,11 @@ const GLOSSARY = [
   { name: '減速', ico: '🌿', text: `踩在荊棘上速度 ×${STATUS.slow.mul}，離開就恢復。來源：荊棘` },
   { name: '暈眩', ico: '📯', text: `不動也不咬。來源：吹角手（${UNITS.horn.stun} 秒）；雇工逃跑時該排敵人也會愣 3 秒` },
   { name: '嚇退', ico: '🏺', text: `往回跑 ${UNITS.jar.panic} 秒，跑的時候不咬人。來源：瓦瓶火把` },
-  { name: '咬住', ico: '🐕', text: '牧羊犬咬住的敵人停下不走，改咬狗，直到狗受傷回窩。狗對賊、偷羊人、狐狸、野狗咬得特別痛' },
+  { name: '咬住', ico: '🐕', text: '牧羊犬咬住的敵人停下不走，改咬狗，直到狗受傷回窩。狗對賊、偷羊人、狐狸、野狗、強盜咬得特別痛' },
   { name: '嚎叫', ico: '🐺', text: `領頭狼每 ${ENEMIES.alpha.howl} 秒一次，2 格內的狼速度 ×${STATUS.howl.mul}，持續 ${STATUS.howl.t} 秒。對策：狗咬住牠` },
   { name: '咆哮', ico: '🦁', text: `獅子每 ${ENEMIES.lion.roar} 秒一次，2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走（講定工價的只僵住）` },
   { name: '狂暴', ico: '🐻', text: `母熊血量低於 ${Math.round(ENEMIES.bear.enrage * 100)}% 時速度與傷害 ×2，直到被打倒` },
-  { name: '厚皮', ico: '🛡', text: `石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%；機弦、投石機、火、毒全額。母熊、獅子、豹都是厚皮` },
+  { name: '厚皮', ico: '🛡', text: `石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%；機弦、投石機、拋石手、火、毒全額。母熊、獅子、豹、野牛都是厚皮` },
   { name: '換排', ico: '↕️', text: `敵人從這排換到隔壁排，射手要跟著換。來源：牧人杖（趕的）、豺狼碰到牆繞路、豹每 ${ENEMIES.leopard.shiftEvery} 秒自己換、夜鴞在三排之間飄。油燈照到的排，敵人不會自己換排（杖還是趕得動）` },
   { name: '看門的', ico: '🧍', text: '門口站的人（約 10:3「看門的就給他開門」；約翰福音裡看門的只認牧人的聲音，這裡借他的名字做一次性的門）。第一隻走到門口的地面敵人會被他擋下，把這排的地面敵人一起趕出場，叼著的迷羊也放下；用過一次他就不在了，那排再漏就守不住。飛的不經過門。寧靜夜每排一位、起風夜中間三排、暴風夜第 2、4 排' },
   { name: '無月夜', ico: '🌑', text: '第二章起第二波後看不到腳印預告，不知道下一隻從哪排來。油燈照到的三排例外' },
@@ -1661,7 +1661,7 @@ window.addEventListener('pagehide', () => { pauseGame(); Sound.suspend(); }); //
 // 頂欄與開場頁的喇叭：一下切全部靜音；暫停層裡才有細項（音效／蟲鳴／音量三檔）
 function syncSoundUI() {
   const p = Sound.prefs;
-  document.querySelectorAll('.snd-btn').forEach(b => { b.textContent = p.sfx ? '🔊' : '🔇'; b.title = p.sfx ? '聲音：開（點一下靜音）' : '聲音：關（點一下打開）'; });
+  document.querySelectorAll('.snd-btn').forEach(b => { b.textContent = p.sfx ? '🔊' : '🔇'; b.title = p.sfx ? '音效：開（點一下關掉音效；音樂在暫停面板另外調）' : '音效：關（點一下打開音效）'; });
   document.querySelectorAll('#snd-panel [data-snd]').forEach(b => { const on = !!p[b.dataset.snd]; b.textContent = on ? '開' : '關'; b.classList.toggle('on', on); });
   document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.classList.toggle('on', Number(b.dataset.vol) === p.vol));
   document.querySelectorAll('#snd-panel .snd-row[data-dep="sfx"]').forEach(row => row.classList.toggle('off', !p.sfx)); // 標了 data-dep=sfx 的列（蟲鳴、音量）跟著音效壓暗；音樂自己一軌不受影響（Standards 審查 11/1：不靠列序號）
@@ -1937,7 +1937,7 @@ async function shareImage() {
     catch (e) { if (e && e.name === 'AbortError') { shareNote(''); return; } shareNote('系統分享開不了，改成下載'); }
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  if ($('#share-note').textContent === '…') shareNote('圖存好了，看瀏覽器的下載'); // 分享失敗轉下載的那句留著
+  if ($('#share-note').textContent === '…') shareNote('已交給瀏覽器下載，到下載項目裡找'); // 分享失敗轉下載的那句留著
 }
 $('#share-btn').addEventListener('click', () => { Sound.play('tap'); shareNote('…'); shareImage().catch(() => shareNote('存圖失敗')); });
 
