@@ -413,7 +413,7 @@
     <button class="corner left" id="settings-btn" title="設定：存檔碼、統計">⚙️</button>
     <img class="cover" src="img/cover-home.webp" alt="" onerror="this.remove()">
     <h1>羊圈守夜</h1>
-    <div class="ref">受託守夜的無名牧人。每一夜都取材自聖經裡牧人的故事。</div>
+    <div class="ref">今晚，羊群交給你了。帶上夥伴、排好防線，循著聖經故事，一起守到天亮。</div>
     <div id="save-note" hidden></div>
     <button class="btn" id="continue-btn" hidden></button>
     <div id="modes"></div>
@@ -609,7 +609,7 @@
   </div>
 </div>
 
-<script src="data.js?v=22"></script>
+<script src="data.js?v=23"></script>
 <script src="engine.js?v=27"></script>
 <script src="save.js?v=6"></script>
 <script src="sound.js?v=9"></script>
@@ -681,7 +681,7 @@ function unlocked(id) { return unlockAll || Engine.isUnlocked(P.cleared, id); } 
 function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(l.id)) for (const k of l.units) if (!all.includes(k)) all.push(k); return all; }
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
-const CHAPTERS = { 1: '學會牧人、射手、牆、狗，最後一夜兩隻獅子', 2: '沒有月亮看不到腳印，敵人會換排；山上還有別人家的羊要帶回來', 3: '羊圈在山上，斜坡上的敵人直射打不到：要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛' };
+const CHAPTERS = { 1: '先備糧，再排陣。從第一隻狼開始練起，最後迎戰兩隻獅子！', 2: '月亮藏起來，腳印也看不見了。提防換排的敵人，也別忘了接回路上的迷羊。', 3: '羊圈搬上山，老擺法得換一換。拋石越過斜坡、陷坑留住敵人，最後挑戰兩隻野牛！' };
 const HOME_UPDATE = '最近更新 11/1：第三章 20 題試煉齊了、成就冊、第 30 夜後的尾聲、背景音樂、高對比、存圖分享；細節在設定頁的更新紀錄';
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
@@ -1868,9 +1868,9 @@ $('#achv-back').addEventListener('click', () => { $('#achv').hidden = true; $('#
 
 // ====== 尾聲（期 4）：第 30 夜守過後的結局——三章回顧、經文、製作名單；點一下換頁 ======
 const EPILOGUE = [
-  { bg: 'img/scene-moon.webp', kicker: '第一章', title: CHAPTER_NAMES[1], lines: ['從雅各替拉班看守羊群的那一夜開始。', '十夜，學會了牧人、射手、牆、狗；最後一夜兩隻獅子。'] },
-  { bg: 'img/scene-dark.webp', kicker: '第二章', title: CHAPTER_NAMES[2], lines: ['沒有月亮的夜，看不到腳印，敵人會換排。', '山上還有別人家的羊，一隻隻帶回來。'] },
-  { bg: 'img/scene-dawn.webp', kicker: '第三章', title: CHAPTER_NAMES[3], lines: ['羊圈搬到山上，斜坡上的敵人直射打不到。', '要拋、要困、要把牆退到坡緣；最後一夜兩隻野牛。'] },
+  { bg: 'img/scene-moon.webp', kicker: '第一章', title: CHAPTER_NAMES[1], lines: ['從雅各交到你手裡的羊群開始。', '你學會備糧、排陣，也學會在狼群靠近時，替夥伴多爭取一點時間。'] },
+  { bg: 'img/scene-dark.webp', kicker: '第二章', title: CHAPTER_NAMES[2], lines: ['月亮藏起來了，路上卻還有羊沒回家。', '你不只守著圈裡的，也為那些走迷的，留了一條回來的路。'] },
+  { bg: 'img/scene-dawn.webp', kicker: '第三章', title: CHAPTER_NAMES[3], lines: ['羊圈搬上山，熟悉的辦法也得轉個彎。', '石頭拋過坡緣，夥伴守在前頭。一步一步，又守到了天亮。'] },
   { kicker: '三十夜', title: '天亮了', lines: ['「我是好牧人；好牧人為羊捨命。」（約 10:11）', '「你出你入，耶和華要保護你，從今時直到永遠。」（詩 121:8）'] },
   { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：葉真旭', '程式與關卡：Claude Code', '審查與生圖：Codex', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '經文：和合本（CUNP）', '2026 年 10 月'], end: true },
 ];
