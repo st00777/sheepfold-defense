@@ -53,7 +53,7 @@
   html.big .card .name, html.big .card .cost, html.big .rc .name, html.big .rc .cost { font-size: 15px; }
   html.big .dialog p, html.big .tips, html.big .newbox, html.big #roster-detail { font-size: 17px; }
   html.big .dialog .ref, html.big #diff-hint, html.big #best, html.big .lv .t span, html.big #roster-detail .num { font-size: 15px; }
-  html.big #toast, html.big .snd-row { font-size: 17px; }
+  html.big #toast { --toast-fs: 17px; } html.big .snd-row { font-size: 17px; }
   #top, #cards-wrap, #bottom, #dev { flex-shrink: 0; }
   #top { gap: 6px; }
   #top > span:first-child, #sheep { white-space: nowrap; }
@@ -162,7 +162,7 @@
   #bottom { margin-top: 10px; padding: 8px 12px 12px; background: var(--panel); border-radius: 10px; }
   #bar { height: 8px; background: #0006; border-radius: 4px; overflow: hidden; }
   #bar > i { display: block; height: 100%; width: 100%; background: var(--gold); transform: scaleX(0); transform-origin: left; transition: transform .3s var(--ease-out); }
-  #toast { text-align: center; font-size: 15px; color: var(--muted); line-height: 1.4; min-height: 2.8em; margin-top: 6px; } /* 固定留兩行高：一行變兩行時 #bottom 不變高、fitBoard 不重算，棋盤不會跳 10px 讓人點錯格（11/2 審查視角 1 高） */
+  #toast { --toast-fs: 15px; text-align: center; font-size: var(--toast-fs); color: var(--muted); line-height: 1.4; height: calc(var(--toast-fs) * 2.8); overflow: hidden; margin-top: 6px; } /* 高度固定兩行（照 --toast-fs 算，不跟著 toast() 臨時縮的字級變）；超過兩行的長提示由 toast() 把字縮小到塞得下，內容不裁掉（11/2 小居：min-height 只是「至少兩行」） */ /* 固定留兩行高：一行變兩行時 #bottom 不變高、fitBoard 不重算，棋盤不會跳 10px 讓人點錯格（11/2 審查視角 1 高） */
   #toast.tip { color: var(--new); }
 
   /* 蓋在上面的對話／結果畫面 */
@@ -185,6 +185,7 @@
   .dialog .ref { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
   .dialog p { line-height: 1.7; font-size: 15px; text-align: left; }
   .dialog .who { color: var(--gold); }
+  .dialog .sub-line { color: var(--gold); opacity: .9; margin: -4px 0 6px; } /* 開場標題（夜名）下的副標＝那一夜的 title，選夜列和開場頁從此同一個名字（11/2 審查） */
   .dialog .who-line { color: var(--gold); opacity: .9; margin: -6px 0 12px; } /* 開場標題下的人物身分一行（data.js 的 who），給不認識這些名字的玩家 */
   #psalm .btn { display: block; margin: 8px auto 0; opacity: 0; transition: opacity .6s; } /* 章末詩篇的「讀全文」，跟詩句一樣淡入 */
   #psalm .btn.on { opacity: 1; }
@@ -454,6 +455,7 @@
   <div class="dialog">
     <div class="intro-content">
     <h1 id="intro-title"></h1>
+    <div class="ref sub-line" id="intro-sub" hidden></div>
     <div class="ref" id="intro-ref"></div>
     <div class="ref who-line" id="intro-who" hidden></div>
     <p id="intro-text"></p>
@@ -618,7 +620,7 @@
   </div>
 </div>
 
-<script src="data.js?v=27"></script>
+<script src="data.js?v=28"></script>
 <script src="engine.js?v=28"></script>
 <script src="save.js?v=6"></script>
 <script src="sound.js?v=9"></script>
@@ -695,6 +697,14 @@ const HOME_UPDATE = '最近更新 11/2：點單位先預覽再升級、暫停面
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.11.02.3', notes: [ // 11/2 多角色評估剩下的三個小項
+    '開場頁的大標題改成跟選夜列一樣的夜名（例如「雅各的夜」），原本的標題（例如「羊圈守夜」）變成下面一行副標，不會再以為走錯夜',
+    '第 30 夜開場的引文縮成一句，不用滑兩下才看得到提示',
+    '尾聲最後一頁的經文換成約翰福音 10:28「誰也不能從我手裏把他們奪去」，「好牧人為羊捨命」在第 4 夜、成就和試煉已經讀過三次了',
+    '尾聲雅各數羊那一頁：三十夜都沒失過羊才說「你也沒少過一隻」，失過羊的會聽到另一句',
+    '提示列固定兩行高；太長的提示會把字縮小塞進去，不裁掉也不把棋盤往下推',
+    '圖鑑和波間提示裡的「再點一下升級」改成「點兩下」，跟現在第一下只看、第二下才扣糧的操作一致',
+  ] },
   { ver: '2026.11.02.2', notes: [ // 11/2 收尾前多角色評估（docs/review-multiview-2026-11-02.md）第 4 節 1–10 項
     '點棋盤上的牧人、牆、可升級的夥伴：第一下只亮範圍、提示要花多少糧，4 秒內再點一下才真的升級或修補，不會再一碰就扣糧',
     '暫停面板多了「重新開始」；「重新開始」和「回選夜」都要按兩下才算，不怕誤觸',
@@ -919,7 +929,7 @@ function openIntro(L, T) {
   const t = $('#intro-text');
   if (trial) {
     const base = Engine.levelById(trial.levelId), kind = TRIAL_KINDS[trial.kind];
-    $('#intro-title').textContent = trial.title;
+    $('#intro-title').textContent = trial.title; $('#intro-sub').hidden = true;
     $('#intro-ref').textContent = `${kind.ico} ${kind.name}・取自第 ${Engine.posOf(base.id)} 夜「${base.name}」`;
     $('#intro-who').hidden = true;
     t.innerHTML = `<div class="verse">${trial.text}</div>`;
@@ -929,7 +939,8 @@ function openIntro(L, T) {
     kb.querySelectorAll('.diff').forEach(b => { const T2 = sibs.find(x => x.kind === b.dataset.kind); b.hidden = !T2; b.classList.toggle('selected', T2 === trial); b.onclick = T2 && T2 !== trial ? () => { openTrial(T2); Sound.play('tap'); } : null; });
   } else {
     $('#kinds').hidden = true;
-    $('#intro-title').textContent = L.title;
+    $('#intro-title').textContent = L.name; // 跟選夜列同一個名字（雅各的夜），原本的 title（羊圈守夜）降成副標（11/2 審查：同一夜兩個名字會讓人以為走錯夜）
+    $('#intro-sub').hidden = !L.title; $('#intro-sub').textContent = L.title || '';
     $('#intro-ref').textContent = L.ref;
     $('#intro-who').hidden = !L.who; $('#intro-who').textContent = L.who || ''; // 第 7、8、9、23 夜：這位人物是誰，一行白話（11/2 審查交集 H）
     t.innerHTML = L.speaker ? `<span class="who">${L.speaker}：</span>${L.intro}` : `<div class="verse">${L.intro}</div>`;
@@ -1038,6 +1049,8 @@ function markSeenEnemy(t) { if (!SD.seen.enemies.includes(t)) { SD.seen.enemies.
 
 function toast(msg, tip) {
   const t = $('#toast'), s = msg == null ? '' : String(msg), h = icoText(s); if (h !== s) t.innerHTML = h; else t.textContent = s; t.classList.toggle('tip', !!tip); // 有單位 emoji 才走 innerHTML 換縮圖，其餘照舊純文字
+  // 框固定兩行高：超過的長提示（最長的波間提示近 50 字，窄螢幕＋大字會到三行）把字級一級一級縮到塞得下、最小 12px，內容不裁掉、棋盤不跳
+  t.style.fontSize = ''; for (let fs = parseFloat(getComputedStyle(t).fontSize) - 1; t.scrollHeight > t.clientHeight + 1 && fs >= 12; fs--) t.style.fontSize = fs + 'px';
   clearTimeout(toastTimer);
   if (tip) toastTimer = setTimeout(() => t.classList.remove('tip'), 5000);
 }
@@ -1221,7 +1234,7 @@ function watchStall(dt) {
   if (G.over || G.phase !== 'wave') { stallT = 0; return; }
   if (G.killed !== stallKilled) { stallKilled = G.killed; stallT = 0; return; }
   stallT += dt * speed;
-  if (stallT >= 90 && !stallTold) { stallTold = true; toast('這一波僵住了。看看場上剩哪種敵人：暫停面板的圖鑑寫著牠怕什麼；或回選夜換個隊伍再來', true); }
+  if (stallT >= 90 && !stallTold) { stallTold = true; toast('這一波僵住了。暫停面板的圖鑑寫著每種敵人怕什麼，看看場上剩的那種', true); }
 }
 // 速度：玩家用右上角 ⏩ 在 1× 與 2× 之間切（存 sheepfold-speed）；開發者列的 1／2／4／8× 走同一條
 function setSpeed(n) {
@@ -1532,7 +1545,7 @@ function fullRef(ref) { return String(ref || '').replace(/^([\u4e00-\u9fff]{1,2}
 function unitNums(k) {
   const u = UNITS[k], s = [];
   s.push(u.hp > 1 ? `血量 ${u.hp}` : '一次性，放下就用掉，沒有血量');
-  if (u.kind === 'producer') s.push(`每 ${u.every} 秒產 ${u.gives} 糧；升級老牧人（${ELDER_COST} 糧）後每 ${(u.every * ELDER_MUL).toFixed(1)} 秒一次`);
+  if (u.kind === 'producer') s.push(`每 ${u.every} 秒產 ${u.gives} 糧；點兩下升級老牧人（${ELDER_COST} 糧，第一下只看花費）後每 ${(u.every * ELDER_MUL).toFixed(1)} 秒一次`);
   if (u.kind === 'shooter') s.push(`攻擊間隔 ${u.every} 秒，每次傷害 ${u.dmg}，${u.range ? `射程 ${u.range} 格` : '射程整排'}${u.pierce ? `；穿透整排，每穿一隻傷害剩 ${Math.round(u.falloff * 100)}%` : ''}${u.splash ? `；拋到同排${u.lobNear ? '最前面' : '最遠'}的敵人頭上，落點 ${u.splash} 格內一起受傷${u.lobNear ? '（落點小，通常只中一隻）' : '（濺射）'}；拋射飛得過山坡、厚皮也全額，但石頭飛 ${0.8} 秒才落地` : u.shot ? '；直射：從高地射出去，飛到斜坡只打得到飛的，斜坡上的地面敵人在腳底下打不到' : ''}`);
   if (u.flees) s.push(`敵人進到 ${u.flees} 格內就逃走（單位消失），該排敵人愣住 3 秒`);
   if (u.kind === 'blocker') s.push(u.norepair ? `不攻擊；不能修補${u.tall ? '；賊翻不過' : '；賊會翻過去'}` : `不攻擊；修補一次 ${REPAIR_COST} 糧回 ${REPAIR_HP} 血量，間隔 ${REPAIR_CD} 秒${u.tall ? '；賊翻不過，大鷹在這排飛不高' : '；賊會翻過去'}`);
@@ -1550,7 +1563,7 @@ function unitNums(k) {
   if (u.light !== undefined) s.push(`不攻擊；照亮自己這排和上下 ${u.light} 排：光裡的敵人不會自己換排（豺狼不繞路、豹不跳排、夜鴞不飄，牧人杖照樣趕得動），無月夜裡那幾排的腳印預告也會回來`);
   if (u.kind === 'patrol') s.push(`在本排與上下鄰排巡邏（每排 ${u.walk} 秒）；空閒時優先走向近戰範圍內最靠近羊圈的地面敵人，接敵後留在那排。前方 ${u.reach} 格內可攻擊，每 ${u.every} 秒傷害 ${u.dmg}。他站在哪一排，就擋那排的狼、也只在那排被咬；鄰排他這一欄已經有東西就走不進去`);
   if (u.cradle) s.push(`不攻擊；接應本排與上下鄰排，迷羊走到他所在的那一欄就立刻回圈（羊數 +1、糧 +${STRAY.reward}），不必走到最左邊`);
-  if (u.upgrade) { const p = u.upgrade; s.push(`第 ${p.from} 夜起再點一下花 ${p.cost} 糧升級「${p.name}」：${p.desc}${p.poison ? `；中毒 ${STATUS.poison.t} 秒、每秒 ${STATUS.poison.dps}、攻擊 ×${STATUS.poison.biteMul}，同一隻只中一次` : ''}${p.all ? `；每 ${u.every} 秒一次，飛的不受影響` : ''}${p.hp ? `；血量 ${u.hp}→${p.hp}` : ''}${p.flees === 0 ? '；不再逃跑，獅子吼只僵住' : ''}${p.light !== undefined ? `；照亮上下各 ${p.light} 排` : ''}${p.lanes ? `；上下各 ${p.lanes} 排穿過的也點燃` : ''}`); }
+  if (u.upgrade) { const p = u.upgrade; s.push(`第 ${p.from} 夜起點兩下花 ${p.cost} 糧升級「${p.name}」（第一下看範圍和花費，第二下才扣糧）：${p.desc}${p.poison ? `；中毒 ${STATUS.poison.t} 秒、每秒 ${STATUS.poison.dps}、攻擊 ×${STATUS.poison.biteMul}，同一隻只中一次` : ''}${p.all ? `；每 ${u.every} 秒一次，飛的不受影響` : ''}${p.hp ? `；血量 ${u.hp}→${p.hp}` : ''}${p.flees === 0 ? '；不再逃跑，獅子吼只僵住' : ''}${p.light !== undefined ? `；照亮上下各 ${p.light} 排` : ''}${p.lanes ? `；上下各 ${p.lanes} 排穿過的也點燃` : ''}`); }
   return s.join('・');
 }
 function enemyNums(k) {
@@ -1941,8 +1954,8 @@ const EPILOGUE = [
   { bg: 'img/scene-moon.webp', kicker: '第一章', title: CHAPTER_NAMES[1], lines: ['從雅各交到你手裡的羊群開始。', '你學會備糧、排陣，也學會在狼群靠近時，替夥伴多爭取一點時間。'] },
   { bg: 'img/scene-dark.webp', kicker: '第二章', title: CHAPTER_NAMES[2], lines: ['月亮藏起來了，路上卻還有羊沒回家。', '你不只守著圈裡的，也為那些走迷的，留了一條回來的路。'] },
   { bg: 'img/scene-dawn.webp', kicker: '第三章', title: CHAPTER_NAMES[3], lines: ['羊圈搬上山，熟悉的辦法也得轉個彎。', '石頭拋過坡緣，夥伴守在前頭。一步一步，又守到了天亮。'] },
-  { bg: 'img/scene-moon.webp', kicker: '回到羊圈', title: '雅各又數了一遍', lines: ['這回他開口了：', '「三十夜，你也沒少過一隻。」'] }, // 收束回第 1 夜：雅各數羊、把水袋遞給你的那個無名牧人（11/2 審查視角 2 高）
-  { kicker: '三十夜', title: '天亮了', lines: ['「我是好牧人；好牧人為羊捨命。」（約 10:11）', '「你出你入，耶和華要保護你，從今時直到永遠。」（詩 121:8）'] },
+  { bg: 'img/scene-moon.webp', kicker: '回到羊圈', title: '雅各又數了一遍', lines: () => ['這回他開口了：', LEVELS.every(L => starsOf(L.id).noLoss) ? '「三十夜，你也沒少過一隻。」' : '「三十夜，羊群交在你手裡，這一路辛苦你了。」'] }, // 三十夜全部零失羊才說「沒少過一隻」，失過羊的玩家說另一句，免得結語跟戰果矛盾（11/2 小居） // 收束回第 1 夜：雅各數羊、把水袋遞給你的那個無名牧人（11/2 審查視角 2 高）
+  { kicker: '三十夜', title: '天亮了', lines: ['「他們永不滅亡，誰也不能從我手裏把他們奪去。」（約 10:28）', '「你出你入，耶和華要保護你，從今時直到永遠。」（詩 121:8）'] },
   { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：葉真旭', '程式與關卡：Claude Code', '審查與生圖：Codex', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '經文：和合本（CUNP）', '2026 年 10 月'], tail: '試煉冊還有幾夜，等你去守。', end: true },
 ];
 let epIdx = -1, epTimer = 0, epFrom = '';
@@ -1954,7 +1967,7 @@ function epNext() {
   clearTimeout(epTimer);
   epTimer = setTimeout(() => {
     bg.style.backgroundImage = sl.bg ? `url(${sl.bg})` : 'none';
-    body.innerHTML = `<div class="ep-kicker">${sl.kicker}</div><h1>${sl.title}</h1>${(sl.lines || []).map(l => `<p>${l}</p>`).join('')}${sl.small ? `<div class="ep-small">${sl.small.join('<br>')}</div>` : ''}${sl.tail ? `<p>${sl.tail}</p>` : ''}${sl.end ? `<button class="btn" id="ep-done">${epFrom === 'result' ? '回選夜' : '回首頁'}</button>` : ''}`; // 按鈕照實際落點寫：從結算頁進來的關掉會回選夜（backToLevels），首頁 🌅 進來的回首頁（11/2 審查交集 G）
+    body.innerHTML = `<div class="ep-kicker">${sl.kicker}</div><h1>${sl.title}</h1>${(typeof sl.lines === 'function' ? sl.lines() : sl.lines || []).map(l => `<p>${l}</p>`).join('')}${sl.small ? `<div class="ep-small">${sl.small.join('<br>')}</div>` : ''}${sl.tail ? `<p>${sl.tail}</p>` : ''}${sl.end ? `<button class="btn" id="ep-done">${epFrom === 'result' ? '回選夜' : '回首頁'}</button>` : ''}`; // 按鈕照實際落點寫：從結算頁進來的關掉會回選夜（backToLevels），首頁 🌅 進來的回首頁（11/2 審查交集 G）
     $('#ep-hint').textContent = sl.end ? '' : '點一下繼續';
     if (sl.bg) bg.classList.add('on'); body.classList.add('on');
     if (sl.end) $('#ep-done').addEventListener('click', ev => { ev.stopPropagation(); closeEpilogue(); });

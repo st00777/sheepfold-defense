@@ -7,21 +7,21 @@ const ROWS = 5, COLS = 7;
 // ====== 我方單位 ======
 // kind：producer 產糧／shooter 射手／blocker 牆／dog 牧羊犬／floor 鋪地／instant 一次性／support 輔助／deflector 趕路（第二章）／patrol 巡夜（第二章）
 // 第二章欄位：light 油燈照亮上下幾排（腳印預告回來）；lanes 射手同時打上下幾排；deflect 每趕一隻自己掉多少血；cradle 本排及上下鄰排的迷羊走到他的欄位就安全；walk 巡夜人每走一排要幾秒、reach 打前方幾格
-// upgrade：放下後「再點一下」花糧升級，欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）；fromId＝在哪一夜（id）學會，engine.js 載入時換算成 from＝那一夜的位置（顯示編號），desc 裡的 {from} 一併填入
+// upgrade：放下後「點兩下」花糧升級（第一下只預覽範圍與花費，4 秒內第二下才扣糧，index.html tapCell），欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）；fromId＝在哪一夜（id）學會，engine.js 載入時換算成 from＝那一夜的位置（顯示編號），desc 裡的 {from} 一併填入
 // heal 每秒回血／range 回血範圍幾格（1＝周圍八格、2＝5×5）／brave 獅子咆哮嚇不停
 const UNITS = {
   shepherd: { name: '牧人', title: '羊圈的根基，糧從他手裡來',     ico: '🧑‍🌾', cost: 50,  hp: 60,  kind: 'producer', every: 7,   gives: 25,
-              desc: '定時產糧。再點一下升級成老牧人，產糧更快', ref: '創 31:40' },
+              desc: '定時產糧。點兩下升級成老牧人，產糧更快', ref: '創 31:40' },
   slinger:  { name: '投石手', title: '甩石不差毫髮的便雅憫人',   ico: '🙋',   cost: 100, hp: 60,  kind: 'shooter', every: 1.3, dmg: 20, shot: 'stone',
               desc: '投石攻擊同一排的敵人', ref: '士 20:16' },
   wall:     { name: '石牆', title: '為羊群築的牆',     ico: '🧱',   cost: 50,  hp: 300, kind: 'blocker',
-              desc: '高血量擋路。再點一下花 25 糧修補', ref: '民 32:16' },
+              desc: '高血量擋路。點兩下花 25 糧修補', ref: '民 32:16' },
   sling:    { name: '機弦手', title: '一顆石子，撂倒巨人',   ico: '🎯',   cost: 150, hp: 60,  kind: 'shooter', every: 3.2, dmg: 90, shot: 'sling',
               desc: '單發傷害高、攻擊間隔長，專打獅子和熊', ref: '撒上 17:40' },
   dog:      { name: '牧羊犬', title: '追賊的，不要命的',   ico: '🐕',   cost: 75,  hp: 220, kind: 'dog', dps: 10, hunt: 30, run: 1.6, rest: 10,
               desc: '抓賊的。追咬賊、偷羊人、狐狸、野狗；大傢伙也能拖幾秒。同排幾隻狗會分頭咬，敵人少就一起上。受傷回窩休息，不會死', ref: '伯 30:1' },
   hireling: { name: '雇工', title: '見狼來就撇下羊逃走',     ico: '🤾',   cost: 25,  hp: 40,  kind: 'shooter', every: 0.9, dmg: 10, shot: 'stone', range: 2.5, flees: 1.0,
-              desc: '低費短射程投石手，敵人一靠近就逃跑。第 {from} 夜起再點一下講定工價，他就不逃了', ref: '約 10:12',
+              desc: '低費短射程投石手，敵人一靠近就逃跑。第 {from} 夜起點兩下講定工價，他就不逃了', ref: '約 10:12',
               // 升級（期 3，2026-10-30）：講定工價，flees 0＝不再逃跑（獅子吼只僵住）、hp 40→60（engine 升級時把 maxHp 一起補上）；射程 2.5 不變，定位仍是「要牆擋的短射程」。工價 25 不是 50：模擬過 50 要攢到 150 才付得起、狼第 2 波就到他早逃了；25＋25＝50 糧是投石手的一半，六成多傷害、三分之一射程，這才是真的取捨
               upgrade: { name: '講定工價', ico: '🪙', cost: 25, fromId: 16, flees: 0, hp: 60, desc: '講定一天一錢銀子，他就不再逃跑，血量也多了', ref: '太 20:2' } },
   tower:    { name: '守望樓', title: '葡萄園中的樓，賊也翻不過',   ico: '🗼',   cost: 125, hp: 600, kind: 'blocker', tall: true,
@@ -29,32 +29,32 @@ const UNITS = {
   archer:   { name: '弓箭手', title: '在曠野長大的弓箭手',   ico: '🏹',   cost: 125, hp: 60,  kind: 'shooter', every: 1.8, dmg: 26, shot: 'arrow', pierce: true, falloff: 0.8,
               desc: '箭矢穿透整排，每穿一隻傷害降低', ref: '創 21:20' },
   thorns:   { name: '荊棘', title: '用荊棘堵住她的道',     ico: '🌿',   cost: 75,  hp: 150, kind: 'floor', slow: 0.5, dps: 6, wear: 3,
-              desc: '鋪地減速並持續傷害，踩久會損壞。放在射手前面最划算；第 {from} 夜起再點一下撒蠍子', ref: '何 2:6',
-              // 升級：再點一下花糧撒蠍子進去，踩入的敵人中毒（from＝第幾夜起學會）；持續有效，每隻敵人同一片荊棘只叮一次
+              desc: '鋪地減速並持續傷害，踩久會損壞。放在射手前面最划算；第 {from} 夜起點兩下撒蠍子', ref: '何 2:6',
+              // 升級：點兩下花糧撒蠍子進去，踩入的敵人中毒（from＝第幾夜起學會）；持續有效，每隻敵人同一片荊棘只叮一次
               upgrade: { name: '荊棘蠍窩', ico: '🦂', cost: 50, fromId: 5, poison: 8, desc: '撒蠍子進荊棘，踩入的敵人中毒，持續有效', ref: '申 8:15' } },
   brazier:  { name: '火盆', title: '夜間按著更次看守羊群',     ico: '🔥',   cost: 75,  hp: 100, kind: 'support', ignite: true,
-              desc: '點燃穿過的石子與箭矢，燃燒會傳給隔壁敵人。第 {from} 夜起再點一下，上下兩排的也點得著', ref: '路 2:8',
+              desc: '點燃穿過的石子與箭矢，燃燒會傳給隔壁敵人。第 {from} 夜起點兩下，上下兩排的也點得著', ref: '路 2:8',
               // 升級（期 3）：壇上的火常常燒著，lanes 1＝上下各一排穿過這一欄的石子與箭矢也點燃（跟投石隊的 lanes 同一個字彙）；燃燒數值不變
               upgrade: { name: '壇上的火', ico: '🎇', cost: 50, fromId: 17, lanes: 1, desc: '火常常燒著，上下兩排穿過的石子和箭矢也點燃', ref: '利 6:13' } },
   jar:      { name: '瓦瓶火把', title: '打破瓦瓶，火把一亮', ico: '🏺',   cost: 100, hp: 0,   kind: 'instant', dmg: 30, panic: 2.5,
               desc: '一次性。九格範圍傷害，並嚇退敵人', ref: '士 7:19' },
   horn:     { name: '吹角手', title: '吹角，你們就蒙記念',   ico: '📯',   cost: 100, hp: 60,  kind: 'support', every: 20, push: 1, stun: 2,
-              desc: '每 20 秒吹角，同排敵人後退一格並暈眩。第 {from} 夜起再點一下換銀號，五排一起退', ref: '民 10:9',
+              desc: '每 20 秒吹角，同排敵人後退一格並暈眩。第 {from} 夜起點兩下換銀號，五排一起退', ref: '民 10:9',
               // 升級：銀號，吹一次五排地面敵人全部後退並暈眩（all＝全場）
               upgrade: { name: '銀號', ico: '🎺', cost: 75, fromId: 14, all: true, desc: '換成銀號，吹一次五排的地面敵人全部後退一格並暈眩', ref: '民 10:2' } },
   healer:   { name: '纏裹的牧人', title: '受傷的，我必纏裹', ico: '🩹', cost: 100, hp: 60,  kind: 'support', every: 1, heal: 8, range: 1, brave: true,
-              desc: '不攻擊，持續回復周圍八格夥伴的血量，不怕獅子咆哮。第 {from} 夜起再點一下膏油，範圍擴大到 5×5、回復更多血量', ref: '結 34:16',
-              // 升級：再點一下花糧膏油，範圍 1 格→2 格（5×5 共 24 格）、回血 8→12；brave＝獅子咆哮嚇不停它
+              desc: '不攻擊，持續回復周圍八格夥伴的血量，不怕獅子咆哮。第 {from} 夜起點兩下膏油，範圍擴大到 5×5、回復更多血量', ref: '結 34:16',
+              // 升級：點兩下花糧膏油，範圍 1 格→2 格（5×5 共 24 格）、回血 8→12；brave＝獅子咆哮嚇不停它
               upgrade: { name: '膏油', ico: '🫗', cost: 50, fromId: 7, heal: 12, range: 2, desc: '膏油後周圍 5×5 共 24 格的夥伴每秒回復 12 血量，一位顧整條防線', ref: '詩 23:5' } },
   catapult: { name: '投石機', title: '巧匠所設計的機器',   ico: '🛞',   cost: 200, hp: 80,  kind: 'shooter', every: 4, dmg: 45, shot: 'lob', splash: 1.2,
-              desc: '攻擊同排最遠的敵人，濺射傷害波及落點周圍。拋射飛得過山坡。第 {from} 夜起再點一下換巧匠的機器，裝填更快、濺射更大', ref: '代下 26:15',
+              desc: '攻擊同排最遠的敵人，濺射傷害波及落點周圍。拋射飛得過山坡。第 {from} 夜起點兩下換巧匠的機器，裝填更快、濺射更大', ref: '代下 26:15',
               // 升級（第三章）：巧匠的機器，裝填 4 秒→2.6 秒、濺射 1.2→1.5 格；every／splash 蓋過原本的
               upgrade: { name: '巧匠的機器', ico: '⚙️', cost: 100, fromId: 28, every: 2.6, splash: 1.5, desc: '裝填 4 秒變 2.6 秒、濺射 1.2 格變 1.5 格，斜坡上擠成串的狼一砸一片', ref: '代下 26:15' } },
   // ====== 第二章「另外的羊」 ======
   staff:    { name: '牧人杖', title: '你的杖、你的竿，都安慰我',   ico: '🦯',   cost: 50,  hp: 150, kind: 'deflector', deflect: 10, deflectCd: 4,
               desc: '不攻擊。地面敵人走到它面前就被趕到隔壁排，放在沒有射手的排，把敵人趕進有射手的那排。頭目趕不動', ref: '詩 23:4' },
   lamp:     { name: '油燈', title: '她的燈終夜不滅',     ico: '🪔',   cost: 50,  hp: 60,  kind: 'support', light: 1,
-              desc: '不攻擊。照亮自己這排和上下兩排：光裡的敵人不換排（豺狼不繞路、豹不跳排、夜鴞不飄），無月夜裡那三排的腳印預告也會回來。放中間那排最划算；第 {from} 夜起再點一下放上燈臺，照得更遠', ref: '箴 31:18',
+              desc: '不攻擊。照亮自己這排和上下兩排：光裡的敵人不換排（豺狼不繞路、豹不跳排、夜鴞不飄），無月夜裡那三排的腳印預告也會回來。放中間那排最划算；第 {from} 夜起點兩下放上燈臺，照得更遠', ref: '箴 31:18',
               // 升級（期 3）：放在燈臺上，light 1→2＝照亮上下各兩排，放中間那排五排全亮（一盞升級＝一格，對上第 2、4 排各一盞＝兩格）
               upgrade: { name: '燈臺', ico: '🕯️', cost: 50, fromId: 12, light: 2, desc: '放在燈臺上，照亮上下各兩排；放中間那排，五排全亮', ref: '太 5:15' } },
   patrol:   { name: '巡夜人', title: '晝夜作我們的保障',   ico: '🚶',   cost: 125, hp: 140, kind: 'patrol', every: 0.8, dmg: 18, walk: 1.2, reach: 1.3,
@@ -290,7 +290,7 @@ const LEVELS = [
     speaker: '阿摩司', who: '阿摩司：提哥亞村的牧人，放羊、修桑樹，後來成了先知', // who：開場標題下一行白話身分，給沒聽過這些人名的玩家（11/2 審查交集 H）
     intro: '我是牧人，又是修理桑樹的，不是先知的門徒。獅子吼叫，誰不懼怕？今晚天上也要看著，鷙鳥會飛過牆。火盆給你，石子穿過火就會燒。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier'], fresh: ['brazier'], must: ['thorns'],
-    tips: ['🦂 荊棘學會新招：放下後再點一下花 50 糧撒蠍子，踩入的敵人中毒', '🔥 火盆要放在射手前面，石子穿過才會變火', '🦅 鷙鳥飛過牆和狗，只有投射攻擊打得到'],
+    tips: ['🦂 荊棘學會新招：放下後點兩下花 50 糧撒蠍子，踩入的敵人中毒', '🔥 火盆要放在射手前面，石子穿過才會變火', '🦅 鷙鳥飛過牆和狗，只有投射攻擊打得到'],
     waves: [
       { list: [['wolf', 6]],                                  gap: 4.0, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['bird', 1], ['wolf', 6], ['bird', 2]],        gap: 2.6, rows: [0, 1, 2, 3, 4], hpMul: 1.3, ordered: true, say: '天上有東西', hint: '抬頭。鷙鳥會飛過牆，每排都要有射手' },
@@ -336,7 +336,7 @@ const LEVELS = [
     speaker: null,
     intro: '上帝藉以西結先知說：「牧人在羊群四散的日子怎樣尋找他的羊，我必照樣尋找我的羊。」「失喪的，我必尋找；被逐的，我必領回；受傷的，我必纏裹；有病的，我必醫治。」（結 34:12、16）這是第一章的最後一夜。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult'], fresh: [], must: ['archer', 'healer', 'catapult'],
-    tips: ['🦁 今晚共五波，最後一波有兩隻獅子', '🫗 纏裹的牧人放下後再點一下花 50 糧膏油，回血範圍擴大到 5×5，放中排就顧得到五條線'],
+    tips: ['🦁 今晚共五波，最後一波有兩隻獅子', '🫗 纏裹的牧人放下後點兩下花 50 糧膏油，回血範圍擴大到 5×5，放中排就顧得到五條線'],
     sheep: 3,
     waves: [
       { list: [['wolf', 6], ['fast', 2]],                                   gap: 3.0, rows: [0, 1, 2, 3, 4], hpMul: 1.2, say: '第 1 波' },
@@ -515,7 +515,7 @@ const LEVELS = [
     speaker: null, moonless: 2, sheep: 3,
     intro: '耶穌說：「我另外有羊，不是這圈裡的；我必須領他們來，他們也要聽我的聲音，並且要合成一群，歸一個牧人了。」（約 10:16）今晚山上還有羊沒回來，兩隻豹也在。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle'], fresh: [], must: ['horn', 'volley', 'dog'],
-    tips: ['🎺 吹角手放下後再點一下花 75 糧換銀號，一吹五排敵人全退', '🐆 今晚共五波，最後一波兩隻豹走不同排'],
+    tips: ['🎺 吹角手放下後點兩下花 75 糧換銀號，一吹五排敵人全退', '🐆 今晚共五波，最後一波兩隻豹走不同排'],
     waves: [
       { list: [['wolf', 7], ['fast', 2]],                                                   gap: 3.4, rows: [0, 1, 2, 3, 4], hpMul: 1.2, say: '第 1 波' },
       { list: [['jackal', 4], ['wolf', 10], ['boar', 1]],                                   gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.5, say: '繞路的、撞牆的', hint: '豺狼和野豬一起來。吹角手換銀號，一吹五排都退一格' },
@@ -646,7 +646,7 @@ const LEVELS = [
     speaker: '烏西雅的牧人',
     intro: '王的巧匠又改了機器，裝得更快、砸得更遠。今晚狼群從山下擠著上來，斜坡正好是機器的靶場。',
     units: [...CH3, 'lobber', 'cairn', 'pit', 'waterskin'], fresh: [], must: ['catapult', 'lobber'],
-    tips: ['⚙️ 投石機放下後再點一下花 100 糧換巧匠的機器，裝填 4 秒變 2.6 秒、濺射更大。拋射從哪裡都打得到斜坡上', '🐺 狼擠在斜坡上走得慢，正好一砸一片'],
+    tips: ['⚙️ 投石機放下後點兩下花 100 糧換巧匠的機器，裝填 4 秒變 2.6 秒、濺射更大。拋射從哪裡都打得到斜坡上', '🐺 狼擠在斜坡上走得慢，正好一砸一片'],
     waves: [
       { list: [['wolf', 7]],                                                                  gap: 3.5, rows: [1, 2, 3], hpMul: 1,   say: '第 1 波，狼' },
       { list: [['wolf', 14], ['locust', 16]],                                                 gap: 0.9, rows: [2],       hpMul: 1.3, say: '擠成一串', hint: '這波擠在中排，投石機升級後一砸一片。斜坡上走得慢，砸得到更多' },
@@ -675,7 +675,7 @@ const LEVELS = [
   {
     id: 30, chapter: 3, hill: 4, diffScale: 0.45, name: '往山裏去', title: '第三章最後一夜', ref: '取材：馬太福音 18:12-13、詩篇 121 篇',
     speaker: null, sheep: 3,
-    intro: '耶穌用尋羊的比喻說：「一個人若有一百隻羊，一隻走迷了路，你們的意思如何？他豈不撇下這九十九隻，往山裏去找那隻迷路的羊嗎？若是找著了，我實在告訴你們，他為這一隻羊歡喜，比為那沒有迷路的九十九隻歡喜還大呢！」（太 18:12-13）今晚山上的羊要一隻隻回來，野牛也在。',
+    intro: '耶穌說：「他豈不撇下這九十九隻，往山裏去找那隻迷路的羊嗎？」（太 18:12）今晚山上的羊要一隻隻回來，野牛也在。', // 原本整段 18:12-13 近 90 字要滑兩下才看得完，只留這一句逐字引文；全句在結算頁 win 與 wolf 結語還看得到（11/2 審查）
     units: [...CH3, 'lobber', 'cairn', 'pit', 'waterskin'], fresh: [], must: ['catapult', 'pit', 'dog', 'lobber'],
     tips: ['🐂 今晚共五波，最後一波兩隻野牛走不同排，兩個坑先留著', '🐑 迷羊會從斜坡上來，狼在斜坡上叼走牠你打不到；狗護送、拋石手砸斜坡上的狼'],
     waves: [
