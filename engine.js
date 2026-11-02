@@ -541,6 +541,20 @@
     return { ok: false, msg: def.kind === 'producer' ? '已經是老牧人了' : def.kind === 'blocker' ? '牆還好好的' : u.upgraded ? '已經升級過了' : '這格已經有人了' };
   }
 
+  // 沒選卡點單位「第一下」要做什麼：只看不改。回 { action, cost, name }（elder 升老牧人／upgrade 通用升級／repair 修補），
+  // 不會花糧的（石堆推倒、送卡模式、沒東西可做）回 null。畫面層靠它做「第一下預覽、第二下才扣糧」（11/2 多視角審查交集 A：手機上想看單位就被升級扣 75 糧）。
+  // 條件順序跟 tapUnit 一字不差，兩邊要一起改
+  function tapPreview(G, r, c) {
+    if (G.over) return null;
+    const u = G.units[key(r, c)]; if (!u) return null;
+    const def = UNITS[u.type];
+    if (def.rolls || G.level.conveyor) return null;
+    if (def.kind === 'producer' && !u.elder) return { action: 'elder', cost: ELDER_COST, name: '老牧人' };
+    if (def.upgrade && !u.upgraded) { if (u.hp <= 0 || posOf(G.level.id) < def.upgrade.from) return null; return { action: 'upgrade', cost: def.upgrade.cost, name: def.upgrade.name }; }
+    if (def.kind === 'blocker' && u.hp < u.maxHp && !def.norepair) { if (u.repairAt && G.time < u.repairAt) return null; return { action: 'repair', cost: REPAIR_COST, name: '修補' }; }
+    return null;
+  }
+
   // 單位角標：糧夠了才提示「升級」或「修補」。規則放這裡，畫面層只負責畫（跟 tapUnit 同一套條件；修補的提示門檻 REPAIR_HINT 在 data.js，點了任何受傷的牆都修得了，角標只在傷到那個比例以下才掛）
   function tapHint(G, u) {
     if (G.level.conveyor) return '';
@@ -1372,6 +1386,6 @@
   for (const msg of validateLevels()) console.error(msg);
   for (const msg of validateTrials()) console.error(msg);
 
-  const Engine = { achievementsEarned, achievementsNew, validateAchievements, starsOfNight, create, gateRows, place, tapUnit, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, trialById, trialGate, isTrialUnlocked, enemiesSeenBy, trialLevel, dailyTrial, validateTrials, sameMods, rowLit, starSlots, validateLevels, onHillCell, dev, effOf };
+  const Engine = { achievementsEarned, achievementsNew, validateAchievements, starsOfNight, create, gateRows, place, tapUnit, tapPreview, tapHint, sell, swap, canSwap, snapshot, checkSnapshot, restore, step, canAfford, levelById, posOf, nextOf, isUnlocked, restOf, countUnits, scaleWaves, defaultPick, validPick, applyPick, checkMods, normalizeMods, applyMods, trialById, trialGate, isTrialUnlocked, enemiesSeenBy, trialLevel, dailyTrial, validateTrials, sameMods, rowLit, starSlots, validateLevels, onHillCell, dev, effOf };
   if (typeof module !== 'undefined') module.exports = Engine; else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
