@@ -1,3 +1,5 @@
 .DS_Store
 # 角色原圖 PNG（1024px、共 150MB+）不進 git；備份在 ~/glc-work/sheepfold-char-src/
 img/char/
+# 玩家數據紀錄（本機用，見 .claude/skills/sheepfold-data）
+docs/data-insights.md
