@@ -625,7 +625,7 @@
 <script src="save.js?v=6"></script>
 <script src="sound.js?v=9"></script>
 <script src="lib/pixi.min.js"></script>
-<script src="render.js?v=26"></script>
+<script src="render.js?v=27"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS、TRIALS、TRIAL_KINDS 由 data.js 直接提供
@@ -697,6 +697,9 @@ const HOME_UPDATE = '最近更新 11/2：點單位先預覽再升級、暫停面
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.11.04', notes: [ // 11/4 James iPad Safari 回報
+    'iPad 上點棋盤「點兩下」升級時，畫面不會再被 Safari 當成雙擊放大、也不會卡在放大狀態縮不回來',
+  ] },
   { ver: '2026.11.02.3', notes: [ // 11/2 多角色評估剩下的三個小項
     '開場頁的大標題改成跟選夜列一樣的夜名（例如「雅各的夜」），原本的標題（例如「羊圈守夜」）變成下面一行副標，不會再以為走錯夜',
     '第 30 夜開場的引文縮成一句，不用滑兩下才看得到提示',
