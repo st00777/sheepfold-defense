@@ -15,7 +15,9 @@ function loadLib() { global.window = global.window || {}; return new Function(li
 
 test('lib/pixelfx.js 打包：六個效果都在（日芒 11/5 James 看過拿掉）、煙圈與螢火蟲真的畫得出像素', () => {
   const P = loadLib();
-  for (const k of ['createFrame', 'clearFrame', 'createFx', 'composite', 'poof', 'collect', 'hitSpark', 'critHit', 'splash', 'fireflies', 'fireball', 'groundSlam']) assert.ok(P[k], k);
+  for (const k of ['createFrame', 'clearFrame', 'createFx', 'composite', 'poof', 'collect', 'hitSpark', 'splash', 'fireflies', 'fireball', 'groundSlam', 'fireRing', 'quake', 'thunderclap', 'dirtExplosion', 'poisonCloud', 'heart', 'clawSwipe']) assert.ok(P[k], k);
+  // 每個打包進來的效果都要能在 node 畫出東西（不依賴瀏覽器），更新 0.4 秒後有像素
+  for (const k of ['poof', 'collect', 'hitSpark', 'splash', 'fireball', 'groundSlam', 'fireRing', 'quake', 'thunderclap', 'dirtExplosion', 'poisonCloud', 'heart', 'clawSwipe']) { const fr = P.createFrame(320, 240), fx = P.createFx(P[k], { x: 160, y: 200 }); fx.update(.15); fx.draw(fr, "back"); fx.draw(fr, "front"); const o = new Uint8ClampedArray(320 * 240 * 4); P.composite(fr, o, null); let n = 0; for (let i = 3; i < o.length; i += 4) if (o[i]) n++; assert.ok(n > 30, k + ' 畫出 ' + n + ' 個像素'); }
   // 火球跟著投射物飛：改 options.x/y 要真的移動畫出來的位置（createFx 回的 options 跟 draw 用的是同一個物件）
   { const fr = P.createFrame(320, 100), fx = P.createFx(P.fireball, { x: 60, y: 50 }); fx.update(.2); fx.draw(fr, 'back'); fx.draw(fr, 'front'); const a = new Uint8ClampedArray(320 * 100 * 4); P.composite(fr, a, null); fx.options.x = 260; P.clearFrame(fr); fx.draw(fr, 'back'); fx.draw(fr, 'front'); const b = new Uint8ClampedArray(320 * 100 * 4); P.composite(fr, b, null); const left = (o) => { let n = 0; for (let y = 0; y < 100; y++) for (let x = 0; x < 160; x++) if (o[(y * 320 + x) * 4 + 3]) n++; return n; }; assert.ok(left(a) > 200 && left(b) < 50, '火球搬到右邊後左半邊不該還有像素：' + left(a) + '→' + left(b)); }
   assert.ok(!P.sunburst, '日芒不該再打包進來');
@@ -31,7 +33,7 @@ test('lib/pixelfx.js 打包：六個效果都在（日芒 11/5 James 看過拿�
 
 test('render.js：pixelfx 層在減少動態、省效能、加速時不出；清場與開省效能會把進行中的效果清掉', () => {
   assert.match(src, /function pxOk\(\) \{ return !!\(window\.PixelFX && app && !reduce\(\) && !lite\); \}/);
-  assert.match(src, /function pxPlay\([^)]*\) \{[^\n]*\n\s*if \(!pxOk\(\) \|\| !PX\.frame \|\| speed > 1\) return null;/);
+  assert.match(src, /function pxPlay\([^)]*\) \{[^\n]*\n\s*if \(!pxOk\(\) \|\| !PX\.layers\.length \|\| speed > 1\) return null;/);
   assert.match(src, /pxStopAll\(\);\n\s*setMarker\(null\)/, 'clear() 要清 pixelfx');
   assert.match(src, /setLite\(on\) \{ lite = !!on; if \(lite\) pxStopAll\(\);/);
   assert.match(src, /'fx', 'px', 'light'/, 'px 圖層在效果層之上、光照之下');
