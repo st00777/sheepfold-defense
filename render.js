@@ -692,7 +692,7 @@ const Board = (() => {
   function dawn() {
     if (!app) return;
     dawned = true; state.dawn = 1; state.dusk = 0; L.skySpr.alpha = 0;
-    pxStopFlies(); pxPlay('sunburst', W * .88, H * .14, { seed: 3 }, 2.6); // pixelfx 試用：螢火蟲收掉、右上角一輪金色日芒轉 2.6 秒淡出
+    pxStopFlies(); // 天亮螢火蟲收掉（11/5 James 看過：右上角的日芒不合，拿掉；其他六個留）
     if (reduce()) return;
     for (const [, v] of UN) { const u = v.u; tweens.push({ t: -(.12 + u.c * .055), dur: .36, fn: k => { v.inner.y = -ch * .08 * Math.sin(k * Math.PI); }, done: () => { v.inner.y = 0; } }); }
   }

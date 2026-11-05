@@ -13,9 +13,11 @@ const lib = fs.readFileSync(path.join(root, 'lib', 'pixelfx.js'), 'utf8');
 
 function loadLib() { global.window = global.window || {}; return new Function(lib + ';return PixelFX')(); }
 
-test('lib/pixelfx.js 打包：七個效果都在、煙圈與螢火蟲真的畫得出像素', () => {
+test('lib/pixelfx.js 打包：六個效果都在（日芒 11/5 James 看過拿掉）、煙圈與螢火蟲真的畫得出像素', () => {
   const P = loadLib();
-  for (const k of ['createFrame', 'clearFrame', 'createFx', 'composite', 'poof', 'collect', 'sunburst', 'hitSpark', 'critHit', 'splash', 'fireflies']) assert.ok(P[k], k);
+  for (const k of ['createFrame', 'clearFrame', 'createFx', 'composite', 'poof', 'collect', 'hitSpark', 'critHit', 'splash', 'fireflies']) assert.ok(P[k], k);
+  assert.ok(!P.sunburst, '日芒不該再打包進來');
+  assert.ok(!/pxPlay\('sunburst'/.test(src), 'render.js 不該再放日芒');
   const count = (mod, o, t) => { const fr = P.createFrame(320, 200), fx = P.createFx(mod, o); fx.update(t); P.clearFrame(fr); fx.draw(fr, 'back'); fx.draw(fr, 'front'); const out = new Uint8ClampedArray(320 * 200 * 4); P.composite(fr, out, null); let n = 0; for (let i = 3; i < out.length; i += 4) if (out[i]) n++; return n; };
   assert.ok(count(P.poof, { x: 160, y: 150 }, .3) > 500, '煙圈');
   assert.ok(count(P.fireflies, { x: 160, y: 220 }, 1.3) > 500, '螢火蟲');
