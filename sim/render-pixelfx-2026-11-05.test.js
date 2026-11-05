@@ -40,6 +40,20 @@ test('render.js：pixelfx 層在減少動態、省效能、加速時不出；清
 });
 
 test('index.html：lib/pixelfx.js 在 render.js 之前載入，render.js 版本號有加', () => {
-  const a = html.indexOf('lib/pixelfx.js?v='), b = html.indexOf('render.js?v=28');
+  const a = html.indexOf('lib/pixelfx.js?v='), m = html.match(/render\.js\?v=(\d+)/), b = m ? m.index : -1;
   assert.ok(a > 0 && b > a, '載入順序');
+  assert.ok(m && +m[1] >= 29, 'render.js 版本號至少 29（11/5 晚上狗爪痕修正）');
+});
+
+// 11/5 晚上 James 真機：牧羊犬爪痕畫在狗的位置還翻了面、只出第一下。引擎 bark 事件只在剛咬住送一次，
+// 所以畫面端要自己盯著咬住中的狗、每隔一下畫在敵人身上；這裡讀原始碼守住
+test('render.js：狗爪痕由 dogClaw 週期畫在敵人身上，bark 事件不再直接放爪痕', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'render.js'), 'utf8');
+  const bark = src.match(/case 'bark':[^\n]*/)[0];
+  assert.ok(!bark.includes('pxPlay'), 'bark 不直接放爪痕');
+  const fn = src.slice(src.indexOf('function dogClaw'), src.indexOf('function drawMovers'));
+  assert.ok(fn.includes("pxPlay('clawSwipe'") && fn.includes('ev.cont.x') && fn.includes('EN.get(e.id)'), '爪痕放在敵人畫面位置');
+  assert.ok(fn.includes('e.heldBy === u.id'), '只有主咬手畫');
+  assert.ok(/v\.clawT = \.75/.test(fn) && fn.includes('v.clawT = (v.clawT || 0) - dt'), '每 0.75 秒重畫一次');
+  assert.ok(/dogClaw\(u, dt\)/.test(src.slice(src.indexOf('function drawMovers'))), 'drawMovers 每幀呼叫');
 });

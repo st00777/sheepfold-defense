@@ -534,6 +534,20 @@ const Board = (() => {
     let halo = null; if (kind === 'stray') { halo = new PIXI.Graphics().circle(0, 0, ch * .36).stroke({ width: 2, color: GOLD, alpha: .85 }); halo.visible = false; body.addChildAt(halo, 0); } // 迷羊還在最右邊安全區（狼叼不到）時套一圈金邊，走進第 6 格金邊消失＝開始有危險
     const v = { cont, body, spr, bright, brightT: 0, hp, hpLast: -1, phase: Math.random() * 6, kind, swing: 0, zz: null, halo }; MV.set(id, v); return v; // brightT：減少動態時巡夜人出手改用「亮一下」的剩餘秒數（跟 bright 精靈分開存，2026-10-23 混用過一次整局停掉）
   }
+  // 狗咬住敵人：引擎只在剛咬住那一刻送一次 bark 事件，之後每幀扣血沒事件，所以畫面這邊自己盯著「咬住中」的狗，
+  // 每 0.75 秒在敵人身上畫一道爪痕（11/5 James：原本畫在狗的位置又翻了面、而且只出第一下）。同一隻敵人上好幾隻狗時只有主咬手（heldBy）畫，不疊成一團
+  // 爪痕效果 128×96、原點在左下 [36,84]，node 真畫過：三道抓痕落在原點右上方約 x 0–70、y −49–+18（效果像素），所以原點往左下挪讓抓痕中心落在敵人身體偏左上（狗從左邊咬）；本機 Chrome 暫停截圖對過
+  function dogClaw(u, dt) {
+    const v = MV.get(u.id); if (!v) return;
+    const e = u.gripping && u.holding ? G.enemies.find(o => o.id === u.holding) : null;
+    const ev = e && !e.dead && e.heldBy === u.id ? EN.get(e.id) : null;
+    if (!ev) { v.clawT = 0; return; }
+    if (paused) return;
+    v.clawT = (v.clawT || 0) - dt;
+    if (v.clawT > 0) return;
+    v.clawT = .75;
+    pxPlay('clawSwipe', ev.cont.x - 40 * PX.ps, ev.cont.y + 16 * PX.ps, { seed: 1 + (u.id % 40) });
+  }
   function drawMovers(dt) {
     const alive = new Set(); const anim = !paused && !still && speed <= 1 && !reduce();
     const put = (id, emoji, kind, x, y, hpv, max, resting) => {
@@ -548,7 +562,7 @@ const Board = (() => {
       if (resting && !v.zz) { v.zz = makeText('💤', Math.max(10, ch * .18), TEXT, false); v.zz.style.stroke = null; v.zz.x = cw * .2; v.zz.y = -ch * .3; v.cont.addChild(v.zz); } if (!resting && v.zz) { v.zz.destroy(); v.zz = null; }
       if (max && v.hpLast !== hpv) { v.hpLast = hpv; hpBar(v.hp, cw * .8, ch * .38, clamp(hpv / max, 0, 1), OK); }
     };
-    for (const k in G.units) { const u = G.units[k]; if (u.type === 'dog') put(u.id, '🐕', 'dog', u.x + .5, u.r + .5, u.hp, u.maxHp, !!u.resting); else if (u.type === 'patrol') put(u.id, UNITS.patrol.ico, 'patrol', u.c + .5, u.rv + .5, u.hp, u.maxHp, false); }
+    for (const k in G.units) { const u = G.units[k]; if (u.type === 'dog') { put(u.id, '🐕', 'dog', u.x + .5, u.r + .5, u.hp, u.maxHp, !!u.resting); dogClaw(u, dt); } else if (u.type === 'patrol') put(u.id, UNITS.patrol.ico, 'patrol', u.c + .5, u.rv + .5, u.hp, u.maxHp, false); }
     for (const s of G.strays) if (!s.dead) { put(s.id, STRAY.ico, 'stray', s.x + .5, s.r + .5, 0, 0, false); const v = MV.get(s.id); if (v && v.halo) v.halo.visible = s.x > COLS - STRAY.safe; }
     for (const [id, v] of MV) if (!alive.has(id)) { v.cont.destroy({ children: true }); MV.delete(id); }
   }
@@ -606,7 +620,7 @@ const Board = (() => {
       case 'home': pxPlay('heart', px, py - ch * .5, {}, 1.4); popText(r, x, FX_TEXT.home, true); break; // 迷羊自己走回圈：同一顆心＋原本的 💛
       case 'dodge': flashDodge(r, x); break;
       case 'crouch': popText(r, x, FX_TEXT.crouch, true); break; // 豹蹲伏：本體縮小變灰之外，頭上飄 👁（跟 DOM 版一樣，蹲著的要讓人注意到）
-      case 'bark': pxPlay('clawSwipe', px, py, { flip: true }); break; // 狗撲咬住：pixelfx 試用三道爪痕（翻面朝左，狗從左邊撲）；本體動作已看得到，不飄字
+      case 'bark': break; // 狗剛咬住：爪痕改由 dogClaw 每 0.75 秒畫在敵人身上（這事件只來一次，咬著的期間沒事件）；本體動作已看得到，不飄字
       case 'hop': break; // 換排：本體動作已看得到，不飄字
       // ====== 第三章 ======
       case 'overfly': { if (speed > 1) break; popText(r, x, FX_TEXT.overfly, true); if (!reduce()) for (let i = 0; i < 3; i++) spark(px + i * 4, py - ch * .28, 0xf3ead8, .7, .012 * ch, -ch * .2, .3, 1.2); break; } // 石子從頭頂飛過：一團淡白的「咻」（加速時省略：五排同時射會冒一堆字）

@@ -626,7 +626,7 @@
 <script src="sound.js?v=9"></script>
 <script src="lib/pixi.min.js"></script>
 <script src="lib/pixelfx.js?v=4"></script>
-<script src="render.js?v=28"></script>
+<script src="render.js?v=29"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS、TRIALS、TRIAL_KINDS 由 data.js 直接提供
@@ -698,6 +698,9 @@ const HOME_UPDATE = '最近更新 11/5：棋盤多了像素風小動畫（螢火
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.11.05.1', notes: [ // 11/5 晚上 James 真機：牧羊犬爪痕位置怪、只出第一下
+    '牧羊犬咬住敵人時，爪痕改畫在敵人身上，而且咬著的期間每隔一下就抓一次，不再只出第一下',
+  ] },
   { ver: '2026.11.05', notes: [ // 11/5 試用 pixelfx 像素特效（分支試看，不合適整條退）
     '棋盤多了一批像素風小動畫：寧靜夜的螢火蟲、敵人倒下的煙圈、升級成功的閃光、巡夜人出手的火花、過了火盆的石子與箭變成火球、投石機與拋石手的落點震地、水袋水花、瓦瓶火把燒出一圈火、坑塌噴土、中毒的敵人腳下一片毒霧、領頭狼嚎叫與獅吼與吹角的衝擊波、牧羊犬撲咬的爪痕、迷羊回圈頭上一顆心；省效能模式、減少動態與 2× 加速時不會出現',
   ] },
