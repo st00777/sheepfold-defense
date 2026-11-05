@@ -1,0 +1,39 @@
+// 11/5 試用 pixelfx 像素特效（分支 feat/pixelfx-trial）。render.js 是 Pixi 畫面層跑不進 sim，
+// 這裡做兩件事：lib/pixelfx.js 打包真的能在 node 畫出像素；render.js 的開關與載入順序守住。
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs');
+const path = require('path');
+
+const root = path.join(__dirname, '..');
+const src = fs.readFileSync(path.join(root, 'render.js'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const lib = fs.readFileSync(path.join(root, 'lib', 'pixelfx.js'), 'utf8');
+
+function loadLib() { global.window = global.window || {}; return new Function(lib + ';return PixelFX')(); }
+
+test('lib/pixelfx.js 打包：七個效果都在、煙圈與螢火蟲真的畫得出像素', () => {
+  const P = loadLib();
+  for (const k of ['createFrame', 'clearFrame', 'createFx', 'composite', 'poof', 'collect', 'sunburst', 'hitSpark', 'critHit', 'splash', 'fireflies']) assert.ok(P[k], k);
+  const count = (mod, o, t) => { const fr = P.createFrame(320, 200), fx = P.createFx(mod, o); fx.update(t); P.clearFrame(fr); fx.draw(fr, 'back'); fx.draw(fr, 'front'); const out = new Uint8ClampedArray(320 * 200 * 4); P.composite(fr, out, null); let n = 0; for (let i = 3; i < out.length; i += 4) if (out[i]) n++; return n; };
+  assert.ok(count(P.poof, { x: 160, y: 150 }, .3) > 500, '煙圈');
+  assert.ok(count(P.fireflies, { x: 160, y: 220 }, 1.3) > 500, '螢火蟲');
+  // 去草地版：原點放在畫面下緣外，畫面最底 3 排不該有整排的草
+  const fr = P.createFrame(320, 200), fx = P.createFx(P.fireflies, { x: 160, y: 220 }); fx.update(2); fx.draw(fr, 'back'); fx.draw(fr, 'front');
+  const out = new Uint8ClampedArray(320 * 200 * 4); P.composite(fr, out, null); let bottom = 0; for (let y = 197; y < 200; y++) for (let x = 0; x < 320; x++) if (out[(y * 320 + x) * 4 + 3]) bottom++;
+  assert.ok(bottom < 60, '底排幾乎沒有草：' + bottom);
+});
+
+test('render.js：pixelfx 層在減少動態、省效能、加速時不出；清場與開省效能會把進行中的效果清掉', () => {
+  assert.match(src, /function pxOk\(\) \{ return !!\(window\.PixelFX && app && !reduce\(\) && !lite\); \}/);
+  assert.match(src, /function pxPlay\([^)]*\) \{[^\n]*\n\s*if \(!pxOk\(\) \|\| !PX\.frame \|\| speed > 1\) return null;/);
+  assert.match(src, /pxStopAll\(\);\n\s*setMarker\(null\)/, 'clear() 要清 pixelfx');
+  assert.match(src, /setLite\(on\) \{ lite = !!on; if \(lite\) pxStopAll\(\);/);
+  assert.match(src, /'fx', 'px', 'light'/, 'px 圖層在效果層之上、光照之下');
+});
+
+test('index.html：lib/pixelfx.js 在 render.js 之前載入，render.js 版本號有加', () => {
+  const a = html.indexOf('lib/pixelfx.js?v='), b = html.indexOf('render.js?v=28');
+  assert.ok(a > 0 && b > a, '載入順序');
+});

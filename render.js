@@ -47,6 +47,39 @@ const Board = (() => {
   const particles = [], tweens = [];
   const state = { hints: new Map(), range: new Set(), cursor: null, teach: null, litRows: [false, false, false, false, false], dark: false, cellsDirty: true, dusk: 0, dawn: 0, lose: 0, flash: 0, bolt: null, dust: 0 };
   let marker = null, strayMark = null, rainAcc = 0, shake = 0;
+  // ====== pixelfx 試用層（2026-11-05，分支試看）：像素風特效先畫進一張小畫布（1 像素＝ps 個畫面像素），再當 Pixi 貼圖用最近鄰放大貼在效果層上。lib/pixelfx.js 沒載到、減少動態、省效能、加速：全部不出 ======
+  const PX = { ps: 1, w: 0, h: 0, frame: null, img: null, cv: null, ctx: null, tex: null, spr: null, list: [], flies: [], wantFlies: false };
+  function pxOk() { return !!(window.PixelFX && app && !reduce() && !lite); }
+  function pxLayout() { // 尺寸變了：整張小畫布重做，進行中的效果座標都不對了直接丟掉（螢火蟲會自己再長回來）
+    if (!window.PixelFX || !L.px) return;
+    PX.ps = Math.max(1, Math.round(ch / 50)); PX.w = Math.ceil(W / PX.ps); PX.h = Math.ceil(H / PX.ps); // 一格約 50 個像素高：假人 38 像素高的效果大約占八成格
+    if (PX.spr) { PX.spr.destroy(); PX.tex.destroy(true); PX.spr = null; }
+    PX.cv = document.createElement('canvas'); PX.cv.width = PX.w; PX.cv.height = PX.h; PX.ctx = PX.cv.getContext('2d');
+    PX.frame = PixelFX.createFrame(PX.w, PX.h); PX.img = PX.ctx.createImageData(PX.w, PX.h);
+    PX.tex = PIXI.Texture.from(PX.cv); PX.tex.source.scaleMode = 'nearest';
+    PX.spr = new PIXI.Sprite(PX.tex); PX.spr.scale.set(PX.ps); PX.spr.visible = false; L.px.addChild(PX.spr);
+    PX.list.length = 0; PX.flies.length = 0;
+  }
+  function pxPlay(name, x, y, o, ttl) { // name：lib/pixelfx.js 打包進來的效果名；x,y 畫面座標（效果的原點，多半是腳下）；ttl：循環效果幾秒後自己淡掉
+    if (!pxOk() || !PX.frame || speed > 1) return null;
+    const mod = window.PixelFX[name]; if (!mod) return null;
+    const fx = PixelFX.createFx(mod, Object.assign({ x: x / PX.ps, y: y / PX.ps }, o || {})); const h = { fx, ttl }; PX.list.push(h); return h;
+  }
+  function pxFireflies() { const n = Math.ceil(PX.w / 300); for (let i = 0; i < n; i++) { const h = pxPlay('fireflies', ((i + .5) / n) * W, H + 20 * PX.ps, { seed: 2 + i }); if (h) PX.flies.push(h); } } // 效果本身 320 寬，寬棋盤多放幾組；原點放到棋盤下緣外 20 像素，草地剛好在畫面外、螢火蟲飄在下半張
+  function pxUpdate(dt) {
+    if (!PX.spr) return;
+    if (PX.wantFlies && !PX.flies.length && !dawned) pxFireflies();
+    if (!PX.list.length) { PX.spr.visible = false; return; }
+    for (const h of PX.list) { h.fx.update(dt); if (h.ttl !== undefined && (h.ttl -= dt) <= 0) h.fx.stop(); }
+    for (let i = PX.list.length - 1; i >= 0; i--) if (PX.list[i].fx.done()) PX.list.splice(i, 1);
+    PixelFX.clearFrame(PX.frame);
+    for (const h of PX.list) h.fx.draw(PX.frame, 'back');
+    for (const h of PX.list) h.fx.draw(PX.frame, 'front');
+    PixelFX.composite(PX.frame, PX.img.data, null);
+    PX.ctx.putImageData(PX.img, 0, 0); PX.tex.source.update(); PX.spr.visible = true;
+  }
+  function pxStopFlies() { for (const h of PX.flies) h.fx.stop(); PX.flies.length = 0; PX.wantFlies = false; }
+  function pxStopAll() { PX.list.length = 0; PX.flies.length = 0; PX.wantFlies = false; if (PX.spr) PX.spr.visible = false; }
 
   // ====== 啟動：載圖、建圖層 ======
   async function init(opts) {
@@ -92,7 +125,7 @@ const Board = (() => {
   }
   function buildLayers() {
     // 由下往上：草地 → 格子底色與提示 → 圍欄 → 腳印與土堆 → 單位 → 火光（相加）→ 會動的（敵人、狗、投射物）→ 效果 → 黑暗 → 天氣 → 天色 → 飄字 → 暗角
-    for (const n of ['ground', 'cells', 'marks', 'units', 'glow', 'movers', 'shots', 'fx', 'light', 'hints', 'dark', 'weather', 'sky', 'text', 'top']) { L[n] = new PIXI.Container(); app.stage.addChild(L[n]); }
+    for (const n of ['ground', 'cells', 'marks', 'units', 'glow', 'movers', 'shots', 'fx', 'px', 'light', 'hints', 'dark', 'weather', 'sky', 'text', 'top']) { L[n] = new PIXI.Container(); app.stage.addChild(L[n]); } // px：pixelfx 試用層，跟效果層同高、黑暗之下
     // 光照圖：整張棋盤罩一層往右漸藍的夜色，火盆與油燈周圍用 erase 挖掉（跟無月夜的黑暗層同一招），火邊回到場景圖的暖色、遠處冷藍（封面的光線）。先畫進一張貼圖再蓋上去，洞與洞之間才不會互相疊；提示與飄字在它上面不受影響
     L.lightRT = null; L.lightSpr = new PIXI.Sprite(); L.light.addChild(L.lightSpr);
     L.lightScene = new PIXI.Container(); L.lightBase = new PIXI.Sprite(gradTex.night); L.lightScene.addChild(L.lightBase); L.lightPools = new PIXI.Container(); L.lightScene.addChild(L.lightPools);
@@ -116,6 +149,7 @@ const Board = (() => {
     const w = app.screen.width, h = app.screen.height;
     if (!w || !h || (w === W && h === H)) return;
     W = w; H = h; cw = W / COLS; ch = H / (ROWS + (hillNow !== null ? HILL_DROP : 0)); layoutN++; // 有坡的夜多 HILL_DROP 排高（index.html 把棋盤拉高，這裡照同一個數切格子）
+    pxLayout();
     L.vig.width = W; L.vig.height = H;
     L.skySpr.width = W; L.skySpr.height = H;
     // 左邊 9px 木圍欄（單位底下）
@@ -164,7 +198,7 @@ const Board = (() => {
     if (!G) { app.render(); return info; }
     try {
       drawCells(); drawUnits(dt); info.biting = drawEnemies(dt); drawMovers(dt); info.shots = drawShots(dt); drawMarks();
-      if (!paused) { updateParticles(dt); updateTweens(dt); drawSky(dt); drawWeather(dt); }
+      if (!paused) { updateParticles(dt); updateTweens(dt); pxUpdate(dt); drawSky(dt); drawWeather(dt); }
       drawDark(dt); drawLight(dt);
     } catch (err) { report(err); }
     app.render();
@@ -254,6 +288,7 @@ const Board = (() => {
   function renderUnit(r, c) {
     const k = key(r, c), u = G && G.units[k];
     const old = UN.get(k);
+    if (old && u && old.u === u && ((u.elder && !old.elderWas) || (u.upgraded && !old.upWas))) pxPlay('collect', old.cont.x, old.cont.y + ch * .3); // pixelfx 試用：升級（老牧人或升級卡）引擎會送 unit 事件來重建這格，在重建前放一個拾取閃光
     if (old) { old.cont.destroy({ children: true }); if (old.glow) old.glow.destroy(); if (old.pool) old.pool.destroy(); if (old.up) old.up.destroy({ children: true }); removeHole(k); UN.delete(k); }
     if (!u) return;
     const def = UNITS[u.type];
@@ -463,6 +498,7 @@ const Board = (() => {
     const v = EN.get(e.id); if (!v) return;
     EN.delete(e.id); v.dying = true; const c = v.cont, rd = reduce();
     tween(.22, k => { c.alpha = 1 - k; if (!rd) c.scale.set(1 - .15 * EASE(k)); }, () => c.destroy({ children: true }));
+    if (!e.underground && !v.fly && pxPlay('poof', c.x, c.y + ch * .3, { seed: Math.floor(Math.random() * 97) })) return; // pixelfx 試用：地面敵人倒下放卡通煙圈，放得出來就不再撒原本的塵
     if (rd || speed > 1 || e.underground || v.fly || state.dust >= 4) return;
     state.dust++; setTimeout(() => { state.dust = Math.max(0, state.dust - 1); }, 300); // clear() 可能已把它歸零，別減成負的
     for (let i = 0; i < 7; i++) spawnParticle(c.x + (Math.random() - .5) * cw * .3, c.y + ch * .2, (Math.random() - .5) * cw * .6, -ch * .5 * Math.random(), .26 + Math.random() * .1, 0xe8dcc4, (.04 + Math.random() * .03) * ch, ch * .8, .6, true);
@@ -542,7 +578,7 @@ const Board = (() => {
     const px = (x + .5) * cw, py = yAt(r + .5, x + .5);
     if (reduce() && ['blast', 'splash', 'slam', 'ignite', 'trample', 'emerge'].includes(kind)) popText(r, x, FX_TEXT[kind]); // 減少動態：粒子不出，改飄一個字讓人知道發生了什麼
     switch (kind) {
-      case 'blast': ring(px, py, cw * 1.6, 0xffb060, .45); burst(px, py, 18, [0xff8a30, 0xffd060, 0x777777], ch * .9, .5); break;
+      case 'blast': pxPlay('critHit', px, py + ch * .2); ring(px, py, cw * 1.6, 0xffb060, .45); burst(px, py, 18, [0xff8a30, 0xffd060, 0x777777], ch * .9, .5); break;
       case 'splash': { const R = ev && ev.splash ? ev.splash * cw : cw * .9, k = R / (cw * .9); ring(px, py, R, 0xffe0a0, .3); burst(px, py, Math.max(3, Math.round(8 * k)), [0xc9bda0, 0xffd060], ch * .5 * k, .35); break; } // 圓環＝引擎真正的濺射半徑：拋石手 .45 格畫小圈、投石機 1.2 畫大圈，不再同一個尺寸
       case 'slam': ring(px, py, cw * .9, 0xffe0a0, .3); burst(px, py, 8, [0xc9bda0, 0xffd060], ch * .5, .35); break;
       case 'ignite': burst(px, py, 10, [0xff8a30, 0xffd060], ch * .6, .5); break;
@@ -551,7 +587,7 @@ const Board = (() => {
       case 'horn': { if (speed <= 1) squashUnit(r, x); popText(r, x, FX_TEXT.horn); if (reduce()) break; const g = new PIXI.Graphics(); L.fx.addChild(g); tween(.45, k => { const e = EASE(k); g.clear().ellipse(px + e * W * .9, yAt(r + .5, (px + e * W * .9) / cw), cw * .25, ch * .45).stroke({ width: 3, color: 0xffe28a, alpha: 1 - k }); }, () => g.destroy()); hornShove(ev && ev.moved); break; } // 吹的人回彈＋衝擊波＋被推的滑移
       case 'trample': case 'emerge': case 'flee': { burst(px, py + ch * .2, 6, [0xc9bda0], ch * .4, .3); if (kind === 'flee') popText(r, x, FX_TEXT.flee); const v = kind !== 'emerge' ? UN.get(key(r, Math.round(x))) : null; if (v) v.leaving = kind; break; } // 嚇跑／踩爛：先記在那格單位上，緊接著的 gone 事件照這個播離場動畫
       case 'gate': gateSweep(r); break;
-      case 'strike': { burst(px, py, 6, [0xffe28a, 0xffffff], ch * .4, .25); const t = makeText('✦', Math.max(16, ch * .5), GOLD, true); t.x = px; t.y = py; L.text.addChild(t); tween(.45, k => { t.scale.set(1 + k * .4); t.alpha = 1 - k; }, () => t.destroy()); swingPatrol(id); break; }
+      case 'strike': { pxPlay('hitSpark', px, py + ch * .1, { flip: Math.random() < .5 }); burst(px, py, 6, [0xffe28a, 0xffffff], ch * .4, .25); const t = makeText('✦', Math.max(16, ch * .5), GOLD, true); t.x = px; t.y = py; L.text.addChild(t); tween(.45, k => { t.scale.set(1 + k * .4); t.alpha = 1 - k; }, () => t.destroy()); swingPatrol(id); break; }
       case 'mound': { const g = new PIXI.Graphics(); g.mr = r; g.mx = x; drawMound(g); L.marks.addChild(g); mounds.set(id, g); break; } // 鑽地的會從這裡冒出來：常駐、在 drawMarks 裡閃，emerge 時移除
       case 'catch': catchFx(r, x); break;
       case 'dodge': flashDodge(r, x); break;
@@ -560,7 +596,7 @@ const Board = (() => {
       // ====== 第三章 ======
       case 'overfly': { if (speed > 1) break; popText(r, x, FX_TEXT.overfly, true); if (!reduce()) for (let i = 0; i < 3; i++) spark(px + i * 4, py - ch * .28, 0xf3ead8, .7, .012 * ch, -ch * .2, .3, 1.2); break; } // 石子從頭頂飛過：一團淡白的「咻」（加速時省略：五排同時射會冒一堆字）
       case 'pit': { ring(px, py + ch * .1, cw * .45, 0x3a3028, .4); burst(px, py + ch * .1, 8, [0x6a4a2a, 0x3a3028], ch * .45, .4); popText(r, x, `${FX_TEXT.pit}${ev && ev.sec ? ' ' + ev.sec + 's' : ''}`, true); break; } // 坑塌：土色一圈＋幾秒的字
-      case 'water': { ring(px, py, cw * 1.4, 0x7ab8e0, .45); burst(px, py, 14, [0x7ab8e0, 0xcfe8ff, 0xffffff], ch * .7, .45); popText(r, x, FX_TEXT.water, true); break; } // 水袋：藍色水花
+      case 'water': { pxPlay('splash', px, py + ch * .2); ring(px, py, cw * 1.4, 0x7ab8e0, .45); burst(px, py, 14, [0x7ab8e0, 0xcfe8ff, 0xffffff], ch * .7, .45); popText(r, x, FX_TEXT.water, true); break; } // 水袋：藍色水花
       case 'throw': { const tx = ((ev && ev.tc !== undefined ? ev.tc : x - 1) + .5) * cw, ty = yAt(r + .5, tx / cw); if (reduce() || speed > 1) { if (reduce()) popText(r, x, FX_TEXT.throw, true); else burst(tx, ty, 4, [0xc9bda0], ch * .3, .25); break; } const g = new PIXI.Graphics().circle(0, 0, 4).fill(0xe9e4d0).stroke({ width: 1, color: 0x000000, alpha: .35 }); L.fx.addChild(g); tween(.32, k => { g.x = px + (tx - px) * k; g.y = py + (ty - py) * k - Math.sin(k * Math.PI) * ch * .5; }, () => { g.destroy(); burst(tx, ty, 4, [0xc9bda0], ch * .3, .25); }); break; } // 強盜丟石：一顆小石子從牠手上拋到靶那格；加速只留落點的灰塵
       case 'roll': { // 滾石：一大一小兩顆石頭（石堆那張圖）從石堆那格翻滾下坡——越滾越快、彈兩下、一路帶塵、滾到每個被撞的敵人那格噴一下碎石、滾出坡底淡掉；坡下被撞的敵人跟吹角一樣滑開。加速只一顆、減少動態只飄字
         hornShove(ev && ev.moved); if (reduce()) { popText(r, x, FX_TEXT.roll, true); break; }
@@ -656,10 +692,11 @@ const Board = (() => {
   function dawn() {
     if (!app) return;
     dawned = true; state.dawn = 1; state.dusk = 0; L.skySpr.alpha = 0;
+    pxStopFlies(); pxPlay('sunburst', W * .88, H * .14, { seed: 3 }, 2.6); // pixelfx 試用：螢火蟲收掉、右上角一輪金色日芒轉 2.6 秒淡出
     if (reduce()) return;
     for (const [, v] of UN) { const u = v.u; tweens.push({ t: -(.12 + u.c * .055), dur: .36, fn: k => { v.inner.y = -ch * .08 * Math.sin(k * Math.PI); }, done: () => { v.inner.y = 0; } }); }
   }
-  function lose() { if (!app) return; state.lose = 1; state.dusk = 0; L.skySpr.alpha = 0; }
+  function lose() { if (!app) return; state.lose = 1; state.dusk = 0; L.skySpr.alpha = 0; pxStopFlies(); }
 
   // ====== 粒子與補間（簡單的池）======
   function spawnParticle(x, y, vx, vy, life, color, size, grav, alpha, plain, t) {
@@ -690,6 +727,7 @@ const Board = (() => {
     G = g; diff = opts.diff; speed = opts.speed || 1; dawned = false; if (L.lightSpr) L.lightSpr.alpha = 1; still = false; paused = false; time = 0; errCount = 0;
     if (!app) return; // 棋盤開不起來：index.html 會擋住開始，這裡再守一道
     clear(false);
+    PX.wantFlies = diff === 'calm'; // pixelfx 試用：寧靜夜放螢火蟲（小畫布建好後第一幀才真的生出來）
     state.cellsDirty = state.rocksDirty = true; state.dark = false; state.darkA = 0; L.fogs.forEach(f => { f.alpha = 1; }); state.litRows.fill(false); L.litG.clear();
     for (const k in G.units) renderUnit(G.units[k].r, G.units[k].c);
     dusk(!opts.resumed);
@@ -706,6 +744,7 @@ const Board = (() => {
     for (const w of tweens) if (w.done) try { w.done(); } catch (e) {} tweens.length = 0;
     for (const n of ['fx', 'hints', 'text']) L[n].removeChildren().forEach(c => c.destroy({ children: true }));
     if (state.bolt) { state.bolt.destroy(); state.bolt = null; } L.flashRect.clear(); state.flash = 0;
+    pxStopAll();
     setMarker(null); setStrayMark(null); setHints(null); setRange(null); setTeach(null);
     state.dust = 0;
     if (all) { still = true; G = null; app.render(); }
@@ -733,7 +772,7 @@ const Board = (() => {
     setContrast(on) { contrast = !!on; state.cellsDirty = true; for (const M of [UN, EN, MV]) for (const v of M.values()) if (v && v.hp) v.hpLast = -1; }, get contrast() { return contrast; }, // 血條下一幀全部重畫
     setSpeed(n) { speed = n; }, setPaused(p) { paused = p; }, setStill(s) { still = s; },
     // 省效能模式：開關時把畫布解析度切到 1／回到裝置值，離屏圖跟著 layout 重建；software：WebGL 是軟體模擬（沒開硬體加速）的電腦一開始就該用省效能
-    setLite(on) { lite = !!on; if (!app) return; try { const res = lite ? 1 : Math.min(2, window.devicePixelRatio || 1); if (app.renderer.resolution !== res) { app.renderer.resolution = res; app.resize(); W = H = 0; layout(); frame(G, 0); } } catch (e) { report(e); } },
+    setLite(on) { lite = !!on; if (lite) pxStopAll(); if (!app) return; try { const res = lite ? 1 : Math.min(2, window.devicePixelRatio || 1); if (app.renderer.resolution !== res) { app.renderer.resolution = res; app.resize(); W = H = 0; layout(); frame(G, 0); } } catch (e) { report(e); } },
     get lite() { return lite; }, get software() { return /swiftshader|llvmpipe|software|basic render/i.test(glName); }, get glName() { return glName; },
     get ready() { return !!app; },
     get lastError() { return lastError; }, get errCount() { return errCount; },
