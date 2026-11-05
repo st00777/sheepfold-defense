@@ -15,7 +15,9 @@ function loadLib() { global.window = global.window || {}; return new Function(li
 
 test('lib/pixelfx.js 打包：六個效果都在（日芒 11/5 James 看過拿掉）、煙圈與螢火蟲真的畫得出像素', () => {
   const P = loadLib();
-  for (const k of ['createFrame', 'clearFrame', 'createFx', 'composite', 'poof', 'collect', 'hitSpark', 'critHit', 'splash', 'fireflies']) assert.ok(P[k], k);
+  for (const k of ['createFrame', 'clearFrame', 'createFx', 'composite', 'poof', 'collect', 'hitSpark', 'critHit', 'splash', 'fireflies', 'fireball', 'groundSlam']) assert.ok(P[k], k);
+  // 火球跟著投射物飛：改 options.x/y 要真的移動畫出來的位置（createFx 回的 options 跟 draw 用的是同一個物件）
+  { const fr = P.createFrame(320, 100), fx = P.createFx(P.fireball, { x: 60, y: 50 }); fx.update(.2); fx.draw(fr, 'back'); fx.draw(fr, 'front'); const a = new Uint8ClampedArray(320 * 100 * 4); P.composite(fr, a, null); fx.options.x = 260; P.clearFrame(fr); fx.draw(fr, 'back'); fx.draw(fr, 'front'); const b = new Uint8ClampedArray(320 * 100 * 4); P.composite(fr, b, null); const left = (o) => { let n = 0; for (let y = 0; y < 100; y++) for (let x = 0; x < 160; x++) if (o[(y * 320 + x) * 4 + 3]) n++; return n; }; assert.ok(left(a) > 200 && left(b) < 50, '火球搬到右邊後左半邊不該還有像素：' + left(a) + '→' + left(b)); }
   assert.ok(!P.sunburst, '日芒不該再打包進來');
   assert.ok(!/pxPlay\('sunburst'/.test(src), 'render.js 不該再放日芒');
   const count = (mod, o, t) => { const fr = P.createFrame(320, 200), fx = P.createFx(mod, o); fx.update(t); P.clearFrame(fr); fx.draw(fr, 'back'); fx.draw(fr, 'front'); const out = new Uint8ClampedArray(320 * 200 * 4); P.composite(fr, out, null); let n = 0; for (let i = 3; i < out.length; i += 4) if (out[i]) n++; return n; };

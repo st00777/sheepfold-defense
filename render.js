@@ -48,7 +48,7 @@ const Board = (() => {
   const state = { hints: new Map(), range: new Set(), cursor: null, teach: null, litRows: [false, false, false, false, false], dark: false, cellsDirty: true, dusk: 0, dawn: 0, lose: 0, flash: 0, bolt: null, dust: 0 };
   let marker = null, strayMark = null, rainAcc = 0, shake = 0;
   // ====== pixelfx 試用層（2026-11-05，分支試看）：像素風特效先畫進一張小畫布（1 像素＝ps 個畫面像素），再當 Pixi 貼圖用最近鄰放大貼在效果層上。lib/pixelfx.js 沒載到、減少動態、省效能、加速：全部不出 ======
-  const PX = { ps: 1, w: 0, h: 0, frame: null, img: null, cv: null, ctx: null, tex: null, spr: null, list: [], flies: [], wantFlies: false };
+  const PX = { ps: 1, w: 0, h: 0, frame: null, img: null, cv: null, ctx: null, tex: null, spr: null, list: [], flies: [], wantFlies: false, gen: 0 }; // gen：小畫布重做幾次，跟著投射物飛的火球看到號碼不同就重掛
   function pxOk() { return !!(window.PixelFX && app && !reduce() && !lite); }
   function pxLayout() { // 尺寸變了：整張小畫布重做，進行中的效果座標都不對了直接丟掉（螢火蟲會自己再長回來）
     if (!window.PixelFX || !L.px) return;
@@ -58,7 +58,7 @@ const Board = (() => {
     PX.frame = PixelFX.createFrame(PX.w, PX.h); PX.img = PX.ctx.createImageData(PX.w, PX.h);
     PX.tex = PIXI.Texture.from(PX.cv); PX.tex.source.scaleMode = 'nearest';
     PX.spr = new PIXI.Sprite(PX.tex); PX.spr.scale.set(PX.ps); PX.spr.visible = false; L.px.addChild(PX.spr);
-    PX.list.length = 0; PX.flies.length = 0;
+    PX.list.length = 0; PX.flies.length = 0; PX.gen++;
   }
   function pxPlay(name, x, y, o, ttl) { // name：lib/pixelfx.js 打包進來的效果名；x,y 畫面座標（效果的原點，多半是腳下）；ttl：循環效果幾秒後自己淡掉
     if (!pxOk() || !PX.frame || speed > 1) return null;
@@ -567,9 +567,11 @@ const Board = (() => {
       const x = s.x * cw, y = s.fromHill ? (s.r + .5 - lift) * ch : yAt(s.r + .5 - lift, s.x); v.cont.x = x; v.cont.y = y;
       if (v.shadow) { v.shadow.x = x; v.shadow.y = yAt(s.r + .5, s.x) + ch * .25; v.shadow.alpha = s.fromHill ? .3 * over : .35 - lift * .3; } // 高地的直射過了坡緣才長出地面影子：看得出它飛在斜坡上方，不是穿過上一排的敵人
       if (s.burn) { v.glow.alpha = .8; v.glow.tint = 0xff8a3d; v.g.tint = 0xff8a3d; }
+      // pixelfx：過了火盆的投射物換成它的火球跟著飛（原本的石子／箭和光暈藏起來）；小畫布重做過就重掛；放不出來（加速、省效能）維持原本的橘色石子
+      if (s.burn) { if (v.px && v.px.gen !== PX.gen) { v.px = null; v.g.visible = v.glow.visible = true; } if (!v.px) { const h = pxPlay('fireball', x, y, { radius: s.kind === 'arrow' ? 3 : 5, seed: s.id % 50 }); if (h) { h.gen = PX.gen; v.px = h; v.g.visible = v.glow.visible = false; } } else { v.px.fx.options.x = x / PX.ps; v.px.fx.options.y = y / PX.ps; } }
       if (!paused && speed <= 1 && !reduce()) { v.acc += dt; while (v.acc > .03) { v.acc -= .03; if (s.burn) spark(x - cw * .05, y, Math.random() < .5 ? 0xff8a30 : 0xffd060, .9, .016 * ch, -ch * .3, .3, 1.5); else if (s.kind !== 'arrow') spark(x - cw * .08, y + ch * .02, 0xd8d0c0, .35, .012 * ch, 0, .22, .4); } }
     }
-    for (const [id, v] of SH) if (!alive.has(id)) { v.cont.destroy({ children: true }); if (v.shadow) v.shadow.destroy(); SH.delete(id); }
+    for (const [id, v] of SH) if (!alive.has(id)) { v.cont.destroy({ children: true }); if (v.shadow) v.shadow.destroy(); if (v.px) v.px.fx.stop(); SH.delete(id); }
     return fresh;
   }
 
@@ -579,7 +581,7 @@ const Board = (() => {
     if (reduce() && ['blast', 'splash', 'slam', 'ignite', 'trample', 'emerge'].includes(kind)) popText(r, x, FX_TEXT[kind]); // 減少動態：粒子不出，改飄一個字讓人知道發生了什麼
     switch (kind) {
       case 'blast': pxPlay('critHit', px, py + ch * .2); ring(px, py, cw * 1.6, 0xffb060, .45); burst(px, py, 18, [0xff8a30, 0xffd060, 0x777777], ch * .9, .5); break;
-      case 'splash': { const R = ev && ev.splash ? ev.splash * cw : cw * .9, k = R / (cw * .9); ring(px, py, R, 0xffe0a0, .3); burst(px, py, Math.max(3, Math.round(8 * k)), [0xc9bda0, 0xffd060], ch * .5 * k, .35); break; } // 圓環＝引擎真正的濺射半徑：拋石手 .45 格畫小圈、投石機 1.2 畫大圈，不再同一個尺寸
+      case 'splash': { const R = ev && ev.splash ? ev.splash * cw : cw * .9, k = R / (cw * .9); if (k >= 1) pxPlay('groundSlam', px, py, { reach: R / PX.ps }); ring(px, py, R, 0xffe0a0, .3); burst(px, py, Math.max(3, Math.round(8 * k)), [0xc9bda0, 0xffd060], ch * .5 * k, .35); break; } // 圓環＝引擎真正的濺射半徑：拋石手 .45 格畫小圈、投石機 1.2 畫大圈，不再同一個尺寸
       case 'slam': ring(px, py, cw * .9, 0xffe0a0, .3); burst(px, py, 8, [0xc9bda0, 0xffd060], ch * .5, .35); break;
       case 'ignite': burst(px, py, 10, [0xff8a30, 0xffd060], ch * .6, .5); break;
       case 'howl': ripple(px, py, 0xc9a0dc); break;
