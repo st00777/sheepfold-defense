@@ -72,6 +72,7 @@
 | 人物、道具、場景圖（`img/ico/*.webp`、`img/scene-*.webp`、`img/ground.webp`） | ChatGPT 圖像生成（2026 年 10 月，James 與小居／Codex 操作） | 自家生成；原圖（PNG，約 150 MB）在 James 的 `~/glc-work/sheepfold-char-src/`，不進 git |
 | 封面與分享預覽（`img/cover.jpg`、`img/cover-home.webp`、`img/icon-*.png`） | 同上，照遊戲內現役立繪重畫 | 同上；原檔位置見 docs/menu-redesign-2026-10-31.md |
 | 棋盤繪圖 `lib/pixi.min.js` | PixiJS 8.9.2 | MIT，授權全文在 `lib/LICENSE-pixi.txt` |
+| 像素特效 `lib/pixelfx.js`（螢火蟲、煙圈、火球、毒霧等） | pixelfx 0.3.0（patch-gg/pixelfx），2026-11-05 用 esbuild 打包核心＋14 個效果 | MIT，授權全文在 `lib/LICENSE-pixelfx.txt`；螢火蟲是去掉草地的改版，檔頭有註明 |
 | 音效與背景音樂 | `sound.js` 用 Web Audio 現場合成 | 沒有音檔、沒有授權問題 |
 | 字型 | 系統字（-apple-system／PingFang TC／Noto Sans TC） | 不內嵌字型檔 |
 | 經文 | 和合本（CUNP1），逐字對過 | 改寫處標「取材」；新加文字一律同一流程（`scripts/verify-scripture.js`） |
