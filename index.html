@@ -254,6 +254,9 @@
   #stars { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 4px 0 2px; }
   #stars .st { font-size: 13px; padding: 4px 9px; border-radius: 999px; background: var(--card); color: var(--muted); opacity: 0; animation: starIn 320ms var(--ease-out) forwards; animation-delay: calc(var(--i) * 180ms + 350ms); }
   #stars .st.on { color: var(--gold); background: var(--card-on); }
+  /* 三星全拿：三顆跳完後一起亮兩輪金光（11/6 James：可加）；減少動態不跑 */
+  #stars.full .st.on { animation: starIn 320ms var(--ease-out) forwards, star-glow 1.4s ease-in-out 2; animation-delay: calc(var(--i) * 180ms + 350ms), calc(var(--n) * 180ms + 670ms); }
+  @keyframes star-glow { 0%, 100% { box-shadow: 0 0 0 0 #e6b84a00; } 50% { box-shadow: 0 0 0 4px #e6b84a44, 0 0 18px 6px #e6b84a99; } }
   #stars-note { font-size: 13px; color: var(--muted); margin: 0 0 8px; min-height: 1em; }
   @keyframes starIn { from { opacity: 0; transform: scale(.6); } 70% { transform: scale(1.08); } to { opacity: 1; transform: scale(1); } }
   .upd { margin-top: 10px; font-size: 12px; color: var(--muted); }
@@ -359,7 +362,7 @@
     .card.new::after { animation: none; opacity: .8; }
     .gate.used span { transform: none; }
     .gate.flash::before { animation-duration: .6s; }
-    #stars .st { animation: none; opacity: 1; }
+    #stars .st, #stars.full .st.on { animation: none; opacity: 1; }
     .dialog { transition: opacity 200ms; }
     .card:active, .btn:active, .diff:active, .tab:active, .lv:active, .rc:active, #pause-btn:active, #snd-btn:active, .corner:active, .snd-row button:active, #tut-skip:active { transform: none; }
   }
@@ -667,6 +670,7 @@ let cardEls = [], lastFood = -1, lastHand = 0, lastUnits = -1;
 let devOn = /[?&]dev/.test(location.search), speed = 1, paused = false, devEnemy = '', dawned = false;
 let devUsed = false;   // 這一局有沒有開過開發者面板；開過就不存檔，免得作弊狀態被續玩帶走
 let pendingCp = null;  // 續玩前要先點兵時，先把存檔記著
+let rosterArmed = false; // 隊伍頁「開始守夜」在有檢查點時要按兩下（第一下提示會丟掉進度）；每次開隊伍頁歸零
 const CP_BROKEN = '上次的存檔讀不出來，這一夜要從頭守。';
 
 // ====== 存檔（只存在這支手機）======
@@ -709,6 +713,8 @@ const CHANGELOG = [
     '頭目橫幅跟著暫停，再守一夜時不會留著上一夜的名字；獅吼改成紅橘色衝擊波，跟吹角的金色分得開；無月夜「升級」「修補」角標在暗處也看得到',
     '關掉音效只留音樂時，音量仍然調得了；減少動態時結算頁留 1.5 秒讓你看到天亮；鍵盤焦點在按鈕上按 Enter 由按鈕自己動',
     '開著開發者模式的那局整局不記（之前最高紀錄與守過仍會記）；匯入壞掉的存檔碼不會讓選夜頁打不開',
+    '三顆星全拿時，三顆星跳完會一起亮兩輪金光；有上次進度時從「隊伍」頁按「開始守夜」先提示會重打，再按一次才重打',
+    '第 6 夜摩西、第 18 夜亞伯拉罕的開場各多一句，點到那夜新來的弓箭手與荊棘、抱羊羔的牧人；尾聲製作名單補上像素特效 pixelfx',
   ] },
   { ver: '2026.11.06', notes: [ // 11/6 審查四部奏（範圍 11/1 之後 20 個 commit）採納的修正
     '像素小動畫：遊戲中途開省效能、切 2× 或系統減少動態時，正在跑的螢火蟲、毒霧、火球也一起收掉（之前只擋新的；燒著的石子還可能整段看不見）',
@@ -1348,7 +1354,9 @@ function showStars() {
   const why = [];
   if (!st.noLoss && G.sheepLost) why.push(`失了 ${G.sheepLost} 隻羊`);
   if (slots > 2 && !st.gates) why.push(`用掉了 ${G.gateRows.length - G.gates.length} 位看門的`);
-  const got = items.filter(([k]) => st[k]).length;
+  const got = items.filter(([k]) => st[k]).length, full = !devUsed && got >= slots;
+  box.classList.toggle('full', full); box.style.setProperty('--n', slots); // 三星全拿：跳完後一起亮金光＋一聲高音（11/6 James：可加）
+  if (full && !REDUCE_MOTION.matches) setTimeout(() => { if (!$('#result').hidden) Sound.play('achieve'); }, slots * 180 + 670);
   $('#stars-note').textContent = devUsed ? '開著開發者模式，這局的星不記' : got >= slots ? '這一夜的星全拿了' : why.length ? `差的：${why.join('；')}` : '';
   if (!devUsed) items.forEach(([k], i) => { if (st[k]) setTimeout(() => Sound.play('food'), 350 + i * 180 + 120); }); // 每顆星一聲叮，跟著跳出
 }
@@ -1492,7 +1500,7 @@ const hasLoadout = L => Engine.validPick(L, storedPick(L));
 const roster = { mode: 'view', tab: 'units', picked: new Set(), focus: null, units: [], from: 'levels' };
 // mode 'pick'＝這一關要點兵；'view'＝從關卡選單看圖鑑（所有已開放的單位）
 function openRoster(mode, from) {
-  roster.mode = mode; roster.tab = 'units'; roster.focus = null; roster.from = from || 'levels'; pendingCp = null;
+  roster.mode = mode; roster.tab = 'units'; roster.focus = null; roster.from = from || 'levels'; pendingCp = null; rosterArmed = false;
   if (mode === 'view') track('open_codex', { from: roster.from });
   if (mode === 'pick') {
     roster.units = sortUnits(level.units);
@@ -1699,7 +1707,11 @@ document.addEventListener('keydown', ev => {
   if (k === 'Enter' && cursor && tag !== 'BUTTON') { ev.preventDefault(); tapCell(cursor[0], cursor[1]); } // 焦點在按鈕（加速、暫停）上時 Enter 要讓按鈕自己動，不是去點游標那一格（審查 11/6 小居）
 });
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { roster.tab = b.dataset.tab; roster.focus = null; renderRoster(); }));
-$('#roster-go').addEventListener('click', () => { if (roster.picked.size < MIN_CARDS) return; saveLoadout(level, sortUnits([...roster.picked])); $('#roster').hidden = true; const cp = pendingCp; pendingCp = null; startGame(cp); });
+$('#roster-go').addEventListener('click', () => {
+  if (roster.picked.size < MIN_CARDS) return;
+  if (!pendingCp && !rosterArmed && loadCheckpoint()) { rosterArmed = true; toast('有上次的進度：再按一次「開始守夜」會從頭重打；想接著打，回開場頁按「繼續上次」', true); return; } // 11/6 James：要提示。從「隊伍」頁按開始守夜會丟掉檢查點，第一下先說、第二下才重打
+  saveLoadout(level, sortUnits([...roster.picked])); $('#roster').hidden = true; const cp = pendingCp; pendingCp = null; startGame(cp);
+});
 $('#roster-back').addEventListener('click', () => { $('#roster').hidden = true; if (roster.from === 'intro') { showIntroNew(level); $('#intro').hidden = false; } else if (roster.from === 'pause') $('#pause').hidden = false; else $('#levels').hidden = false; });
 $('#intro-roster').addEventListener('click', () => openRoster(pickedFor(level) ? 'pick' : 'view', 'intro'));
 $('#levels-codex').addEventListener('click', () => openRoster('view', 'levels'));
@@ -1992,7 +2004,7 @@ const EPILOGUE = [
   { bg: 'img/scene-dawn.webp', kicker: '第三章', title: CHAPTER_NAMES[3], lines: ['羊圈搬上山，熟悉的辦法也得轉個彎。', '石頭拋過坡緣，夥伴守在前頭。一步一步，又守到了天亮。'] },
   { bg: 'img/scene-moon.webp', kicker: '回到羊圈', title: '雅各又數了一遍', lines: () => ['這回他開口了：', LEVELS.every(L => starsOf(L.id).noLoss) ? '「三十夜，你也沒少過一隻。」' : '「三十夜，羊群交在你手裡，這一路辛苦你了。」'] }, // 三十夜全部零失羊才說「沒少過一隻」，失過羊的玩家說另一句，免得結語跟戰果矛盾（11/2 小居） // 收束回第 1 夜：雅各數羊、把水袋遞給你的那個無名牧人（11/2 審查視角 2 高）
   { kicker: '三十夜', title: '天亮了', lines: ['「他們永不滅亡，誰也不能從我手裏把他們奪去。」（約 10:28）', '「你出你入，耶和華要保護你，從今時直到永遠。」（詩 121:8）'] },
-  { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：葉真旭', '程式與關卡：Claude Code', '審查與生圖：Codex', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '經文：和合本（CUNP）', '2026 年 10 月'], tail: '試煉冊還有幾夜，等你去守。', end: true },
+  { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：葉真旭', '程式與關卡：Claude Code', '審查與生圖：Codex', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '像素特效：pixelfx（MIT）', '經文：和合本（CUNP）', '2026 年 10–11 月'], tail: '試煉冊還有幾夜，等你去守。', end: true },
 ];
 let epIdx = -1, epTimer = 0, epFrom = '', epShown = Infinity; // epShown：這一頁畫出來的時間；還沒畫出來（Infinity）或剛畫出來 0.6 秒內的點擊不算，手機連點兩下不會整頁跳過（審查 11/6 動畫 review）
 function openEpilogue(from) { for (const s of EPILOGUE) if (s.bg) { const i = new Image(); i.src = s.bg; } epFrom = from; epIdx = -1; $('#epilogue').hidden = false; epNext(); } // 三張場景圖先載，淡入時不會黑底先亮

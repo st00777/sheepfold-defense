@@ -272,7 +272,7 @@ const LEVELS = [
   {
     id: 4, name: '何烈山下', title: '大而可怕的曠野', ref: '取材：出埃及記 3:1、申命記 8:15',
     speaker: '摩西',
-    intro: '葉忒羅的羊今晚在這曠野過夜。這曠野大而可怕，有火蛇、蠍子，地上盡是石頭。你守東邊，我守西邊。',
+    intro: '葉忒羅的羊今晚在這曠野過夜。這曠野大而可怕，有火蛇、蠍子，地上盡是石頭。帶弓的站後排，一箭穿過整排；石縫裡拔來的荊棘鋪在牆前，牠們踩過去就慢。你守東邊，我守西邊。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns'], fresh: ['archer', 'thorns'],
     tips: ['🪨 有石頭的格子不能放東西'],
     rocks: [[0, 3], [2, 2], [3, 5], [4, 1]],
@@ -479,7 +479,7 @@ const LEVELS = [
   {
     id: 13, chapter: 2, name: '分開的羊群', title: '你向左，我就向右', ref: '取材：創世記 13:5-9，亞伯拉罕與羅得的牧人相爭',
     speaker: '亞伯拉罕', moonless: 2, sheep: 3,
-    intro: '我的牧人和羅得的牧人相爭，兩家的羊在山裡混成一群。明天就要分開：你向左，我就向右。今晚先把走散的一隻隻帶回來。草叢裡有東西伏著，小心。',
+    intro: '我的牧人和羅得的牧人相爭，兩家的羊在山裡混成一群。明天就要分開：你向左，我就向右。今晚先把走散的一隻隻帶回來。抱羊羔的牧人放前頭，走散的羊見了他就安全；他不會打，你要護著他。草叢裡有東西伏著，小心。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle'], fresh: ['cradle'], must: ['dog', 'volley'],
     tips: ['🐆 豹會跳過牆、每隔幾秒換一排走，蹲下來就是要衝了'],
     waves: [

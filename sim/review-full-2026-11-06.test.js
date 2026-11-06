@@ -167,6 +167,14 @@ test('文案：回血→回復血量、機弦手傷害高、f21 說的是機弦�
   assert.match(simSrc, /G\.nextRow === r && G\.nextType && G\.nextVisible/);
 });
 
+test('11/6 James 五題拍板：三星金光、隊伍頁開始守夜先提示、兩夜開場點到新單位、尾聲名單補 pixelfx', () => {
+  assert.match(html, /#stars\.full \.st\.on \{ animation: starIn/); assert.match(html, /box\.classList\.toggle\('full', full\)/);
+  assert.match(html, /if \(!pendingCp && !rosterArmed && loadCheckpoint\(\)\) \{ rosterArmed = true;/); assert.match(html, /pendingCp = null; rosterArmed = false;/);
+  assert.ok(D.LEVELS.find(l => l.id === 4).intro.includes('帶弓的') && D.LEVELS.find(l => l.id === 4).intro.includes('荊棘'));
+  assert.ok(D.LEVELS.find(l => l.id === 13).intro.includes('抱羊羔的牧人'));
+  assert.match(html, /'像素特效：pixelfx（MIT）'/);
+});
+
 test('index.html 版本號：data 29、engine 29、save 7、render 31，版本 2026.11.06.1', () => {
   const v = n => +(html.match(new RegExp(n + '\\.js\\?v=(\\d+)')) || [])[1];
   assert.ok(v('data') >= 29 && v('engine') >= 29 && v('save') >= 7 && v('render') >= 31, JSON.stringify([v('data'), v('engine'), v('save'), v('render')]));
