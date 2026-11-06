@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://st00777.github.io/sheepfold-defense/sitemap.xml

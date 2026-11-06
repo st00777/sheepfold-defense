@@ -109,17 +109,18 @@ async function block2_3_nights() {
   const byNight = {};
   for (const r of rows) {
     const n = r.d[0]; if (n === '(not set)') continue;
-    const o = byNight[n] || (byNight[n] = { plays: 0, users: 0, win: 0, lose: 0, lost: 0, loseWave: 0, sec: 0 });
+    const o = byNight[n] || (byNight[n] = { plays: 0, users: 0, win: 0, lose: 0, quit: 0, lost: 0, loseWave: 0, sec: 0 });
     o.plays += r.m[0]; o.users = Math.max(o.users, r.m[1]); o.lost += r.m[2]; o.sec += r.m[4];
-    if (r.d[1] === 'win') o.win += r.m[0]; else { o.lose += r.m[0]; o.loseWave += r.m[3]; }
+    // 結果三種：win 守住、lose 羊被叼光／牧人倒下、quit 中途按重來或回關卡。放棄要分開算：準備階段放棄 wave 是 0，混進「輸在波」會把平均拉到 0
+    if (r.d[1] === 'win') o.win += r.m[0]; else if (r.d[1] === 'quit') o.quit += r.m[0]; else { o.lose += r.m[0]; o.loseWave += r.m[3]; }
   }
   for (const r of stars) { const n = r.d[0]; if (byNight[n]) { byNight[n].starSum = (byNight[n].starSum || 0) + Number(r.d[1]) * r.m[0]; } }
   const nights = Object.keys(byNight).map(Number).sort((a, b) => a - b);
   if (!nights.length) { console.log('  （還沒有帶夜數的局；自訂維度登記後的新局才會出現）'); return; }
-  line('  夜', '人', '局', '守住', '輸', '平均星', '均失羊', '輸在波', '均秒');
+  line('  夜', '人', '局', '守住', '輸', '放棄', '平均星', '均失羊', '輸在波', '均秒');
   for (const n of nights) {
     const o = byNight[n];
-    line(`  ${n} ${nightName(n)}`.slice(0, 14), o.users, o.plays, o.win, o.lose, ((o.starSum || 0) / o.plays).toFixed(1),
+    line(`  ${n} ${nightName(n)}`.slice(0, 14), o.users, o.plays, o.win, o.lose, o.quit, ((o.starSum || 0) / o.plays).toFixed(1),
       (o.lost / o.plays).toFixed(1), o.lose ? (o.loseWave / o.lose).toFixed(1) : '–', Math.round(o.sec / o.plays));
   }
   const far = nights[nights.length - 1];
