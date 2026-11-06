@@ -106,11 +106,14 @@ async function block2_3_nights() {
   const rows = await q(['customEvent:night', 'customEvent:result'], ['eventCount', 'totalUsers', 'customEvent:sheep_lost', 'customEvent:wave', 'customEvent:seconds'],
     [f('eventName', 'night_end'), f('customEvent:mode', 'story')]);
   const stars = await q(['customEvent:night', 'customEvent:stars'], ['eventCount'], [f('eventName', 'night_end'), f('customEvent:mode', 'story')]);
+  // 「人」要另外只按夜分組問：上面那張表是按夜×結果分的，同一夜有人只贏、有人只輸，各列的 totalUsers 取最大或相加都不是這一夜的不重複人數（審查 11/6）
+  const users = await q(['customEvent:night'], ['totalUsers'], [f('eventName', 'night_end'), f('customEvent:mode', 'story')]);
   const byNight = {};
+  for (const r of users) { if (r.d[0] !== '(not set)') byNight[r.d[0]] = { plays: 0, users: r.m[0], win: 0, lose: 0, quit: 0, lost: 0, loseWave: 0, sec: 0 }; }
   for (const r of rows) {
     const n = r.d[0]; if (n === '(not set)') continue;
     const o = byNight[n] || (byNight[n] = { plays: 0, users: 0, win: 0, lose: 0, quit: 0, lost: 0, loseWave: 0, sec: 0 });
-    o.plays += r.m[0]; o.users = Math.max(o.users, r.m[1]); o.lost += r.m[2]; o.sec += r.m[4];
+    o.plays += r.m[0]; o.lost += r.m[2]; o.sec += r.m[4];
     // 結果三種：win 守住、lose 羊被叼光／牧人倒下、quit 中途按重來或回關卡。放棄要分開算：準備階段放棄 wave 是 0，混進「輸在波」會把平均拉到 0
     if (r.d[1] === 'win') o.win += r.m[0]; else if (r.d[1] === 'quit') o.quit += r.m[0]; else { o.lose += r.m[0]; o.loseWave += r.m[3]; }
   }

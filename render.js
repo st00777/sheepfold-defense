@@ -69,12 +69,17 @@ const Board = (() => {
     if (!pxOk() || !PX.layers.length || speed > 1) return null;
     const mod = window.PixelFX[name]; if (!mod) return null;
     const ly = PX.layers[fine ? 1 : 0];
-    const fx = PixelFX.createFx(mod, Object.assign({ x: x / ly.ps, y: y / ly.ps }, o || {})); const h = { fx, ttl, ly, gen: PX.gen }; PX.list.push(h); return h;
+    const fx = PixelFX.createFx(mod, Object.assign({ x: x / ly.ps, y: y / ly.ps }, o || {})); const h = { fx, ttl, ly, gen: PX.gen, name }; PX.list.push(h); return h;
   }
+  const pxCount = name => PX.list.reduce((n, h) => n + (h.name === name ? 1 : 0), 0); // 同一種效果目前有幾個在跑（倒下煙圈要設上限）
+  // 兩套換色的衝擊波（雷鳴效果換調色盤）：嚎叫紫白、獅吼與吹角金色
+  const PX_PURPLE = { palette: ['#1a1424', '#3a2e52', '#6a5a8a', '#a08ec0', '#d0c4e8', '#ffffff'], sparks: ['#d0c4e8', '#a08ec0', '#ffffff'] };
+  const PX_GOLD = { palette: ['#2a1a06', '#5a3a10', '#9a6a1a', '#d9a44a', '#ffd98a', '#ffffff'], sparks: ['#ffd98a', '#d9a44a', '#ffffff'] };
   function pxMove(h, x, y) { h.fx.options.x = x / h.ly.ps; h.fx.options.y = y / h.ly.ps; } // createFx 回的 options 跟 draw 用的是同一個物件，改它就會搬
   function pxFireflies() { const n = Math.ceil(PX.layers[0].w / 300); for (let i = 0; i < n; i++) { const h = pxPlay('fireflies', ((i + .5) / n) * W, H + 20 * PX.ps, { seed: 2 + i }); if (h) PX.flies.push(h); } } // 效果本身 320 寬，寬棋盤多放幾組；原點放到棋盤下緣外 20 像素，草地剛好在畫面外、螢火蟲飄在下半張
   function pxUpdate(dt) {
     if (!PX.layers.length) return;
+    if (!pxOk() || speed > 1) { pxDrop(); return; } // 中途切到加速、減少動態、省效能：進行中的（螢火蟲、毒霧、火球）一起收掉，不只擋新的（審查 11/6）；螢火蟲等切回來自己再長
     if (PX.wantFlies && !PX.flies.length && !dawned) pxFireflies();
     for (const h of PX.list) { h.fx.update(dt); if (h.ttl !== undefined && (h.ttl -= dt) <= 0) h.fx.stop(); }
     for (let i = PX.list.length - 1; i >= 0; i--) if (PX.list[i].fx.done()) PX.list.splice(i, 1);
@@ -89,7 +94,9 @@ const Board = (() => {
     }
   }
   function pxStopFlies() { for (const h of PX.flies) h.fx.stop(); PX.flies.length = 0; PX.wantFlies = false; }
-  function pxStopAll() { PX.list.length = 0; PX.flies.length = 0; PX.wantFlies = false; for (const ly of PX.layers) ly.spr.visible = false; }
+  // 丟掉進行中的效果：gen 加一讓火球、毒霧那種握著 handle 的下一幀知道自己被收了（火球會把藏起來的石子／箭亮回來），不然省效能一開（解析度已是 1 時 layout 不重做）燒著的投射物整段看不見（審查 11/6）
+  function pxDrop() { if (PX.list.length) { PX.list.length = 0; PX.gen++; } PX.flies.length = 0; for (const ly of PX.layers) ly.spr.visible = false; }
+  function pxStopAll() { pxDrop(); PX.wantFlies = false; }
 
   // ====== 啟動：載圖、建圖層 ======
   async function init(opts) {
@@ -509,7 +516,7 @@ const Board = (() => {
     const v = EN.get(e.id); if (!v) return;
     EN.delete(e.id); v.dying = true; const c = v.cont, rd = reduce(); if (v.pxPoison) { v.pxPoison.fx.stop(); v.pxPoison = null; }
     tween(.22, k => { c.alpha = 1 - k; if (!rd) c.scale.set(1 - .15 * EASE(k)); }, () => c.destroy({ children: true }));
-    if (!e.underground && !v.fly && pxPlay('poof', c.x, c.y + ch * .3, { seed: Math.floor(Math.random() * 97) })) return; // pixelfx 試用：地面敵人倒下放卡通煙圈，放得出來就不再撒原本的塵
+    if (!e.underground && !v.fly && pxCount('poof') < 6 && pxPlay('poof', c.x, c.y + ch * .3, { seed: Math.floor(Math.random() * 97) })) return; // pixelfx 試用：地面敵人倒下放卡通煙圈，放得出來就不再撒原本的塵；同時最多六朵（一群狐狸被火把燒倒不疊成一片，審查 11/6）
     if (rd || speed > 1 || e.underground || v.fly || state.dust >= 4) return;
     state.dust++; setTimeout(() => { state.dust = Math.max(0, state.dust - 1); }, 300); // clear() 可能已把它歸零，別減成負的
     for (let i = 0; i < 7; i++) spawnParticle(c.x + (Math.random() - .5) * cw * .3, c.y + ch * .2, (Math.random() - .5) * cw * .6, -ch * .5 * Math.random(), .26 + Math.random() * .1, 0xe8dcc4, (.04 + Math.random() * .03) * ch, ch * .8, .6, true);
@@ -609,9 +616,9 @@ const Board = (() => {
       case 'splash': { const R = ev && ev.splash ? ev.splash * cw : cw * .9, k = R / (cw * .9); if (k >= 1) pxPlay('groundSlam', px, py, { reach: R / PX.ps }); else pxPlay('quake', px, py + ch * .1, { reach: R * 2 / PX.ps }, undefined, true); ring(px, py, R, 0xffe0a0, .3); burst(px, py, Math.max(3, Math.round(8 * k)), [0xc9bda0, 0xffd060], ch * .5 * k, .35); break; } // 圓環＝引擎真正的濺射半徑：拋石手 .45 格畫小圈、投石機 1.2 畫大圈，不再同一個尺寸
       case 'slam': pxPlay('quake', px, py + ch * .2, { reach: cw * 2 / PX.ps }, undefined, true); ring(px, py, cw * .9, 0xffe0a0, .3); burst(px, py, 8, [0xc9bda0, 0xffd060], ch * .5, .35); break;
       case 'ignite': burst(px, py, 10, [0xff8a30, 0xffd060], ch * .6, .5); break;
-      case 'howl': pxPlay('thunderclap', px, py + ch * .2, { palette: ['#1a1424', '#3a2e52', '#6a5a8a', '#a08ec0', '#d0c4e8', '#ffffff'], sparks: ['#d0c4e8', '#a08ec0', '#ffffff'] }, undefined, true); ripple(px, py, 0xc9a0dc); break; // pixelfx 試用：嚎叫＝紫白的衝擊波（雷鳴效果換色）
-      case 'roar': pxPlay('thunderclap', px, py + ch * .2, { palette: ['#2a1a06', '#5a3a10', '#9a6a1a', '#d9a44a', '#ffd98a', '#ffffff'], sparks: ['#ffd98a', '#d9a44a', '#ffffff'] }, undefined, true); ripple(px, py, GOLD); break; // 獅吼＝金色衝擊波
-      case 'horn': { if (speed <= 1) squashUnit(r, x); popText(r, x, FX_TEXT.horn); if (reduce()) break; pxPlay('thunderclap', px, py + ch * .2, { palette: ['#2a1a06', '#5a3a10', '#9a6a1a', '#d9a44a', '#ffd98a', '#ffffff'], sparks: ['#ffd98a', '#d9a44a', '#ffffff'] }, undefined, true); const g = new PIXI.Graphics(); L.fx.addChild(g); tween(.45, k => { const e = EASE(k); g.clear().ellipse(px + e * W * .9, yAt(r + .5, (px + e * W * .9) / cw), cw * .25, ch * .45).stroke({ width: 3, color: 0xffe28a, alpha: 1 - k }); }, () => g.destroy()); hornShove(ev && ev.moved); break; } // 吹的人回彈＋衝擊波＋被推的滑移
+      case 'howl': pxPlay('thunderclap', px, py + ch * .2, PX_PURPLE, undefined, true); ripple(px, py, 0xc9a0dc); break; // pixelfx 試用：嚎叫＝紫白的衝擊波（雷鳴效果換色）
+      case 'roar': pxPlay('thunderclap', px, py + ch * .2, PX_GOLD, undefined, true); ripple(px, py, GOLD); break; // 獅吼＝金色衝擊波
+      case 'horn': { if (speed <= 1) squashUnit(r, x); popText(r, x, FX_TEXT.horn); if (reduce()) break; pxPlay('thunderclap', px, py + ch * .2, PX_GOLD, undefined, true); const g = new PIXI.Graphics(); L.fx.addChild(g); tween(.45, k => { const e = EASE(k); g.clear().ellipse(px + e * W * .9, yAt(r + .5, (px + e * W * .9) / cw), cw * .25, ch * .45).stroke({ width: 3, color: 0xffe28a, alpha: 1 - k }); }, () => g.destroy()); hornShove(ev && ev.moved); break; } // 吹的人回彈＋衝擊波＋被推的滑移
       case 'trample': case 'emerge': case 'flee': { burst(px, py + ch * .2, 6, [0xc9bda0], ch * .4, .3); if (kind === 'flee') popText(r, x, FX_TEXT.flee); const v = kind !== 'emerge' ? UN.get(key(r, Math.round(x))) : null; if (v) v.leaving = kind; break; } // 嚇跑／踩爛：先記在那格單位上，緊接著的 gone 事件照這個播離場動畫
       case 'gate': gateSweep(r); break;
       case 'strike': { pxPlay('hitSpark', px, py + ch * .1, { flip: Math.random() < .5 }); burst(px, py, 6, [0xffe28a, 0xffffff], ch * .4, .25); const t = makeText('✦', Math.max(16, ch * .5), GOLD, true); t.x = px; t.y = py; L.text.addChild(t); tween(.45, k => { t.scale.set(1 + k * .4); t.alpha = 1 - k; }, () => t.destroy()); swingPatrol(id); break; }
@@ -801,7 +808,7 @@ const Board = (() => {
     setContrast(on) { contrast = !!on; state.cellsDirty = true; for (const M of [UN, EN, MV]) for (const v of M.values()) if (v && v.hp) v.hpLast = -1; }, get contrast() { return contrast; }, // 血條下一幀全部重畫
     setSpeed(n) { speed = n; }, setPaused(p) { paused = p; }, setStill(s) { still = s; },
     // 省效能模式：開關時把畫布解析度切到 1／回到裝置值，離屏圖跟著 layout 重建；software：WebGL 是軟體模擬（沒開硬體加速）的電腦一開始就該用省效能
-    setLite(on) { lite = !!on; if (lite) pxStopAll(); if (!app) return; try { const res = lite ? 1 : Math.min(2, window.devicePixelRatio || 1); if (app.renderer.resolution !== res) { app.renderer.resolution = res; app.resize(); W = H = 0; layout(); frame(G, 0); } } catch (e) { report(e); } },
+    setLite(on) { lite = !!on; if (lite) pxDrop(); if (!app) return; try { const res = lite ? 1 : Math.min(2, window.devicePixelRatio || 1); if (app.renderer.resolution !== res) { app.renderer.resolution = res; app.resize(); W = H = 0; layout(); frame(G, 0); } } catch (e) { report(e); } },
     get lite() { return lite; }, get software() { return /swiftshader|llvmpipe|software|basic render/i.test(glName); }, get glName() { return glName; },
     get ready() { return !!app; },
     get lastError() { return lastError; }, get errCount() { return errCount; },

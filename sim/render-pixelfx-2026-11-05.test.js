@@ -35,14 +35,20 @@ test('render.js：pixelfx 層在減少動態、省效能、加速時不出；清
   assert.match(src, /function pxOk\(\) \{ return !!\(window\.PixelFX && app && !reduce\(\) && !lite\); \}/);
   assert.match(src, /function pxPlay\([^)]*\) \{[^\n]*\n\s*if \(!pxOk\(\) \|\| !PX\.layers\.length \|\| speed > 1\) return null;/);
   assert.match(src, /pxStopAll\(\);\n\s*setMarker\(null\)/, 'clear() 要清 pixelfx');
-  assert.match(src, /setLite\(on\) \{ lite = !!on; if \(lite\) pxStopAll\(\);/);
+  assert.match(src, /setLite\(on\) \{ lite = !!on; if \(lite\) pxDrop\(\);/, '省效能一開就丟效果，但 wantFlies 留著：關掉省效能螢火蟲要長回來（11/6 本機 Chrome 抓到之前用 pxStopAll 會把整夜螢火蟲關掉）');
   assert.match(src, /'fx', 'px', 'light'/, 'px 圖層在效果層之上、光照之下');
+  // 11/6 審查：中途切到加速／減少動態／省效能要把進行中的也收掉，而且收的時候 gen 要加一，火球、毒霧握著的 handle 下一幀才知道要重掛（火球會把藏起來的石子亮回來）
+  assert.match(src, /function pxUpdate\(dt\) \{\n[^\n]*\n\s*if \(!pxOk\(\) \|\| speed > 1\) \{ pxDrop\(\); return; \}/, 'pxUpdate 一開頭就收掉不該出的');
+  assert.match(src, /function pxDrop\(\) \{ if \(PX\.list\.length\) \{ PX\.list\.length = 0; PX\.gen\+\+; \}/, 'pxDrop 丟效果時 gen 加一');
+  assert.match(src, /function pxStopAll\(\) \{ pxDrop\(\);/, 'pxStopAll 走 pxDrop');
+  assert.match(src, /pxCount\('poof'\) < 6 && pxPlay\('poof'/, '倒下煙圈同時最多六朵');
 });
 
 test('index.html：lib/pixelfx.js 在 render.js 之前載入，render.js 版本號有加', () => {
   const a = html.indexOf('lib/pixelfx.js?v='), m = html.match(/render\.js\?v=(\d+)/), b = m ? m.index : -1;
   assert.ok(a > 0 && b > a, '載入順序');
-  assert.ok(m && +m[1] >= 29, 'render.js 版本號至少 29（11/5 晚上狗爪痕修正）');
+  assert.ok(m && +m[1] >= 30, 'render.js 版本號至少 30（11/6 審查修正）');
+  const s = html.match(/sound\.js\?v=(\d+)/); assert.ok(s && +s[1] >= 10, 'sound.js 版本號至少 10（11/1 音樂改走自己的 gain，11/6 審查抓到沒加）');
 });
 
 // 11/5 晚上 James 真機：牧羊犬爪痕畫在狗的位置還翻了面、只出第一下。引擎 bark 事件只在剛咬住送一次，

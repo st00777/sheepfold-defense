@@ -623,10 +623,10 @@
 <script src="data.js?v=28"></script>
 <script src="engine.js?v=28"></script>
 <script src="save.js?v=6"></script>
-<script src="sound.js?v=9"></script>
+<script src="sound.js?v=10"></script>
 <script src="lib/pixi.min.js"></script>
 <script src="lib/pixelfx.js?v=4"></script>
-<script src="render.js?v=29"></script>
+<script src="render.js?v=30"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS、TRIALS、TRIAL_KINDS 由 data.js 直接提供
@@ -698,6 +698,10 @@ const HOME_UPDATE = '最近更新 11/5：棋盤多了像素風小動畫（螢火
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.11.06', notes: [ // 11/6 審查四部奏（範圍 11/1 之後 20 個 commit）採納的修正
+    '像素小動畫：遊戲中途開省效能、切 2× 或系統減少動態時，正在跑的螢火蟲、毒霧、火球也一起收掉（之前只擋新的；燒著的石子還可能整段看不見）',
+    '結算頁一出來就按「再守這一夜」，成就卡不會蓋到正在跑的局上，回選單再補跳',
+  ] },
   { ver: '2026.11.05.1', notes: [ // 11/5 晚上 James 真機：牧羊犬爪痕位置怪、只出第一下
     '牧羊犬咬住敵人時，爪痕改畫在敵人身上，而且咬著的期間每隔一下就抓一次，不再只出第一下',
   ] },
@@ -1137,9 +1141,9 @@ function tapCell(r, c) {
   if (selected === 'shovel') { const res = Engine.sell(G, r, c); flushEvents(); if (res.ok) clearSelection(); toast(res.msg || ''); return; }
   if (!selected) { if (tut.on) { toast(tut.waiting ? TUT_STEPS[tut.step].wait : TUT_STEPS[tut.step].say, true); return; }
     // 會花糧的（升老牧人、升級、修補）第一下只看：亮範圍＋提示要花多少糧，4 秒內再點同一格才真的扣糧；糧不夠就直接讓引擎回「要 N 糧」。石堆推倒不花糧，照舊一下就推（11/2 審查交集 A：手機上想看牧人就被扣 75 糧）
-    const k = r + ',' + c, pv = Engine.tapPreview(G, r, c);
-    if (pv && G.food >= pv.cost && !(armed && armed.k === k && performance.now() - armed.t < 4000)) {
-      armed = { k, t: performance.now() };
+    const k = r + ',' + c, pv = Engine.tapPreview(G, r, c), what = pv ? pv.action + ':' + pv.name + ':' + pv.cost : ''; // 第二下要跟第一下看到的是同一件事（同格、同動作、同價）才扣糧；4 秒內那格換了東西或價錢變了就重新亮一次（審查 11/6）
+    if (pv && G.food >= pv.cost && !(armed && armed.k === k && armed.what === what && performance.now() - armed.t < 4000)) {
+      armed = { k, t: performance.now(), what };
       const u = G.units[k]; showRange(rangeCells(u.type, r, c, u.upgraded), 1300);
       toast(pv.action === 'repair' ? `再點一下修補，${pv.cost} 糧` : `再點一下升級「${pv.name}」，${pv.cost} 糧`); return;
     }
@@ -1638,7 +1642,7 @@ function renderRosterDetail() {
     const fresh = (roster.mode === 'pick' || roster.from === 'intro') && level.fresh.includes(k);
     const away = roster.mode !== 'pick' && roster.from === 'intro' && !level.units.includes(k);
     const learns = roster.from === 'intro' && u.upgrade && u.upgrade.from === Engine.posOf(level.id);
-    const note = away ? '<br><span class="new">這一夜還沒遇見，要到後面的夜才會同行</span>' : fresh ? `<br><span class="new">這一夜新開的卡${roster.mode === 'pick' ? '，建議帶上' : ''}</span>` : learns ? `<br><span class="new">這一夜起學會「${u.upgrade.name}」：放下後再點一下</span>` : roster.mode === 'pick' && k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : '';
+    const note = away ? '<br><span class="new">這一夜還沒遇見，要到後面的夜才會同行</span>' : fresh ? `<br><span class="new">這一夜新開的卡${roster.mode === 'pick' ? '，建議帶上' : ''}</span>` : learns ? `<br><span class="new">這一夜起學會「${u.upgrade.name}」：放下後點兩下</span>` : roster.mode === 'pick' && k === 'shepherd' ? '<br><span class="new">沒有牧人就沒有糧，一定帶</span>' : '';
     box.innerHTML = `${bigImg(u, 'units', k)}<div class="dt"><b>${u.name}</b>　<span class="num">🌾 ${u.cost}</span><span class="sub">${u.title || ''}</span>${u.desc}${note}<br><span class="num">${unitNums(k)}</span><div class="ref">${fullRef(u.ref)}${u.upgrade ? '・升級 ' + fullRef(u.upgrade.ref) : ''}</div></div>`;
   } else {
     const e = ENEMIES[k];
@@ -1938,6 +1942,7 @@ function grantAchievements(ceremony) {
 }
 function showAchvCard() {
   if (!$('#achv-card').hidden || !achvQueue.length) return;
+  if (G && !G.over && $('#result').hidden) return; // 結算頁的 0.9 秒還沒到就按了「再守這一夜」：局已經在跑，卡片不蓋上去，佇列留著回選單再跳（審查 11/6）
   const a = achvById(achvQueue.shift()); if (!a) { showAchvCard(); return; }
   $('#achv-ico').textContent = a.ico; $('#achv-name').textContent = a.name; $('#achv-desc').textContent = a.desc; $('#achv-verse').textContent = (a.lead || '') + a.verse; $('#achv-ref').textContent = fullRef(a.ref); // lead：經文前先接回說話的人（第一夜「是我自己賠上」不再像在跟玩家算帳，11/2 審查交集 D）
   $('#achv-more').textContent = achvQueue.length ? `還有 ${achvQueue.length} 條` : '';
@@ -2031,7 +2036,7 @@ async function shareImage() {
   // 11/2 James 的 Android 第一次就看到「畫不出圖」：帶封面失敗就改不帶封面再試一次，還是不行就把錯誤名稱印在訊息裡，下次不用猜
   const encode = cv => dataUrlToBlob(cv.toDataURL('image/jpeg', 0.9));
   let blob = null, err = null, cover = false;
-  try { const cv = drawShareCard(true); cover = cv.coverUsed; blob = encode(cv); } catch (e) { err = e; try { blob = encode(drawShareCard(false)); } catch (e2) { err = e2; } }
+  try { const cv = drawShareCard(true); blob = encode(cv); cover = cv.coverUsed; } catch (e) { err = e; try { blob = encode(drawShareCard(false)); } catch (e2) { err = e2; } } // 轉檔成功才算「有封面」：封面把畫布鎖住時 toDataURL 會丟，第二次畫的是沒封面的（審查 11/6）
   if (!blob) { shareNote(`這支瀏覽器畫不出圖（${(err && (err.name || err.message)) || '不明'}）`); return; }
   const noCover = cover ? '' : err ? '（封面圖讓畫布被鎖住，這張沒封面）' : '（封面圖還沒載好，這張沒封面）'; // 11/2 James 的截圖沒封面，分不出是哪種；寫進訊息下次就知道
   const file = new File([blob], `sheepfold-${trial ? trial.id : 'n' + level.id}.jpg`, { type: 'image/jpeg' });
