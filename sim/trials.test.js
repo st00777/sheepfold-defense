@@ -72,7 +72,10 @@ test('修飾詞 waveOverride：換掉整張波表、數字照寫不乘難度倍�
     const r = E.normalizeMods(base, { waveOverride: bad }); assert.strictEqual(r.mods, null, JSON.stringify(bad)); assert.ok(r.problems.some(p => p.includes('waveOverride')));
   }
   const [G2] = quiet(() => E.create(1, 'calm', rng, { waveOverride: WO }));
-  run(G2, 25); assert.ok(!G2.events.some(e => e.t === 'toast' && e.msg === undefined), '第 1 波沒 say 不丟空 toast');
+  G2.food = 9999; assert.ok(E.place(G2, 2, 0, 'shepherd').ok); // 放了單位局才會開始；原本沒放、run 又每步清 events，這條斷言永遠看到空陣列（審查 11/6 小居）
+  const toasts = []; for (let t = 0; t < 60; t += 0.1) { E.step(G2, 0.1); for (const e of G2.events) if (e.t === 'toast') toasts.push(e.msg); G2.events.length = 0; }
+  assert.ok(G2.started && G2.wave >= 1, '第 1 波真的開始了（wave ' + G2.wave + '）'); // 六隻狼對一個牧人會輸，輸了也算開始過
+  assert.ok(!toasts.some(m => m === undefined), '第 1 波沒 say 不丟空 toast');
 });
 
 test('修飾詞 waveOverride 帶 strays／give（期 2c）：合規的留到關卡波表，迷羊照秒數進場、送卡夜照波送；壞的 strays 或不認識的 give 讓整張波表略過', () => {

@@ -94,7 +94,7 @@ function decide(G, skill) {
   const rows = [...threat].sort((a, b) => Math.min(...rowEnemies(a).map(e => e.x), 9) - Math.min(...rowEnemies(b).map(e => e.x), 9));
   for (const r of rows) {
     const es = rowEnemies(r);
-    const types = new Set(es.map(e => e.type)); if (G.nextRow === r && G.nextType) types.add(G.nextType);
+    const types = new Set(es.map(e => e.type)); if (G.nextRow === r && G.nextType && G.nextVisible) types.add(G.nextType); // 無月夜看不見腳印就不能偷看下一隻是什麼（審查 11/6 小居：之前漏了 nextVisible，模擬打法比真人多知道一隻）
     // 投石隊顧上下三排：隔壁排有的也算這排有射手
     const volleyNear = [r - 1, r, r + 1].some(rr => rr >= 0 && rr < ROWS && has(G, rr, u => u.type === 'volley'));
     const hasShooter = has(G, r, u => kindOf(u) === 'shooter' && !(UNITS[u.type].flees && !u.upgraded)) || volleyNear;

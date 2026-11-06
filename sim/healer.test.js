@@ -46,7 +46,7 @@ test('膏油：50 糧，範圍 2 格、每秒 12；只能升一次', () => {
 
 test('第 6 夜之前不能膏油', () => {
   const G = E.create(6, 'calm', () => 0.5); G.food = 9999; G.started = true;
-  G.level.units = [...G.level.units, 'healer']; // 第 6 關本來沒這張卡，借來測 from 門檻
+  G.level = { ...G.level, units: [...G.level.units, 'healer'] }; // 第 6 關本來沒這張卡，借來測 from 門檻。要複製一份：沒修飾詞時 G.level 就是 LEVELS 裡那個物件，直接改會污染同一行程裡後面的測試（審查 11/6 engine）
   assert.ok(E.place(G, 2, 3, 'healer').ok);
   assert.strictEqual(E.tapUnit(G, 2, 3).ok, false);
 });

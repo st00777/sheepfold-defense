@@ -113,7 +113,7 @@ async function block2_3_nights() {
   for (const r of rows) {
     const n = r.d[0]; if (n === '(not set)') continue;
     const o = byNight[n] || (byNight[n] = { plays: 0, users: 0, win: 0, lose: 0, quit: 0, lost: 0, loseWave: 0, sec: 0 });
-    o.plays += r.m[0]; o.lost += r.m[2]; o.sec += r.m[4];
+    o.plays += r.m[0]; if (r.d[1] !== 'quit') { o.lost += r.m[2]; o.sec += r.m[4]; } // 失羊與秒數只累計打完的局，跟下面的分母同口徑
     // 結果三種：win 守住、lose 羊被叼光／牧人倒下、quit 中途按重來或回關卡。放棄要分開算：準備階段放棄 wave 是 0，混進「輸在波」會把平均拉到 0
     if (r.d[1] === 'win') o.win += r.m[0]; else if (r.d[1] === 'quit') o.quit += r.m[0]; else { o.lose += r.m[0]; o.loseWave += r.m[3]; }
   }
@@ -122,12 +122,13 @@ async function block2_3_nights() {
   if (!nights.length) { console.log('  （還沒有帶夜數的局；自訂維度登記後的新局才會出現）'); return; }
   line('  夜', '人', '局', '守住', '輸', '放棄', '平均星', '均失羊', '輸在波', '均秒');
   for (const n of nights) {
-    const o = byNight[n];
-    line(`  ${n} ${nightName(n)}`.slice(0, 14), o.users, o.plays, o.win, o.lose, o.quit, ((o.starSum || 0) / o.plays).toFixed(1),
-      (o.lost / o.plays).toFixed(1), o.lose ? (o.loseWave / o.lose).toFixed(1) : '–', Math.round(o.sec / o.plays));
+    const o = byNight[n], done = o.plays - o.quit; // 平均星、均失羊、均秒的分母只算打完的局（放棄的星一定 0、秒數又短，混進去會把三欄都拉低；跟「輸在波」同一口徑，審查 11/6）
+    if (!o.plays) { line(`  ${n} ${nightName(n)}`.slice(0, 14), o.users, 0, 0, 0, 0, '–', '–', '–', '–'); continue; } // 「人」那張表有、「夜×結果」那張還沒有（兩次查詢中間剛好有新局）：別印 NaN
+    line(`  ${n} ${nightName(n)}`.slice(0, 14), o.users, o.plays, o.win, o.lose, o.quit, done ? ((o.starSum || 0) / done).toFixed(1) : '–',
+      done ? (o.lost / done).toFixed(1) : '–', o.lose ? (o.loseWave / o.lose).toFixed(1) : '–', done ? Math.round(o.sec / done) : '–');
   }
   const far = nights[nights.length - 1];
-  const hard = nights.filter(n => byNight[n].plays >= 3).sort((a, b) => (byNight[b].lose / byNight[b].plays) - (byNight[a].lose / byNight[a].plays))[0];
+  const hard = nights.filter(n => byNight[n].plays >= 3 && byNight[n].lose > 0).sort((a, b) => (byNight[b].lose / byNight[b].plays) - (byNight[a].lose / byNight[a].plays))[0]; // 沒人輸過的夜不算「輸最多」（不然會印「0% 輸」；審查 11/6）
   console.log(`  最遠有人打到第 ${far} 夜（${nightName(far)}）` + (hard ? `；輸最多的是第 ${hard} 夜 ${nightName(hard)}（${pct(byNight[hard].lose, byNight[hard].plays)} 輸，${byNight[hard].plays} 局）` : ''));
 }
 

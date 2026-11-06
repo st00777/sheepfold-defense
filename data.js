@@ -8,7 +8,7 @@ const ROWS = 5, COLS = 7;
 // kind：producer 產糧／shooter 射手／blocker 牆／dog 牧羊犬／floor 鋪地／instant 一次性／support 輔助／deflector 趕路（第二章）／patrol 巡夜（第二章）
 // 第二章欄位：light 油燈照亮上下幾排（腳印預告回來）；lanes 射手同時打上下幾排；deflect 每趕一隻自己掉多少血；cradle 本排及上下鄰排的迷羊走到他的欄位就安全；walk 巡夜人每走一排要幾秒、reach 打前方幾格
 // upgrade：放下後「點兩下」花糧升級（第一下只預覽範圍與花費，4 秒內第二下才扣糧，index.html tapCell），欄位會蓋過原本的（牧人升老牧人、石牆修補是另外寫死的特例）；fromId＝在哪一夜（id）學會，engine.js 載入時換算成 from＝那一夜的位置（顯示編號），desc 裡的 {from} 一併填入
-// heal 每秒回血／range 回血範圍幾格（1＝周圍八格、2＝5×5）／brave 獅子咆哮嚇不停
+// heal 每秒回血／range 回復血量的範圍幾格（1＝周圍八格、2＝5×5）／brave 獅子咆哮嚇不停
 const UNITS = {
   shepherd: { name: '牧人', title: '羊圈的根基，糧從他手裡來',     ico: '🧑‍🌾', cost: 50,  hp: 60,  kind: 'producer', every: 7,   gives: 25,
               desc: '定時產糧。點兩下升級成老牧人，產糧更快', ref: '創 31:40' },
@@ -122,7 +122,7 @@ const ENEMIES = {
   jackal:  { name: '豺狼', title: '曠野的豺狼',   ico: '🐺', img: 'jackal', hp: 70,  speed: 0.26, bite: 12, cls: 'sly', detour: 6, prio: 3, ref: '耶 5:6',
              tip: '碰到牆就繞到隔壁排。光靠牆攔不住，派牧羊犬咬住牠' },
   boar:    { name: '野豬', title: '林中出來的野豬',   ico: '🐗', hp: 320, speed: 0.30, bite: 20, cls: 'big boar', slam: 100, slamStun: 1.5, trample: true, prio: 2, ref: '詩 80:13',
-             tip: '撞牆第一下很重，還會踩爛荊棘。守望樓擋得住，機弦手打得快' },
+             tip: '撞牆第一下很重，還會踩爛荊棘。守望樓擋得住，機弦手傷害高' },
   owl:     { name: '夜鴞', title: '荒場的鴞鳥',   ico: '🦉', hp: 60,  speed: 0.18, bite: 0,  cls: 'fly owl', flying: true, drift: 1, driftT: 4, ref: '詩 102:6',
              tip: '在排與排之間飄，單排射手常打空。投石隊一次打三排' },
   leopard: { name: '豹', title: '窺伺城邑的豹子',     ico: '🐆', hp: 650, speed: 0.28, bite: 28, cls: 'big leopard', thick: true, vaults: true, shiftEvery: 7, crouchAt: 5, crouch: 2, dash: 2, prio: 2, boss: true, ref: '耶 5:6',
@@ -336,7 +336,7 @@ const LEVELS = [
     speaker: null,
     intro: '上帝藉以西結先知說：「牧人在羊群四散的日子怎樣尋找他的羊，我必照樣尋找我的羊。」「失喪的，我必尋找；被逐的，我必領回；受傷的，我必纏裹；有病的，我必醫治。」（結 34:12、16）這是第一章的最後一夜。',
     units: ['shepherd', 'slinger', 'wall', 'sling', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult'], fresh: [], must: ['archer', 'healer', 'catapult'],
-    tips: ['🦁 今晚共五波，最後一波有兩隻獅子', '🫗 纏裹的牧人放下後點兩下花 50 糧膏油，回血範圍擴大到 5×5，放中排就顧得到五條線'],
+    tips: ['🦁 今晚共五波，最後一波有兩隻獅子', '🫗 纏裹的牧人放下後點兩下花 50 糧膏油，回復血量的範圍擴大到 5×5，放中排就顧得到五條線'],
     sheep: 3,
     waves: [
       { list: [['wolf', 6], ['fast', 2]],                                   gap: 3.0, rows: [0, 1, 2, 3, 4], hpMul: 1.2, say: '第 1 波' },
@@ -383,7 +383,7 @@ const LEVELS = [
     waves: [
       { list: [['wolf', 6]],                                               gap: 4.5, rows: [1, 2, 3],       hpMul: 1,   say: '第 1 波，狼' },
       { list: [['wolf', 8], ['fast', 4]],                                  gap: 2.2, rows: [0, 1, 2, 3, 4], hpMul: 1.2, say: '月亮下山了', hint: '沒有月亮了。油燈放中間，照亮三排，腳印就看得見，光裡的敵人也不會換排' },
-      { list: [['boar', 1], ['wolf', 6]],                                  gap: 2.8, rows: [0, 1, 2, 3, 4], hpMul: 1.45, ordered: true, say: '聽，有東西在撞', hint: '是野豬。牠撞石牆第一下很重，還會踩爛荊棘。守望樓擋得住，機弦手打得快' },
+      { list: [['boar', 1], ['wolf', 6]],                                  gap: 2.8, rows: [0, 1, 2, 3, 4], hpMul: 1.45, ordered: true, say: '聽，有東西在撞', hint: '是野豬。牠撞石牆第一下很重，還會踩爛荊棘。守望樓擋得住，機弦手傷害高' },
       { list: [['boar', 2], ['wolf', 9], ['jackal', 3], ['fast', 3]],      gap: 1.8, rows: [0, 1, 2, 3, 4], hpMul: 1.7, say: '最後一波', hint: '兩頭野豬，看燈下的腳印決定機弦手放哪排' },
     ],
     outroWin: '天亮了，父親的羊一隻沒少。拉結說：那天雅各見到我，就放聲而哭。（創 29:11）',
@@ -528,7 +528,7 @@ const LEVELS = [
     outroLose: {
       wolf: '失去一隻，就撇下九十九隻去找。（路 15:4）再守一夜。',
       sheep: '羊被叼走了。再守一夜，抱羊羔的牧人放前面。',
-      bird: '夜鴞飛進來了。投石隊放中間，天上三排一起顧。',
+      bird: '牠從天上進來了。投石隊放中間，天上三排一起顧。', // 這夜夜鴞、鷙鳥都有，標題已寫闖進來的是誰，內文不點名（審查 11/6 Spec：鷙鳥闖入時內文寫夜鴞）
     },
   },
 
@@ -1046,7 +1046,7 @@ const TRIALS = [
     mods: { units: ['slinger', 'wall', 'dog', 'hireling', 'tower', 'archer', 'thorns', 'brazier', 'jar', 'horn', 'healer', 'catapult', 'staff', 'lamp', 'patrol', 'volley', 'cradle'], oneBudget: true, startFood: 1200, gates: 0, waveOverride: [
       { list: [['fast', 9], ['wolf', 34], ['jackal', 7]], gap: 1.15, rows: ALL, hpMul: 1.29, ordered: true },
     ] },
-    text: '沒有拋石手、沒有投石手。五十隻一波從山下上來，1200 糧。斜坡上的打不到，等牠們上了坡緣再打，牆要擋得住。',
+    text: '沒有拋石手、沒有機弦手。五十隻一波從山下上來，1200 糧。直射的打不到斜坡上的，等牠們上了坡緣再打，牆要擋得住。',
     win: '石子落不到山下，你就在坡緣等。羊一隻沒少。' },
   // ── 第 22 夜 拋擲有時，堆聚有時（id 22）──
   { id: 'w22', kind: 'watch', levelId: 22, diff: 'storm', title: '拋擲有時，堆聚有時・守望',

@@ -14,6 +14,9 @@ test('tapPreview：空格、石堆、送卡模式回 null', () => {
   assert.strictEqual(Engine.tapPreview(G, 2, 0), null);
   const G3 = game(21, 'calm'); G3.food = 9999; // 第三章有石堆
   if (D.UNITS.cairn && G3.level.units.includes('cairn')) { Engine.place(G3, 0, 5, 'cairn'); assert.strictEqual(Engine.tapPreview(G3, 0, 5), null); }
+  const cvL = D.LEVELS.find(L => L.conveyor); assert.ok(cvL, '有送卡夜'); // 送卡模式：標題寫了但原本沒測（審查 11/6 engine）
+  const G4 = Engine.create(cvL.id, 'calm', () => 0.5), ck = cvL.units.find(k => D.UNITS[k].kind !== 'instant'); G4.hand.push(ck); assert.ok(Engine.place(G4, 2, 0, ck).ok, ck);
+  assert.strictEqual(Engine.tapPreview(G4, 2, 0), null, '送卡模式沒有再點一下升級');
 });
 
 test('tapPreview：牧人預告升老牧人、不改狀態；tapUnit 才扣糧', () => {
@@ -40,9 +43,11 @@ test('tapPreview：牆受傷才預告修補，剛修過（冷卻中）不預告'
 });
 
 test('tapPreview：通用升級要到學會那一夜才預告', () => {
-  const early = game(1), late = game(D.LEVELS.find(L => L.units.includes('thorns') && Engine.posOf(L.id) >= D.UNITS.thorns.upgrade.from).id);
+  const earlyL = D.LEVELS.find(L => L.units.includes('thorns') && Engine.posOf(L.id) < D.UNITS.thorns.upgrade.from); // 有荊棘、但還沒到學會升級的那一夜（原本拿第 1 夜、沒荊棘，這一半永遠跳過；審查 11/6 engine）
+  assert.ok(earlyL, '有一夜有荊棘但還沒學會蠍窩');
+  const early = game(earlyL.id), late = game(D.LEVELS.find(L => L.units.includes('thorns') && Engine.posOf(L.id) >= D.UNITS.thorns.upgrade.from).id);
   late.food = 9999;
-  if (early.level.units.includes('thorns')) { Engine.place(early, 2, 3, 'thorns'); assert.strictEqual(Engine.tapPreview(early, 2, 3), null); }
+  assert.ok(Engine.place(early, 2, 3, 'thorns').ok); assert.strictEqual(Engine.tapPreview(early, 2, 3), null, '還沒學會的夜不預告升級');
   assert.ok(Engine.place(late, 2, 3, 'thorns').ok);
   const pv = Engine.tapPreview(late, 2, 3);
   assert.deepStrictEqual(pv, { action: 'upgrade', cost: D.UNITS.thorns.upgrade.cost, name: D.UNITS.thorns.upgrade.name });

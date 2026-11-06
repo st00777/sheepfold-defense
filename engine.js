@@ -167,7 +167,7 @@
     return Array.isArray(s) && s.length >= MIN_CARDS && s.length <= MAX_CARDS && new Set(s).size === s.length && (s.includes('shepherd') || !level.units.includes('shepherd')) && s.every(k => level.units.includes(k));
   }
   // 讓這一局只用名單上的卡
-  function applyPick(G, keys) { G.level = { ...G.level, units: keys, fresh: G.level.fresh.filter(k => keys.includes(k)) }; }
+  function applyPick(G, keys) { G.level = { ...G.level, pool: G.level.pool || G.level.units, units: keys, fresh: G.level.fresh.filter(k => keys.includes(k)) }; } // pool：點兵前這一夜（或試煉題目）本來允許的全部卡，restore 驗檢查點用它，不用這次點的隊伍（審查 11/6 小居：試煉續玩換隊會靜默丟掉場上單位）
 
   // ====== 修飾詞（期 1，2026-10-29）：建局時套在關卡上的一層，試煉冊、今日推薦、模擬器都用這一條 ======
   // 六個欄位，沒寫的就照關卡原樣：
@@ -397,7 +397,7 @@
       if (G.food < def.cost) return { ok: false, msg: `糧不夠，${def.name}要 ${def.cost} 糧` };
       G.food -= def.cost;
     }
-    if (def.kind === 'instant') { useInstant(G, r, c, k); return { ok: true, msg: def.healAll ? `${def.name}倒了，九格內的夥伴回滿血` : `${def.name}打破了` }; }
+    if (def.kind === 'instant') { useInstant(G, r, c, k); return { ok: true, msg: def.healAll ? `${def.name}倒了，九格內的夥伴血量回滿` : `${def.name}打破了` }; }
     makeUnit(G, r, c, k);
     // 第一次放牧人／石牆，順便教「再點一下」
     if (def.kind === 'producer' && !G.taughtElder) { G.taughtElder = true; return { ok: true, msg: `牧人就位。糧夠 ${ELDER_COST} 時再點牧人一下，升老牧人送糧更快` }; }
@@ -429,6 +429,7 @@
       gates: G.gates.slice(), // 還在的看門的
       strays: G.strays.filter(s => !s.dead).map(s => ({ r: s.r, x: Math.round(s.x * 10) / 10, ...(s.own ? { own: true } : {}) })), // 還在路上的迷羊（own＝被大鷹抓走又打下來的自己的羊）
       strayQueue: G.strayQueue.map(t => Math.max(0, Math.round((t - G.waveT) * 10) / 10)),       // 還沒出來的迷羊（距現在幾秒）
+      ...(G.level.conveyor ? { convT: Math.max(0, Math.round(G.convT * 10) / 10) } : {}),        // 送卡夜：下一張卡還有幾秒（沒存的話續玩第一幀就多發一張，審查 11/6 engine）
       units: Object.values(G.units).map(u => ({ type: u.type, r: u.r, c: u.c, hp: Math.round(u.hp), elder: !!u.elder, upgraded: !!u.upgraded,
         cd: u.repairAt ? Math.max(0, Math.round((u.repairAt - G.time) * 10) / 10) : 0,
         rest: u.resting ? Math.max(0.1, Math.round(u.restT * 10) / 10) : 0,
@@ -453,12 +454,13 @@
     if (snap.sheepSaved !== undefined && !isInt(snap.sheepSaved, 0, 99)) return false;
     if (snap.unitsLost !== undefined && snap.unitsLost !== null && !isInt(snap.unitsLost, 0, 999)) return false; // null＝舊檔續玩後不知道，放行
     if (snap.seen !== undefined && !Array.isArray(snap.seen)) return false;
-    if (snap.hand !== undefined && !(Array.isArray(snap.hand) && snap.hand.length <= 12 && snap.hand.every(k => UNITS[k]))) return false;
+    if (snap.hand !== undefined && !(Array.isArray(snap.hand) && snap.hand.length <= 12 && snap.hand.every(isCard))) return false;
     if (snap.gates !== undefined && !(Array.isArray(snap.gates) && snap.gates.length <= ROWS && snap.gates.every(r => isInt(r, 0, ROWS - 1)))) return false;
     if (snap.strays !== undefined && !(Array.isArray(snap.strays) && snap.strays.length <= 20 && snap.strays.every(s => s && isInt(s.r, 0, ROWS - 1) && Number.isFinite(s.x) && s.x >= -1 && s.x <= COLS + 1 && (s.own === undefined || typeof s.own === 'boolean')))) return false;
     if (snap.strayQueue !== undefined && !(Array.isArray(snap.strayQueue) && snap.strayQueue.length <= 20 && snap.strayQueue.every(t => Number.isFinite(t) && t >= 0 && t <= 600))) return false;
+    if (snap.convT !== undefined && !(Number.isFinite(snap.convT) && snap.convT >= 0 && snap.convT <= 60)) return false;
     if (!Array.isArray(snap.units) || snap.units.length > ROWS * COLS) return false;
-    return snap.units.every(s => s && UNITS[s.type] && isInt(s.r, 0, ROWS - 1) && isInt(s.c, 0, COLS - 1)
+    return snap.units.every(s => s && isCard(s.type) && isInt(s.r, 0, ROWS - 1) && isInt(s.c, 0, COLS - 1)
       && (s.hp === undefined || Number.isFinite(s.hp)) && (s.uses === undefined || isInt(s.uses, 0, 99)) && (s.cd === undefined || (Number.isFinite(s.cd) && s.cd >= 0)) && (s.rest === undefined || (Number.isFinite(s.rest) && s.rest >= 0 && s.rest <= 600)) && (s.t === undefined || (Number.isFinite(s.t) && s.t >= 0 && s.t <= 600))
       && (s.cdLen === undefined || (Number.isFinite(s.cdLen) && s.cdLen > 0 && s.cdLen <= 600)));
   }
@@ -467,7 +469,7 @@
     if (!sameMods(snap.mods, G.mods)) return false; // 檢查點是另一組修飾詞（或沒有修飾詞）打出來的，不能接
     for (const s of snap.units) {
       if (G.units[key(s.r, s.c)] || G.rocks.has(key(s.r, s.c))) continue;
-      if (G.mods && !G.level.units.includes(s.type)) continue; // 有修飾詞的局：白名單外的卡不還原（被改過的存檔）；故事模式照舊，玩家換過隊伍的舊檢查點不能丟
+      if (G.mods && !(G.level.pool || G.level.units).includes(s.type)) continue; // 有修飾詞的局：題目白名單（pool＝點兵前的全部卡）外的卡不還原（被改過的存檔）；故事模式照舊，玩家換過隊伍的舊檢查點不能丟
       const def = UNITS[s.type];
       const u = makeUnit(G, s.r, s.c, s.type);
       if (s.elder && def.every) { u.elder = true; u.timer = Math.min(u.timer, def.every * ELDER_MUL); }
@@ -487,6 +489,7 @@
     }
     G.food = Math.max(0, snap.food); if (G.level.sheep) G.sheep = Math.max(1, Math.min(99, Number.isInteger(snap.sheep) ? snap.sheep : G.sheep)); // 迷羊回圈後會超過開局的隻數，不壓回去
     if (G.level.conveyor && Array.isArray(snap.hand)) { G.hand = snap.hand.filter(k => UNITS[k] && G.level.units.includes(k)); ev(G, { t: 'hand' }); } // 送卡模式：手牌跟著存，續玩不會重發開局三張
+    if (G.level.conveyor) G.convT = Number.isFinite(snap.convT) ? snap.convT : conveyorEvery(G); // 下一張卡的倒數也接回來；舊快照沒這欄就從整段間隔重數，不是第一幀就發
     G.sheepLost = Number.isInteger(snap.sheepLost) ? snap.sheepLost : 0;
     G.sheepSaved = Number.isInteger(snap.sheepSaved) ? snap.sheepSaved : 0;
     G.unitsLost = Number.isInteger(snap.unitsLost) ? snap.unitsLost : null; // 舊存檔沒這欄：這局不知道有沒有損失，「零損失」那顆星不給
@@ -607,6 +610,7 @@
     if (!u || !def) return { ok: false };
     const old = UNITS[u.type];
     if (!G.level.units.includes(k)) return { ok: false, msg: '這一關還沒有這張卡' };
+    { const cap = G.level.maxUnits && G.level.maxUnits[k]; if (cap !== undefined && countUnits(G, k) >= cap) return { ok: false, msg: `${def.name}今晚最多 ${cap} 位` }; } // 數量上限：換卡也算放（canSwap 有擋、swap 本身原本沒擋；目前上限只用在牧人、牧人不能換，先補齊免得以後給牆設上限時漏；審查 11/6 engine）
     if (u.type === k) return { ok: false, msg: old.kind === 'blocker' && u.hp < u.maxHp ? `已經是${old.name}了，被咬壞的空手點它修補` : `這格已經是${old.name}了` };
     if (!SWAP_KINDS.includes(def.kind) || old.kind !== def.kind) return { ok: false, msg: `${old.name}不能直接換成${def.name}，要先用鏟子拆` };
     if (def.cost <= old.cost) return { ok: false, msg: `${def.name}沒有比${old.name}貴，要換請先用鏟子拆` };
@@ -760,6 +764,7 @@
   function dropSheep(G, e, why) {
     if (!e.carrying) return;
     e.carrying = false;
+    if (e.empty) { e.empty = false; return; } // 空手跑的沒羊可丟：掉頭再往羊圈走
     if (e.carryStray) { e.carryStray = false; spawnStray(G, e.r, Math.min(COLS, e.x), e.carryOwn); e.carryOwn = false; }
     ev(G, { t: 'toast', msg: `${ENEMIES[e.type].name}${why}，把羊丟下了 🐑` });
   }
@@ -784,7 +789,7 @@
   }
   const targetable = e => !e.underground && !e.dead && e.hp > 0; // 零血的（這一步剛被打死、還沒清掉）不當目標：不吃石子、不被狗咬、不叼羊、不被嚎叫鼓舞
   // 偷雞摸狗的：狗專咬（翻牆、偷羊、閃避、鑽地）
-  const sneaky = e => { const d = ENEMIES[e.type]; return !!(d.vaults || d.steals || d.dodge || d.digs || d.throws); }; // 強盜站著丟石頭，也算狗的獵物
+  const sneaky = e => { const d = ENEMIES[e.type]; return !!(d.vaults || d.steals || d.dodge || d.digs || d.throws || d.detour); }; // 強盜站著丟石頭，也算狗的獵物；豺狼繞路也算（roster 寫「狗用 hunt 傷害」，之前漏了只吃一般 dps，審查 11/6 小居）
 
   // ====== 每一步 ======
   function step(G, dt) {
@@ -983,7 +988,7 @@
             if (!ground.length) continue;
             u.timer = def.every; u.cdLen = def.every;
             const moved = []; // 每隻實際被推了多遠（靠邊的會被夾住，推不到整格），畫面層照這個滑
-            for (const e of ground) { dropSheep(G, e, '被角聲推回去'); const x0 = e.x; e.x = Math.min(COLS + 0.2, e.x + def.push); e.st.stun = def.stun; release(G, e); moved.push({ id: e.id, dx: e.x - x0 }); }
+            for (const e of ground) { dropSheep(G, e, '被角聲推回去'); const x0 = e.x; e.x = Math.min(COLS + 0.2, e.x + def.push); e.st.stun = Math.max(e.st.stun || 0, def.stun); release(G, e); moved.push({ id: e.id, dx: e.x - x0 }); }
             ev(G, { t: 'fx', kind: 'horn', r: u.r, x: u.c, moved });
             ev(G, { t: 'toast', msg: all ? '銀號一響，五排的狼都退了一步' : '角聲一響，那排的狼退了一步' });
           }
@@ -1009,8 +1014,8 @@
     const nDogs = e => dogHolders(G, e).length;
     if (held) { // 要不要換目標：有敵人叼著羊沒狗追，或有新敵人沒狗盯而我不是手上這隻的第一隻狗
       const free = cands.filter(e => e !== held && nDogs(e) === 0);
-      const first = dogHolders(G, held).reduce((a, b) => (b.holdT < a.holdT || (b.holdT === a.holdT && b.id < a.id) ? b : a)); // 同一幀一起盯上的，id 小的算先
-      if (free.some(e => e.carrying) || (free.length && first !== u)) { unhold(G, u); held = null; }
+      const last = dogHolders(G, held).reduce((a, b) => (b.holdT > a.holdT || (b.holdT === a.holdT && b.id > a.id) ? b : a)); // 最晚盯上的那隻（同一幀一起盯上的，id 大的算晚）；原本寫「我不是第一隻就轉」，三隻以上合咬時轉過去的看走訪順序（審查 11/6 engine）
+      if (free.some(e => e.carrying && !e.empty) || (free.length && last === u)) { unhold(G, u); held = null; }
     }
     if (!held && cands.length) {
       const stray = G.strays.find(s => s.r === u.r && !s.dead && s.x <= COLS - STRAY.safe); // 已經走進狼叼得到的範圍的迷羊
@@ -1077,7 +1082,7 @@
     u.timer = Math.max(0, u.timer - dt); // 走路時也在蓄力，到了那排馬上能出手
     if (arrived) {
       const t = G.enemies.find(e => e.r === row && inReach(e));
-      if (t) { // 接戰：留在這排打，不走
+      if (t && patrolCanStand(G, u, row)) { // 接戰：留在這排打，不走。站的那格被放了東西就不接戰、走下面那條讓回家排（roster：「站著的格子被放了東西就讓回家排」；審查 11/6 小居）
         if (u.timer <= 0) { u.timer = def.every; hurt(G, t, def.dmg); ev(G, { t: 'hit', id: t.id }); ev(G, { t: 'fx', kind: 'strike', r: row, x: t.x, id: u.id }); } // id 帶巡夜人：畫面讓他往前揮一下，看得出是他出的手
         return;
       }
@@ -1237,14 +1242,14 @@
 
       // 驚慌：往右跑，不咬
       if (e.st.panic) { e.x = Math.min(COLS + 0.3, e.x + STATUS.panic.speed * dt); e.biting = null; continue; }
-      if (e.st.stun || e.st.distract || e.heldBy) { e.biting = null; if (e.heldBy) biteDog(G, e, dt); continue; }
+      if (e.st.stun || e.st.distract || e.heldBy) { e.biting = null; if (e.heldBy && !e.st.stun) biteDog(G, e, dt); continue; } // 暈住的（掉坑、被角聲吹、被滾石砸）不咬牆也不咬狗，狗照咬牠（審查 11/6 小居＋engine 兩路）
       // 豹：走到定點先蹲（有預兆），蹲完衝兩格
       if (def.crouchAt && !e.crouched && e.x <= def.crouchAt) { e.crouched = true; e.crouchT = def.crouch; ev(G, { t: 'fx', kind: 'crouch', r: e.r, x: e.x }); ev(G, { t: 'toast', msg: '豹蹲下來了，牠要衝了' }); }
       if (e.crouchT > 0) { e.crouchT -= dt; e.biting = null; if (e.crouchT <= 0) { e.crouchT = 0; e.dashLeft = def.dash; } continue; }
       // 抱著羊往回跑
       if (e.carrying) {
         e.x += (def.fleeSpeed || def.speed * 1.4) * dt;
-        if (e.x > COLS + 0.3) { e.dead = true; G.sheep--; G.sheepLost++; ev(G, { t: 'toast', msg: e.carryOwn ? `一隻羊被${def.name}抓走了 🐑` : e.carryStray ? '迷羊被叼走了 🐑' : '一隻羊被抱走了 🐑' }); ev(G, { t: 'sheep' }); if (G.sheep <= 0) return lose(G, 'sheep'); if (G.level.maxSheepLost !== undefined && G.sheepLost > G.level.maxSheepLost) return lose(G, 'sheepLost'); } // sheepLost：試煉「失羊即輸」（新期 2），羊還有但超過題目准失的隻數
+        if (e.x > COLS + 0.3) { e.dead = true; if (e.empty) continue; G.sheep--; G.sheepLost++; ev(G, { t: 'toast', msg: e.carryOwn ? `一隻羊被${def.name}抓走了 🐑` : e.carryStray ? '迷羊被叼走了 🐑' : '一隻羊被抱走了 🐑' }); ev(G, { t: 'sheep' }); if (G.sheep <= 0) return lose(G, 'sheep'); if (G.level.maxSheepLost !== undefined && G.sheepLost > G.level.maxSheepLost) return lose(G, 'sheepLost'); } // sheepLost：試煉「失羊即輸」（新期 2），羊還有但超過題目准失的隻數
         continue;
       }
       // 強盜：走到坡下定點就站住，朝這排最前面的夥伴丟石頭；這排沒夥伴了才繼續走（被推回去就再走回來站好）
@@ -1276,7 +1281,7 @@
           if (bk === 'deflector' && !def.boss && e.deflectCd <= 0) {
             const r2 = deflectRow(b);
             // 不趕回牠剛被趕來的那排（兩根杖之間不打乒乓；這根杖就當牆讓牠咬）
-            if (r2 !== e.deflectFrom && moveRow(G, e, r2)) { e.deflectFrom = b.r; e.deflectCd = UNITS[b.type].deflectCd; b.hp -= UNITS[b.type].deflect; ev(G, { t: 'unit', r: b.r, c: b.c }); if (b.hp <= 0) removeUnit(G, b); continue; }
+            if (r2 !== e.deflectFrom && moveRow(G, e, r2)) { e.deflectFrom = b.r; e.deflectCd = UNITS[b.type].deflectCd; b.hp -= UNITS[b.type].deflect; ev(G, { t: 'unit', r: b.r, c: b.c }); if (b.hp <= 0) { b.worn = true; removeUnit(G, b); } continue; } // worn：杖撥到斷是自己磨損，離場事件才不會標成 sold 直接消失（審查 11/6 engine）
           }
           // 豺狼：前面是牆、隔壁排同一格空著就繞過去
           if (def.detour && bk === 'blocker' && e.detourCd <= 0 && rowLit(G, e.r)) { if (!G.toldLampLock) { G.toldLampLock = true; ev(G, { t: 'toast', msg: '豺狼被油燈照著，繞不了路，只能咬牆' }); } }
@@ -1305,7 +1310,10 @@
       if (e.x < -0.6) {
         const type = e.type;
         if (def.steals && G.sheep > 0) {
+          const inTransit = G.enemies.filter(o => o !== e && o.carrying && !o.empty && (!o.carryStray || o.carryOwn)).length + G.strays.filter(s => !s.dead && s.own).length; // 正被抱走／抓走、還有打下來正走回圈的自己的羊：名額還在 G.sheep 裡，圈裡卻已經沒有牠
           e.carrying = true; e.x = -0.5;
+          if (G.sheep - inTransit <= 0) { e.empty = true; ev(G, { t: 'toast', msg: `${def.name}到了羊圈，羊都不在，空手跑了` }); continue; } // 羊全在路上（審查 11/6 engine：羊剩一隻、兩個偷羊人都「抱起」同一隻，打倒一個把羊救回來了，另一個跑出去還是判輸）
+
           if (def.flying) { e.carryStray = true; e.carryOwn = true; e.high = false; } // 大鷹抓了羊就飛低了，打下來羊會落地自己走回來
           ev(G, { t: 'toast', msg: def.flying ? `${def.name}抓起一隻羊往回飛了！現在牠飛低了，打下來` : '偷羊人抱起一隻羊往回跑了！' }); ev(G, { t: 'fx', kind: 'grab', r: e.r, x: 0, type }); continue; // type：畫面層放誰的聲音（大鷹抓羊再尖嘯一聲）
         }

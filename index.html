@@ -518,7 +518,7 @@
       <div class="snd-row"><span>音樂</span><button data-snd="music">開</button></div>
       <div class="snd-row"><span>音效</span><button data-snd="sfx">開</button></div>
       <div class="snd-row" data-dep="sfx"><span>蟲鳴</span><button data-snd="amb">關</button></div>
-      <div class="snd-row" data-dep="sfx"><span>音量</span><div class="seg"><button data-vol="0">小</button><button data-vol="1">中</button><button data-vol="2">大</button></div></div>
+      <div class="snd-row"><span>音量</span><div class="seg"><button data-vol="0">小</button><button data-vol="1">中</button><button data-vol="2">大</button></div></div><!-- 音量不跟著音效壓暗：背景音樂也吃同一個音量，關了音效只留音樂時還要調得了（審查 11/6） -->
     </div>
     <div class="snd-note">手機切到靜音時不會有聲音。</div>
     <div class="snd-note key-help">鍵盤：1–9 選卡、0 鏟子、方向鍵移動、Enter 放下、Esc 取消（沒選卡就暫停）、空白鍵暫停</div>
@@ -620,13 +620,13 @@
   </div>
 </div>
 
-<script src="data.js?v=28"></script>
-<script src="engine.js?v=28"></script>
-<script src="save.js?v=6"></script>
+<script src="data.js?v=29"></script>
+<script src="engine.js?v=29"></script>
+<script src="save.js?v=7"></script>
 <script src="sound.js?v=10"></script>
 <script src="lib/pixi.min.js"></script>
 <script src="lib/pixelfx.js?v=4"></script>
-<script src="render.js?v=30"></script>
+<script src="render.js?v=31"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS、TRIALS、TRIAL_KINDS 由 data.js 直接提供
@@ -694,10 +694,22 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '先備糧，再排陣。從第一隻狼開始練起，最後迎戰兩隻獅子！', 2: '月亮藏起來，腳印也看不見了。提防換排的敵人，也別忘了接回路上的迷羊。', 3: '羊圈搬上山，老擺法得換一換。拋石越過斜坡、陷坑留住敵人，最後挑戰兩隻野牛！' };
-const HOME_UPDATE = '最近更新 11/5：棋盤多了像素風小動畫（螢火蟲、煙圈、火球、毒霧、衝擊波），省效能或減少動態時不出現；細節在設定頁的更新紀錄';
+const HOME_UPDATE = '最近更新 11/6：全遊戲審查修正——雇工嚇跑、牆被咬垮終於有離場動畫；偷羊人抱著的羊救回來就不算失；豺狼被狗咬傷害照規格；送卡夜放卡不再沒聲音；細節在設定頁的更新紀錄';
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.11.06.1', notes: [ // 11/6 晚上：全遊戲審查四部奏（不只最近改動）採納的修正，表在 docs/review-full-2026-11-06.md
+    '單位離場終於有動畫：雇工被嚇跑轉身跑掉、荊棘被野豬踩扁、牆被咬垮倒下、荊棘磨光縮小淡出（10/29 做好的動畫一直沒接上）',
+    '偷羊人、大鷹：羊正被抱走或正走回圈時，後到的找不到羊會空手跑掉，不再「抱走」同一隻羊害你被判輸',
+    '牧羊犬咬豺狼的傷害照規格用獵犬傷害（之前只有一般傷害的三分之一）；暈住的敵人（掉坑、被角聲吹）不再反咬狗；角聲不會把陷坑更長的困住時間縮短',
+    '送卡夜放下手上最後一張卡，放下的聲音、回彈與範圍提示回來了；送卡夜續玩時下一張卡的倒數也接回來，不再一續玩就多拿一張',
+    '巡夜人站的格子被你放了東西，就算正在打也會讓出來走回家排',
+    '守夜試煉續玩時換了隊伍，場上原本的單位不會再被悄悄丟掉',
+    '結算頁的成就卡等三顆星跳完才出來；詩篇夜在結算頁按「再守這一夜」會先把成就卡跳完；尾聲連點兩下不會跳過一頁',
+    '頭目橫幅跟著暫停，再守一夜時不會留著上一夜的名字；獅吼改成紅橘色衝擊波，跟吹角的金色分得開；無月夜「升級」「修補」角標在暗處也看得到',
+    '關掉音效只留音樂時，音量仍然調得了；減少動態時結算頁留 1.5 秒讓你看到天亮；鍵盤焦點在按鈕上按 Enter 由按鈕自己動',
+    '開著開發者模式的那局整局不記（之前最高紀錄與守過仍會記）；匯入壞掉的存檔碼不會讓選夜頁打不開',
+  ] },
   { ver: '2026.11.06', notes: [ // 11/6 審查四部奏（範圍 11/1 之後 20 個 commit）採納的修正
     '像素小動畫：遊戲中途開省效能、切 2× 或系統減少動態時，正在跑的螢火蟲、毒霧、火球也一起收掉（之前只擋新的；燒著的石子還可能整段看不見）',
     '結算頁一出來就按「再守這一夜」，成就卡不會蓋到正在跑的局上，回選單再補跳',
@@ -1153,12 +1165,13 @@ function tapCell(r, c) {
     return; }
   if (tut.on) { const [tr, tc] = TUT_STEPS[tut.step].cell; if (r !== tr || c !== tc) { toast('放在亮著的那一格', true); return; } }
   // 格子有人就走「直接換」（同類更貴才會成功，其餘回原因）；沒人才是放下。水袋例外：直接倒在那一格（它就是要倒在受傷的守望樓上）；瓦瓶照舊要空格
-  const res = G.units[r + ',' + c] && !UNITS[selected].healAll ? Engine.swap(G, r, c, selected) : Engine.place(G, r, c, selected);
+  const sel = selected; // 先記住放的是哪張：送卡夜放下手上最後一張同類卡，引擎送 hand 事件、flushEvents 會把選取清掉，下面再讀 selected 就是 null（審查 11/6 小居抓到：放下後沒聲音、沒回彈、範圍不亮，主控台 TypeError）
+  const res = G.units[r + ',' + c] && !UNITS[sel].healAll ? Engine.swap(G, r, c, sel) : Engine.place(G, r, c, sel);
   flushEvents();
   if (!res.ok) { toast(res.msg || ''); return; }
-  if (nightStat) nightStat.placed[selected] = (nightStat.placed[selected] || 0) + 1; // 統計：這一夜每張卡放了幾次
-  if (UNITS[selected].kind !== 'instant') { Sound.play('place'); Board.placed(r, c, selected); } // 放下壓扁回彈；火盆油燈先點亮。瓦瓶的聲音走 fx blast，也不回彈
-  showRange(rangeCells(selected, r, c), 1300); // 放下後亮 1.3 秒這張卡管得到的格子（手機沒有滑過，靠這個看範圍）
+  if (nightStat) nightStat.placed[sel] = (nightStat.placed[sel] || 0) + 1; // 統計：這一夜每張卡放了幾次
+  if (UNITS[sel].kind !== 'instant') { Sound.play('place'); Board.placed(r, c, sel); } // 放下壓扁回彈；火盆油燈先點亮。瓦瓶的聲音走 fx blast，也不回彈
+  showRange(rangeCells(sel, r, c), 1300); // 放下後亮 1.3 秒這張卡管得到的格子（手機沒有滑過，靠這個看範圍）
   clearSelection();
   if (tut.on) { tutAdvance(); return; }
   toast(res.msg);
@@ -1207,6 +1220,7 @@ function flushEvents() {
       case 'callout': if (!seenEnemy(e.type)) { toast(`${ENEMIES[e.type].ico} ${e.tip}`, true); markSeenEnemy(e.type); } break;
       case 'pop': Board.event(e, G); if (String(e.text)[0] === '+') Sound.play('food'); break;
       case 'unit': Board.event(e, G); break;
+      case 'gone': Board.event(e, G); break; // 單位離場（嚇跑、踩爛、被咬倒、磨損用完）：render.js 的 unitGone 照原因播動畫。10/29 做好動畫時這裡漏了轉交，整整一週沒播過（審查 11/6 Standards／render 兩路都抓到）
       case 'fx': Board.event(e, G); if (FX_SFX[e.kind]) Sound.play(FX_SFX[e.kind]); if (e.kind === 'gate') Sound.play('horn'); if (e.kind === 'grab' && SPAWN_SFX[e.type]) Sound.play(SPAWN_SFX[e.type]); break; // 大鷹抓羊再尖嘯一聲（提案 §5 #11）
       case 'marker': case 'strayMark': Board.event(e, G); break;
       case 'sheep': $('#sheep-n').textContent = G.sheep; break;
@@ -1226,6 +1240,7 @@ function tick(now) {
   raf = requestAnimationFrame(tick);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   if (paused) return;
+  if (nightStat) nightStat.sec = (nightStat.sec || 0) + dt; // 統計的「耗時」只算真的在打的秒數：暫停、切去別的 App 都不算（dt 封頂 0.05，背景回來那一下也不會灌進去；審查 11/6）
   // 加速時分成小步跑，數值行為才跟 1× 一樣
   const wasWave = G.phase === 'wave';
   try {
@@ -1314,6 +1329,7 @@ function recordBest(cleared) {
     if (cleared) T.cleared[trial.id] = true;
     return saveProgress();
   }
+  if (devUsed) return true; // 故事模式也一樣：開著開發者面板的那局整個不記（最高紀錄、守過、星）。原本只擋星，+500 糧清場過的夜會記成守過、下一夜也跟著開（審查 11/6 小居＋index 兩路都抓到；要全開用 ?all）
   const k = level.id + ':' + diff;
   const score = cleared ? G.waves.length + 1 : G.wave;
   const old = P.best[k] || {};
@@ -1351,7 +1367,7 @@ function onWin() {
     if (!trial) showStars(); // 試煉不記星（藍圖：星只在故事模式顯示與統計）
     $('#next').hidden = !next; $('#retry').textContent = trial ? '再打這一題' : '再守這一夜';
     $('#epilogue-btn').hidden = !(!trial && level.id === LAST_NIGHT.id); // 第 30 夜：結算頁多一顆「看尾聲」（期 4）
-    if (fresh.length && !level.psalm) setTimeout(showAchvCard, 900); // 成就卡片：結算頁出來後再跳，一次一條；0.9 秒內離開的話，佇列留著、回首頁再跳（Spec 審查 11/1）。章末夜（有詩篇）不在這裡跳，等玩家離開結算回到任一選單再跳（showMenu），詩篇才讀得完（11/2 審查交集 B）
+    if (fresh.length && !level.psalm) setTimeout(showAchvCard, 350 + Engine.starSlots(level) * 180 + 320 + 800); // 成就卡片：等三顆星都跳完（每顆 180ms、最後一顆 320ms）再停 0.8 秒才跳，兩個儀式不疊在一起（審查 11/6 動畫 review；原本固定 0.9 秒會蓋到第三顆星），一次一條；還沒跳就離開的話，佇列留著、回首頁再跳（Spec 審查 11/1）。章末夜（有詩篇）不在這裡跳，等玩家離開結算回到任一選單再跳（showMenu），詩篇才讀得完（11/2 審查交集 B）
     if (level.psalm && !trial) {
       const box = $('#psalm'), lines = level.psalm, pick = lines.length > 2 ? (level.psalmPick ?? 0) : -1; // 整篇詩（第 10、30 夜）先只放 psalmPick 那一句，點「讀全文」才展開；兩句的（第 20 夜）照舊全放（11/2 審查視角 4）
       if (level.psalmTitle) { const h = document.createElement('div'); h.className = 'ref'; h.textContent = level.psalmTitle; box.appendChild(h); setTimeout(() => h.classList.add('on'), 300); } // 不認識的人也知道這是哪一篇（2026-10-20 G2）
@@ -1363,7 +1379,7 @@ function onWin() {
         more.addEventListener('click', () => { more.remove(); box.querySelectorAll('div:not(.ref)').forEach(d => d.remove()); lines.forEach((line, i) => addLine(line, 100 + i * 250)); Sound.play('tap'); });
       }
     }
-  }, REDUCE_MOTION.matches ? 0 : 2600); // 2026-10-26 James：場景淡成清晨要 1.8 秒，0.9 秒就被結算頁蓋住看不到；延到 2.6 秒（淡完再停 0.8 秒），失守那邊維持 0.9
+  }, REDUCE_MOTION.matches ? 1500 : 2600); // 2026-10-26 James：場景淡成清晨要 1.8 秒，0.9 秒就被結算頁蓋住看不到；延到 2.6 秒（淡完再停 0.8 秒），失守那邊維持 0.9。減少動態減的是位移不是時間：清晨淡入只是透明度，留 1.5 秒讓人看到「熬過了」（審查 11/6 動畫 review；原本 0 秒直接蓋掉）
 }
 // 結語依實際羊數選（2026-10-21 小居第 6 項）：有羊數的夜才講；接回幾隻、失去幾隻、圈裡剩幾隻都從引擎帶，不再一句「一隻不少」到底
 function sheepSummary() {
@@ -1399,6 +1415,7 @@ function clearBoard() {
   selected = null; clearRange();
   document.querySelectorAll('.card').forEach(x => x.classList.remove('selected'));
   tut.on = false; $('#tut-skip').classList.remove('on');
+  clearTimeout(bannerTimer); if (bannerAnim) { try { bannerAnim.cancel(); } catch (e) {} bannerAnim = null; } $('#boss-banner').style.opacity = 0; // 上一夜的頭目橫幅不帶進下一夜（頭目剛登場就輸、馬上再守時會飄著舊名字；審查 11/6）
   $('#result').hidden = true;
 }
 function startGame(fromCp) {
@@ -1432,7 +1449,7 @@ function startGame(fromCp) {
   last = performance.now();
   raf = requestAnimationFrame(tick);
   Sound.ambient(true); Sound.music(chapterOf(level)); // 期 5：三章各一套生成式背景音樂
-  nightStat = devUsed ? null : { placed: {}, t0: Date.now(), resumed }; // 開著開發者面板的那局整局不記
+  nightStat = devUsed ? null : { placed: {}, sec: 0, resumed }; // 開著開發者面板的那局整局不記
   if (nightStat) track('night_start', { night: Engine.posOf(level.id), level_id: level.id, diff, resumed: resumed ? 1 : 0, mode: trial ? 'trial' : 'story', ...(trial ? { trial_id: trial.id } : {}) }); // mode：報表照夜分組時先濾掉試煉，才不會把試煉算成那一夜的故事局
 }
 function backToLevels() {
@@ -1585,7 +1602,7 @@ function enemyNums(k) {
   const e = ENEMIES[k], sp = e.speed >= SPEED_FAST ? '快' : e.speed <= SPEED_SLOW ? '慢' : '普通';
   const s = [`血量 ${e.hp}`, e.bite ? `每秒傷害 ${e.bite}` : '不攻擊', `移動速度 ${sp}`];
   if (e.thick) s.push(`厚皮：石子與箭矢傷害只剩 ${Math.round(THICK_MUL * 100)}%，機弦、投石機、拋石手、火、毒全額`);
-  if (e.howl) s.push(`每 ${e.howl} 秒嚎叫：2 格內的狼速度 ×${STATUS.howl.mul}，持續 ${STATUS.howl.t} 秒`);
+  if (e.howl) s.push(`每 ${e.howl} 秒嚎叫：2 格內的敵人速度 ×${STATUS.howl.mul}，持續 ${STATUS.howl.t} 秒`); // 引擎對兩格內所有敵人生效（母熊、鷙鳥也跑），跟 11/2 波間提示同口徑（審查 11/6 小居）
   if (e.roar) s.push(`每 ${e.roar} 秒咆哮：2 格內的夥伴停手 ${STATUS.fear.t} 秒（牆、荊棘、狗、纏裹的牧人不受影響），雇工直接逃走（講定工價的只僵住）`);
   if (e.wallMul) s.push(`咬牆傷害 ×${e.wallMul}`);
   if (e.enrage) s.push(`血量低於 ${Math.round(e.enrage * 100)}% 狂暴：速度與傷害 ×2`);
@@ -1679,7 +1696,7 @@ document.addEventListener('keydown', ev => {
   if (k === '0' || k === 's' || k === 'S') { tapShovel(); return; }
   const dr = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[k];
   if (dr) { ev.preventDefault(); if (cursor) setCursor(cursor[0] + dr[0], cursor[1] + dr[1]); else setCursor(Math.floor(ROWS / 2), 0); return; }
-  if (k === 'Enter' && cursor) { ev.preventDefault(); tapCell(cursor[0], cursor[1]); }
+  if (k === 'Enter' && cursor && tag !== 'BUTTON') { ev.preventDefault(); tapCell(cursor[0], cursor[1]); } // 焦點在按鈕（加速、暫停）上時 Enter 要讓按鈕自己動，不是去點游標那一格（審查 11/6 小居）
 });
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => { roster.tab = b.dataset.tab; roster.focus = null; renderRoster(); }));
 $('#roster-go').addEventListener('click', () => { if (roster.picked.size < MIN_CARDS) return; saveLoadout(level, sortUnits([...roster.picked])); $('#roster').hidden = true; const cp = pendingCp; pendingCp = null; startGame(cp); });
@@ -1726,7 +1743,8 @@ const isCssAnim = a => (typeof CSSAnimation !== 'undefined' && a instanceof CSSA
 function syncPause() {
   Board.setPaused(paused); $('#dev-pause').classList.toggle('on', paused); $('#dev-pause').textContent = paused ? '繼續' : '暫停';
   const shell = $('#shell'); if (!shell || !shell.getAnimations) return;
-  if (paused) { for (const a of shell.getAnimations({ subtree: true })) if (!isCssAnim(a) && a.playState === 'running') { a.pause(); heldAnims.push(a); } }
+  const banner = $('#boss-banner'), anims = [...shell.getAnimations({ subtree: true }), ...(banner && banner.getAnimations ? banner.getAnimations() : [])]; // 頭目橫幅掛在 #scene 不在 #shell 底下，也要一起停（審查 11/6：頭目一登場就暫停，回來橫幅已經跑完）
+  if (paused) { for (const a of anims) if (!isCssAnim(a) && a.playState === 'running') { a.pause(); heldAnims.push(a); } }
   else for (const a of heldAnims.splice(0)) if (a.playState === 'paused') a.play();
 }
 function pauseGame() {
@@ -1761,7 +1779,7 @@ function syncSoundUI() {
   document.querySelectorAll('.snd-btn').forEach(b => { b.textContent = p.sfx ? '🔊' : '🔇'; b.title = p.sfx ? '音效：開（點一下關掉音效；音樂在暫停面板另外調）' : '音效：關（點一下打開音效）'; });
   document.querySelectorAll('#snd-panel [data-snd]').forEach(b => { const on = !!p[b.dataset.snd]; b.textContent = on ? '開' : '關'; b.classList.toggle('on', on); });
   document.querySelectorAll('#snd-panel [data-vol]').forEach(b => b.classList.toggle('on', Number(b.dataset.vol) === p.vol));
-  document.querySelectorAll('#snd-panel .snd-row[data-dep="sfx"]').forEach(row => row.classList.toggle('off', !p.sfx)); // 標了 data-dep=sfx 的列（蟲鳴、音量）跟著音效壓暗；音樂自己一軌不受影響（Standards 審查 11/1：不靠列序號）
+  document.querySelectorAll('#snd-panel .snd-row[data-dep="sfx"]').forEach(row => row.classList.toggle('off', !p.sfx)); // 標了 data-dep=sfx 的列（蟲鳴）跟著音效壓暗；音量列不標，音樂也吃它（Standards 審查 11/1：不靠列序號；11/6 審查：關音效留音樂時音量調不了）
 }
 document.querySelectorAll('.snd-btn').forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); Sound.set('sfx', !Sound.prefs.sfx); syncSoundUI(); Sound.play('tap'); }));
 document.querySelectorAll('#snd-panel [data-snd]').forEach(b => b.addEventListener('click', () => { Sound.set(b.dataset.snd, !Sound.prefs[b.dataset.snd]); syncSoundUI(); Sound.play('tap'); }));
@@ -1864,14 +1882,14 @@ function trackNightEnd(result) {
   if (!nightStat || devUsed) { nightStat = null; return; }
   const st = (G.result && G.result.stars) || {}, stars = trial ? 0 : (result === 'win' ? 1 : 0) + (st.noLoss ? 1 : 0) + (st.gates ? 1 : 0); // 試煉不記星，統計也送 0
   const base = { night: Engine.posOf(level.id), level_id: level.id, diff, mode: trial ? 'trial' : 'story', ...(trial ? { trial_id: trial.id } : {}) };
-  track('night_end', Object.assign({ result, wave: G.wave, stars, sheep_lost: G.sheepLost || 0, seconds: Math.round((Date.now() - nightStat.t0) / 1000), resumed: nightStat.resumed ? 1 : 0 }, base));
+  track('night_end', Object.assign({ result, wave: G.wave, stars, sheep_lost: G.sheepLost || 0, seconds: Math.round(nightStat.sec || 0), resumed: nightStat.resumed ? 1 : 0 }, base));
   for (const k in nightStat.placed) track('card_used', Object.assign({ card: k, count: nightStat.placed[k], result }, base)); // 續玩那局只算續玩後放的（檢查點不存次數），看趨勢夠用
   nightStat = null;
 }
 function setAnalytics(on) { SD.prefs.analytics = !!on; SAVE.save(); window['ga-disable-' + GA_ID] = !on; if (on) gaInit(); syncSettingsUI(); }
 gaInit();
 // 同一支瀏覽器開兩個分頁：別的分頁寫了存檔，這邊沒在打的話就重新載入拿最新的，免得等一下用舊的蓋回去（code review 10/29；打到一半不動，這一局打完存的會以這邊為準）
-window.addEventListener('storage', ev => { if (ev.key === SAVE.KEY && ev.newValue && (!G || G.over) && $('#settings').hidden && $('#changelog').hidden) location.reload(); });
+window.addEventListener('storage', ev => { if (ev.key === SAVE.KEY && ev.newValue && (!G || G.over) && MENU_IDS.some(m => !$(m).hidden) && $('#result').hidden && $('#settings').hidden && $('#changelog').hidden) location.reload(); }); // 只在選單畫面上才重載：天亮那 2.6 秒與結算頁局已經「結束」，重載會讓結算與成就卡沒出現（審查 11/6）
 
 // ====== 設定頁（首頁左上 ⚙️）：存檔碼匯出／匯入、匿名統計開關、版本 ======
 const fillNotes = (box, notes = UPDATE_NOTES) => { box.textContent = ''; for (const x of notes) { const d = document.createElement('div'); d.textContent = '・' + x; box.appendChild(d); } }; // 不走 innerHTML，之後就算文案來自存檔也不會變成程式
@@ -1948,7 +1966,9 @@ function showAchvCard() {
   $('#achv-more').textContent = achvQueue.length ? `還有 ${achvQueue.length} 條` : '';
   $('#achv-card').hidden = false; Sound.play('achieve');
 }
-$('#achv-ok').addEventListener('click', () => { $('#achv-card').hidden = true; Sound.play('tap'); if (achvQueue.length) setTimeout(showAchvCard, 180); });
+let achvAfter = null; // 成就卡收完要接著做的事（結算頁按「再守這一夜」／「換隊再試」時先把卡跳完再走，不然詩篇夜的卡要等到不知哪一局才冒出來；審查 11/6 動畫 review）
+$('#achv-ok').addEventListener('click', () => { $('#achv-card').hidden = true; Sound.play('tap'); if (achvQueue.length) setTimeout(showAchvCard, 180); else if (achvAfter) { const f = achvAfter; achvAfter = null; f(); } });
+function afterAchv(f) { if (achvQueue.length && !$('#result').hidden) { achvAfter = f; showAchvCard(); } else f(); } // 結算頁上還有沒跳的成就卡：先跳完、收下後才做 f
 function openAchievements() {
   const box = $('#achv-list'); box.innerHTML = '';
   const have = SD.achievements || {};
@@ -1974,14 +1994,15 @@ const EPILOGUE = [
   { kicker: '三十夜', title: '天亮了', lines: ['「他們永不滅亡，誰也不能從我手裏把他們奪去。」（約 10:28）', '「你出你入，耶和華要保護你，從今時直到永遠。」（詩 121:8）'] },
   { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：葉真旭', '程式與關卡：Claude Code', '審查與生圖：Codex', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '經文：和合本（CUNP）', '2026 年 10 月'], tail: '試煉冊還有幾夜，等你去守。', end: true },
 ];
-let epIdx = -1, epTimer = 0, epFrom = '';
+let epIdx = -1, epTimer = 0, epFrom = '', epShown = Infinity; // epShown：這一頁畫出來的時間；還沒畫出來（Infinity）或剛畫出來 0.6 秒內的點擊不算，手機連點兩下不會整頁跳過（審查 11/6 動畫 review）
 function openEpilogue(from) { for (const s of EPILOGUE) if (s.bg) { const i = new Image(); i.src = s.bg; } epFrom = from; epIdx = -1; $('#epilogue').hidden = false; epNext(); } // 三張場景圖先載，淡入時不會黑底先亮
 function epNext() {
   epIdx++; const sl = EPILOGUE[epIdx]; if (!sl) { closeEpilogue(); return; }
   const bg = $('#ep-bg'), body = $('#ep-body');
   bg.classList.remove('on'); body.classList.remove('on');
-  clearTimeout(epTimer);
+  clearTimeout(epTimer); epShown = Infinity;
   epTimer = setTimeout(() => {
+    epShown = performance.now();
     bg.style.backgroundImage = sl.bg ? `url(${sl.bg})` : 'none';
     body.innerHTML = `<div class="ep-kicker">${sl.kicker}</div><h1>${sl.title}</h1>${(typeof sl.lines === 'function' ? sl.lines() : sl.lines || []).map(l => `<p>${l}</p>`).join('')}${sl.small ? `<div class="ep-small">${sl.small.join('<br>')}</div>` : ''}${sl.tail ? `<p>${sl.tail}</p>` : ''}${sl.end ? `<button class="btn" id="ep-done">${epFrom === 'result' ? '回選夜' : '回首頁'}</button>` : ''}`; // 按鈕照實際落點寫：從結算頁進來的關掉會回選夜（backToLevels），首頁 🌅 進來的回首頁（11/2 審查交集 G）
     $('#ep-hint').textContent = sl.end ? '' : '點一下繼續';
@@ -1990,7 +2011,7 @@ function epNext() {
   }, REDUCE_MOTION.matches ? 0 : 350);
 }
 function closeEpilogue() { clearTimeout(epTimer); $('#epilogue').hidden = true; Sound.play('tap'); if (epFrom === 'result') backToLevels(); }
-$('#epilogue').addEventListener('click', () => { const sl = EPILOGUE[epIdx]; if (!sl || sl.end) return; epNext(); Sound.play('tap'); });
+$('#epilogue').addEventListener('click', () => { const sl = EPILOGUE[epIdx]; if (!sl || sl.end || performance.now() - epShown < 600) return; epNext(); Sound.play('tap'); });
 $('#ep-close').addEventListener('click', ev => { ev.stopPropagation(); closeEpilogue(); }); // 右上角 ✕：手機沒有 Esc 的出口
 $('#epilogue-btn').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('result'); });
 $('#levels-epilogue').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('home'); });
@@ -2038,7 +2059,7 @@ async function shareImage() {
   let blob = null, err = null, cover = false;
   try { const cv = drawShareCard(true); blob = encode(cv); cover = cv.coverUsed; } catch (e) { err = e; try { blob = encode(drawShareCard(false)); } catch (e2) { err = e2; } } // 轉檔成功才算「有封面」：封面把畫布鎖住時 toDataURL 會丟，第二次畫的是沒封面的（審查 11/6）
   if (!blob) { shareNote(`這支瀏覽器畫不出圖（${(err && (err.name || err.message)) || '不明'}）`); return; }
-  const noCover = cover ? '' : err ? '（封面圖讓畫布被鎖住，這張沒封面）' : '（封面圖還沒載好，這張沒封面）'; // 11/2 James 的截圖沒封面，分不出是哪種；寫進訊息下次就知道
+  const noCover = cover ? '' : err && err.name === 'SecurityError' ? '（封面圖讓畫布被鎖住，這張沒封面）' : err ? `（第一次畫失敗：${err.name || err.message || '不明'}，這張沒封面）` : '（封面圖還沒載好，這張沒封面）'; // 11/2 James 的截圖沒封面，分不出是哪種；寫進訊息下次就知道。只有 SecurityError 才是畫布被鎖，別的錯照名字寫（審查 11/6）
   const file = new File([blob], `sheepfold-${trial ? trial.id : 'n' + level.id}.jpg`, { type: 'image/jpeg' });
   if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) { // 手機：系統分享（LINE、存到相簿都在裡面）；取消就取消
     try { await navigator.share({ files: [file], title: '羊圈守夜' }); shareNote('分享出去了' + noCover); return; }
@@ -2053,7 +2074,7 @@ $('#share-btn').addEventListener('click', () => { Sound.play('tap'); shareNote('
 function showUpdateNotice() {
   if (SD.announced === APP_VERSION) return;
   const show = SAVE.status !== 'fresh'; // 全新玩家沒有「更新了什麼」好看，直接標成看過
-  SD.announced = APP_VERSION; if (show) SAVE.save();
+  SD.announced = APP_VERSION; SAVE.save(); // 全新玩家也要存：gaInit 在這之前已經存過一次（公告欄位還空著），只改記憶體的話第二次開頁會跳「更新了」給沒玩過的人（審查 11/6）
   if (!show) return;
   $('#notice-ver').textContent = `版本 ${APP_VERSION}`;
   fillNotes($('#notice-notes'));
@@ -2068,8 +2089,8 @@ if (!DIFFS[diff]) diff = 'calm';
 document.querySelectorAll('#diffs .diff').forEach(b => b.addEventListener('click', () => applyDiff(b.dataset.key))); // 守望／烈火那兩顆也是 .diff，點了是換題（openIntro 裡掛），不是換難度
 $('#start').addEventListener('click', () => { if (!boardReady) { toast(Board.ready ? '棋盤圖還在載入，等一下再按' : '這支瀏覽器開不了棋盤畫面', true); return; } markIntroSeen(); if (pickedFor(level) && !hasLoadout(level)) { openRoster('pick', 'intro'); return; } $('#intro').hidden = true; startGame(); });
 $('#intro-back').addEventListener('click', backToLevels);
-$('#retry').addEventListener('click', () => startGame());
-$('#result-swap').addEventListener('click', () => { Sound.play('tap'); clearBoard(); openIntro(level, trial); openRoster('pick', 'intro'); }); // 輸了換隊再試：直接開這一夜的隊伍頁，「出發」就開局、「回開場」回開場頁（11/2 審查交集 F）
+$('#retry').addEventListener('click', () => afterAchv(() => startGame()));
+$('#result-swap').addEventListener('click', () => afterAchv(() => { Sound.play('tap'); clearBoard(); openIntro(level, trial); openRoster('pick', 'intro'); })); // 輸了換隊再試：直接開這一夜的隊伍頁，「出發」就開局、「回開場」回開場頁（11/2 審查交集 F）
 $('#back').addEventListener('click', backToLevels);
 $('#next').addEventListener('click', () => { const nx = trial ? null : Engine.nextOf(level.id); clearBoard(); if (nx) openIntro(nx); else backToLevels(); });
 showUpdateNotice();

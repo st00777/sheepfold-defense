@@ -78,7 +78,7 @@
   const STEPS = {};
   STEPS[4] = d => { if (!isObj(d.trials)) d.trials = emptyTrials(); }; // v4 → v5：多一欄 trials，其餘不動
   STEPS[5] = d => { if (!isObj(d.achievements)) d.achievements = {}; if (isObj(d.prefs)) { if (typeof d.prefs.contrast !== 'boolean') d.prefs.contrast = false; if (isObj(d.prefs.sound) && typeof d.prefs.sound.music !== 'boolean') d.prefs.sound.music = true; } }; // v5 → v6：成就＋高對比＋音樂開關，其餘不動
-  function migrate(d) { while (d.version < VERSION && STEPS[d.version]) { STEPS[d.version](d); d.version++; } return d; }
+  function migrate(d) { while (d.version < VERSION) { if (STEPS[d.version]) STEPS[d.version](d); d.version++; } return d; } // 沒有對應步驟的舊版號（v1–v3 手改的存檔）也往上數到現版：欄位 validate 都補齊了，版號卡在舊的會每次開頁都重寫備份（審查 11/6）
 
   // ====== 檢查與補齊：缺的欄位補預設、型別不對的丟掉；檢查點交給 opts.check（Engine.checkSnapshot）驗，壞的只丟那一份 ======
   // 回 { data, problems }；整份不能用（不是物件、來自更新版本）時 data 為 null
@@ -88,11 +88,12 @@
     if (Number.isFinite(input.version) && input.version > VERSION) return { data: null, problems: [`這份存檔來自更新的版本（v${input.version}），請先更新遊戲再匯入`] };
     const now = typeof opts.now === 'string' ? opts.now : new Date().toISOString();
     const d = empty(now);
-    d.version = Number.isFinite(input.version) ? input.version : VERSION;
+    d.version = Number.isInteger(input.version) && input.version >= 1 ? input.version : VERSION; // 不是整數（4.5）或沒寫的當現版：欄位反正下面都會補齊（審查 11/6）
+    const diffs = Array.isArray(opts.diffs) ? opts.diffs : DIFFS_DEFAULT;
     if (typeof input.created === 'string') d.created = input.created;
     if (typeof input.updated === 'string') d.updated = input.updated;
     const P = isObj(input.progress) ? input.progress : {};
-    if (isObj(P.cleared)) for (const id in P.cleared) if (isObj(P.cleared[id])) { const o = {}; for (const k in P.cleared[id]) if (P.cleared[id][k]) o[k] = true; d.progress.cleared[id] = o; }
+    if (isObj(P.cleared)) for (const id in P.cleared) if (isObj(P.cleared[id])) { const o = {}; for (const k in P.cleared[id]) if (P.cleared[id][k] && diffs.includes(k)) o[k] = true; if (Object.keys(o).length) d.progress.cleared[id] = o; } // 只留認得的難度名（不認得的選夜頁 DIFFS[k].name 會丟例外、整章進不去）；全是 false 的不留空物件（空物件會被「接著守」當成守過；審查 11/6 小居＋index 兩路）
     if (isObj(P.best)) for (const k in P.best) { const b = P.best[k]; if (isObj(b) && Number.isFinite(b.score)) d.progress.best[k] = { score: b.score, cleared: !!b.cleared, wave: Number.isFinite(b.wave) ? b.wave : 0 }; }
     if (isObj(P.stars)) for (const id in P.stars) if (isObj(P.stars[id])) d.progress.stars[id] = { noLoss: !!P.stars[id].noLoss, gates: !!P.stars[id].gates };
     if (isObj(input.checkpoints)) for (const id in input.checkpoints) {
@@ -117,7 +118,7 @@
     }
     if (isObj(input.seen)) for (const f of ['intro', 'cards', 'enemies']) d.seen[f] = strArr(input.seen[f]);
     d.tutorial = !!input.tutorial;
-    const pr = isObj(input.prefs) ? input.prefs : {}, diffs = Array.isArray(opts.diffs) ? opts.diffs : DIFFS_DEFAULT;
+    const pr = isObj(input.prefs) ? input.prefs : {};
     if (diffs.includes(pr.diff)) d.prefs.diff = pr.diff;
     if (pr.speed === 2) d.prefs.speed = 2;
     d.prefs.big = !!pr.big;
@@ -192,7 +193,7 @@
     return api;
   }
 
-  // ====== 存檔碼：SF4.<base64url(JSON)>.<FNV-1a 8 碼>。純 ASCII，貼來貼去不會被改字；校驗碼擋少字、改字 ======
+  // ====== 存檔碼：SF<版本>.<base64url(JSON)>.<FNV-1a 8 碼>（現在是 SF6.）。純 ASCII，貼來貼去不會被改字；校驗碼擋少字、改字 ======
   function utf8ToB64(s) {
     if (typeof TextEncoder !== 'undefined' && typeof btoa === 'function') { const b = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < b.length; i++) bin += String.fromCharCode(b[i]); return btoa(bin); }
     return Buffer.from(s, 'utf8').toString('base64');
