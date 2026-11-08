@@ -74,8 +74,8 @@
   .snd-row button.on { border-color: var(--gold); background: var(--card-on); }
   /* 蠟燭開關（11/8，靈感來自 AIMRAN Library 的 Candle toggle，照自己的寫法重寫）：開＝燭芯點成火苗、微微晃；關＝只剩燭身與黑燭芯。「開／關」兩個字照留，大字與讀屏都看得到。音量的小中大、存檔碼的匯出匯入不是開關，不掛 */
   .snd-row button.cdl { position: relative; padding-left: 34px; text-align: left; min-width: 74px; }
-  .snd-row button.cdl::before { content: ''; position: absolute; left: 12px; bottom: 6px; width: 9px; height: 14px; border-radius: 2px 2px 1px 1px; background: linear-gradient(90deg, #efe3c6, #cdbb92); box-shadow: inset -2px 0 0 #b8a37a; }
-  .snd-row button.cdl::after { content: ''; position: absolute; left: 15.5px; bottom: 20px; width: 2px; height: 4px; border-radius: 1px; background: #2a1d12; transform-origin: 50% 100%; transition: left 260ms var(--ease-out), width 260ms var(--ease-out), height 260ms var(--ease-out), background 260ms, box-shadow 260ms; }
+  .snd-row button.cdl::before { content: ''; position: absolute; left: 12px; bottom: 4px; width: 9px; height: 14px; border-radius: 2px 2px 1px 1px; background: linear-gradient(90deg, #efe3c6, #cdbb92); box-shadow: inset -2px 0 0 #b8a37a; }
+  .snd-row button.cdl::after { content: ''; position: absolute; left: 15.5px; bottom: 18px; width: 2px; height: 4px; border-radius: 1px; background: #2a1d12; transform-origin: 50% 100%; transition: left 260ms var(--ease-out), width 260ms var(--ease-out), height 260ms var(--ease-out), background 260ms, box-shadow 260ms; }
   .snd-row button.cdl.on::after { left: 13px; width: 7px; height: 11px; border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%; background: radial-gradient(ellipse at 50% 80%, #fff7cf 0 25%, #f5b03f 55%, #d4531c 100%); box-shadow: 0 0 6px 2px #f5b03f66, 0 0 14px 4px #f5b03f33; animation: candle-flicker 1.3s ease-in-out infinite alternate; }
   @keyframes candle-flicker { 0% { transform: scale(1, 1) rotate(-2deg); } 50% { transform: scale(.9, 1.08) rotate(2deg); } 100% { transform: scale(1.05, .94) rotate(-1deg); } }
   /* 畫出來的勾（11/8）：存檔碼複製成功、試煉冊過了的題共用。.draw 才從頭畫，沒掛就直接是完整的勾 */
@@ -86,11 +86,13 @@
   @keyframes ck-draw { from { stroke-dashoffset: 26; } to { stroke-dashoffset: 0; } }
   @keyframes ck-pop { from { transform: scale(.4); } 60% { transform: scale(1.18); } to { transform: none; } }
   #set-copy.done { background: var(--ok); }
-  #set-copy.shake { animation: shake 320ms; }
-  @keyframes shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+  #set-copy.shake { animation: copy-shake 320ms; }
+  @keyframes copy-shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
   .lv .s .tm .ck { color: var(--gold); width: 1.1em; height: 1.1em; }
+  html.contrast .snd-row button.cdl:not(.on)::after { background: #8a7a5c; } /* 高對比：關著的燭芯原本深褐配深底幾乎看不見（動畫 review 11/8）；:not(.on) 才不會蓋掉火苗 */
   @media (prefers-reduced-motion: reduce) {
     .snd-row button.cdl.on::after { animation: none; }
+    .snd-row button.cdl::after { transition: none; }
     .ck.draw, .ck.draw path, #set-copy.shake { animation: none; }
   }
   .snd-row.off { opacity: .4; pointer-events: none; } /* 音效關著時，蟲鳴與音量先壓暗 */
@@ -360,15 +362,17 @@
   #epilogue .ep-small { color: var(--muted); font-size: 13px; line-height: 1.8; }
   #epilogue .ep-hint { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; color: var(--muted); font-size: 12px; }
   #epilogue .btn { margin-top: 18px; }
-  /* 製作名單像片尾一樣往上捲（11/8，靈感 AIMRAN Library 的 Rolling film end credits）：6 秒捲到定位停住，底下那句與按鈕再淡入；點一下畫面直接捲到底（.skip）。八行 × 1.8 行高＝14.4em，框多留 1em 給底邊漸隱 */
-  #epilogue .ep-roll { height: 15.4em; overflow: hidden; -webkit-mask: linear-gradient(#000 calc(100% - 1em), transparent); mask: linear-gradient(#000 calc(100% - 1em), transparent); }
-  #epilogue .ep-roll > div { animation: ep-roll 6s cubic-bezier(.2, .6, .3, 1) both; }
-  @keyframes ep-roll { from { transform: translateY(15.4em); } to { transform: none; } }
-  #epilogue .ep-after { animation: ach-fade 600ms 5.6s both; }
-  #epilogue .ep.skip .ep-roll > div, #epilogue .ep.skip .ep-after { animation-duration: 0s; animation-delay: 0s; }
+  /* 製作名單像片尾一樣往上捲（11/8，靈感 AIMRAN Library 的 Rolling film end credits）：等頁面淡入 0.8 秒才起跑、5.5 秒捲到定位停住；尾句與按鈕（.ep-after）平常藏著（visibility hidden，按不到也 Tab 不到），JS 等捲動 animationend 或點畫面跳過（.skip）才加 .on 現身。框高跟著內容走、底下多留 1em 給漸隱，名單加長或折行也不會被裁（審查 11/8：寫死 15.4em、透明按鈕可點、起跑被淡入吃掉三條都改） */
+  #epilogue .ep-roll { overflow: hidden; padding-bottom: 1em; -webkit-mask: linear-gradient(#000 calc(100% - 1em), transparent); mask: linear-gradient(#000 calc(100% - 1em), transparent); }
+  #epilogue .ep-roll > div { animation: ep-roll 5.5s cubic-bezier(.2, .6, .3, 1) 800ms both; }
+  @keyframes ep-roll { from { transform: translateY(100%); } to { transform: none; } }
+  #epilogue .ep-after { visibility: hidden; opacity: 0; transition: opacity 600ms, visibility 0s 600ms; }
+  #epilogue .ep-after.on { visibility: visible; opacity: 1; transition: opacity 600ms; }
+  #epilogue .ep.skip .ep-roll > div { animation: none; } /* 直接拿掉動畫就是終點（transform none），比把時長歸零穩（Safari 中途改時長有過不套用的案例） */
   @media (prefers-reduced-motion: reduce) {
-    #epilogue .ep-roll > div, #epilogue .ep-after { animation: none; }
-    #epilogue .ep-roll { height: auto; -webkit-mask: none; mask: none; }
+    #epilogue .ep-roll > div { animation: none; }
+    #epilogue .ep-roll { padding-bottom: 0; -webkit-mask: none; mask: none; }
+    #epilogue .ep-after { transition: none; }
   }
   #epilogue .ep-close { position: fixed; top: 12px; right: 12px; font-size: 16px; padding: 4px 10px; opacity: .75; z-index: 1; } /* 手機沒有 Esc，右上角給一顆看得到的出口（11/2 審查交集 G） */
   @media (prefers-reduced-motion: reduce) { #epilogue .ep-bg, #epilogue .ep-body { transition: none; } }
@@ -618,7 +622,7 @@
       <div class="set-box" id="set-export-box" hidden>
         <textarea id="set-export-code" readonly rows="4" aria-label="存檔碼"></textarea>
         <button class="btn small" id="set-copy">複製</button>
-        <div class="set-note" id="set-copy-note">這一串就是這支手機的全部紀錄。貼到 LINE 或備忘錄留著，換手機時在設定頁按「匯入」貼回來。</div>
+        <div class="set-note" id="set-copy-note" aria-live="polite">這一串就是這支手機的全部紀錄。貼到 LINE 或備忘錄留著，換手機時在設定頁按「匯入」貼回來。</div>
       </div>
       <div class="set-box" id="set-import-box" hidden>
         <textarea id="set-import-code" rows="4" placeholder="把存檔碼貼在這裡（SF 開頭）" aria-label="貼上存檔碼"></textarea>
@@ -917,6 +921,7 @@ function row(ico, title, sub, right, cls = '') { const d = document.createElemen
 const CHEV = '<span class="chev">›</span>';
 // 主畫面：接著守 ＋ 守夜／守夜試煉兩個入口，各寫一句進度
 function buildLevels() {
+  freshTrial = null; // 回首頁就不再欠那個勾（審查 11/8：沒經過試煉選夜的話會留到很久以後才突然畫）
   const nx = nextLevel();
   const cb = $('#continue-btn'); cb.hidden = !nx;
   if (nx) { cb.textContent = `接著守：第 ${Engine.posOf(nx.id)} 夜 ${nx.name}`; cb.onclick = () => openIntro(nx); }
@@ -980,7 +985,7 @@ function openNights(mode, c) {
       const ts = trialsOf(L); if (!ts.length) { missing++; continue; }
       const ok = trialUnlocked(ts[0]), isDaily = !!daily && ts.some(T => T.id === daily.id);
       // 一題一個標記：金勾 過了（剛過的那題畫一次，11/8）／3波 最遠打到／存 有檢查點／— 還沒打
-      const mark = T => { const b = SD.trials.best[T.id], done = SD.trials.cleared[T.id], cp = SD.trials.checkpoints[T.id]; return `<span class="tm">${TRIAL_KINDS[T.kind].ico}${done ? CHECK_SVG(T.id === freshTrial ? ' draw' : '') : b ? `${b.wave}波` : cp ? '存' : '—'}</span>`; };
+      const mark = T => { const b = SD.trials.best[T.id], done = SD.trials.cleared[T.id], cp = SD.trials.checkpoints[T.id]; return `<span class="tm">${TRIAL_KINDS[T.kind].ico}${done ? CHECK_SVG(T.id === freshTrial, '過了') : b ? `${b.wave}波` : cp ? '存' : '—'}</span>`; };
       d = row(ok ? Engine.posOf(L.id) : '🔒', L.name, ok ? (isDaily ? '<span class="trial-tag">今日</span> ' : '') + L.ref.replace('取材：', '') : `暴風夜 ${'★'.repeat(Engine.starSlots(L))} 就會開`, ok ? ts.map(mark).join(' ') : '', (ok ? '' : 'locked') + (isDaily ? ' next' : ''));
       // 點一夜：今日推薦的那題優先，否則先開還沒過的；都過了從守望開始
       if (ok) d.addEventListener('click', () => openTrial((isDaily && ts.find(T => T.id === daily.id)) || ts.find(T => !SD.trials.cleared[T.id]) || ts[0]));
@@ -1222,7 +1227,7 @@ function tapCell(r, c) {
 
 // 棋盤上的動畫（受擊、倒下、回彈、天色、閃電…）都在 render.js；這裡剩看門的（走道）與外框這兩個 DOM 元素的動作
 const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
-const CHECK_SVG = (cls = '') => `<svg class="ck${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 7"/></svg>`; // 畫出來的勾（11/8）：存檔碼複製成功、試煉過關共用；帶 ' draw' 才從頭畫
+const CHECK_SVG = (draw = false, label = '') => `<svg class="ck${draw ? ' draw' : ''}" viewBox="0 0 24 24" ${label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"'}><path d="M4 12.5l5 5L20 7"/></svg>`; // 畫出來的勾（11/8）：存檔碼複製成功、試煉過關共用；draw 才從頭畫；label 給讀屏唸（試煉冊沒別的字說「過了」，小居 11/8）
 let copyTimer = 0, freshTrial = null; // copyTimer：複製按鈕 1.6 秒後回到「複製」；freshTrial：剛第一次過的試煉題 id，回選夜畫一次勾後清掉
 const EASE_OUT = 'cubic-bezier(.23, 1, .32, 1)';
 // 頭目登場：只震外框一次（2px、350ms）＋金邊閃一下；棋盤格子不動
@@ -1733,7 +1738,7 @@ document.addEventListener('keydown', ev => {
   const tag = (ev.target && ev.target.tagName) || ''; if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   if (!$('#lightbox').hidden) { if (ev.key === 'Escape') $('#lightbox').hidden = true; return; }
   if (!$('#achv-card').hidden) { if (ev.key === 'Enter' || ev.key === 'Escape' || ev.key === ' ') { ev.preventDefault(); $('#achv-ok').click(); } return; }
-  if (!$('#epilogue').hidden) { const sl = EPILOGUE[epIdx]; if (ev.key === 'Tab') return; if (ev.key === 'Escape' || ((ev.key === 'Enter' || ev.key === ' ') && sl && sl.end)) { ev.preventDefault(); closeEpilogue(); } else if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'ArrowRight') { ev.preventDefault(); epNext(); Sound.play('tap'); } return; } // 審查 11/1（動畫路＋小居）：Esc 隨時可離開、最後一頁 Enter 關、Tab 照常走到按鈕
+  if (!$('#epilogue').hidden) { const sl = EPILOGUE[epIdx]; if (ev.key === 'Tab') return; const act = ev.key === 'Enter' || ev.key === ' '; if (ev.key === 'Escape' || (act && sl && sl.end && $('#epilogue .ep-after.on'))) { ev.preventDefault(); closeEpilogue(); } else if (act && sl && sl.end) { ev.preventDefault(); epSkip(); } else if (act || ev.key === 'ArrowRight') { ev.preventDefault(); epNext(); Sound.play('tap'); } return; } // 審查 11/1（動畫路＋小居）：Esc 隨時可離開、Tab 照常走到按鈕。最後一頁 Enter／空白：名單還在捲就先捲到底，按鈕出來了才關（11/8）
   if (!G || G.over || !$('#result').hidden || !$('#roster').hidden || MENU_IDS.some(m => !$(m).hidden)) return;
   const k = ev.key;
   if (k === 'Escape') { ev.preventDefault(); if (paused) resumeGame(); else if (selected) { clearSelection(); toast('取消了，先點一張卡再點草地'); } else pauseGame(); return; }
@@ -1976,10 +1981,11 @@ $('#set-copy').addEventListener('click', async () => {
   const ta = $('#set-export-code'); let ok = false;
   try { await navigator.clipboard.writeText(ta.value); ok = true; } catch (e) { try { ta.focus(); ta.select(); ok = document.execCommand('copy'); } catch (e2) {} }
   $('#set-copy-note').textContent = ok ? '已複製。貼到 LINE 或備忘錄留著；換手機時在設定頁按「匯入」貼回來。' : '這支瀏覽器不讓自動複製：請長按上面的字、全選後複製。';
-  // 按鈕本身也回話（11/8）：成功畫一個勾、1.6 秒後回到「複製」；失敗抖兩下。手機上只看按鈕也知道成功了沒
-  const btn = $('#set-copy'); clearTimeout(copyTimer); btn.classList.remove('shake');
-  if (ok) { btn.classList.add('done'); btn.innerHTML = `${CHECK_SVG(' draw')} 已複製`; copyTimer = setTimeout(() => { btn.classList.remove('done'); btn.textContent = '複製'; }, 1600); }
-  else { void btn.offsetWidth; btn.classList.add('shake'); }
+  // 按鈕本身也回話（11/8）：成功畫一個勾、失敗換字「沒複製到」並抖一下（減少動態不抖也看得出），都在 1.6 秒後回到「複製」。手機上只看按鈕也知道成功了沒。先成功再失敗也不會卡在綠底（審查 11/8 三路）
+  const btn = $('#set-copy'); clearTimeout(copyTimer); btn.classList.remove('shake', 'done');
+  btn.innerHTML = ok ? `${CHECK_SVG(true)} 已複製` : '沒複製到'; btn.classList.toggle('done', ok);
+  if (!ok) { void btn.offsetWidth; btn.classList.add('shake'); }
+  copyTimer = setTimeout(() => { btn.classList.remove('done'); btn.textContent = '複製'; }, 1600);
   Sound.play(ok ? 'clear' : 'tap');
 });
 $('#set-import').addEventListener('click', () => { $('#set-import-box').hidden = false; $('#set-export-box').hidden = true; $('#set-import-code').value = ''; $('#set-import-preview').textContent = ''; $('#set-import-go').hidden = true; importPending = null; Sound.play('tap'); });
@@ -2049,24 +2055,27 @@ const EPILOGUE = [
   { kicker: '三十夜', title: '天亮了', lines: ['「他們永不滅亡，誰也不能從我手裏把他們奪去。」（約 10:28）', '「你出你入，耶和華要保護你，從今時直到永遠。」（詩 121:8）'] },
   { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：葉真旭', '程式與關卡：Claude Code', '審查與生圖：Codex', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '像素特效：pixelfx（MIT）', '經文：和合本（CUNP）', '2026 年 10–11 月'], tail: '試煉冊還有幾夜，等你去守。', end: true },
 ];
-let epIdx = -1, epTimer = 0, epFrom = '', epShown = Infinity; // epShown：這一頁畫出來的時間；還沒畫出來（Infinity）或剛畫出來 0.6 秒內的點擊不算，手機連點兩下不會整頁跳過（審查 11/6 動畫 review）
-function openEpilogue(from) { for (const s of EPILOGUE) if (s.bg) { const i = new Image(); i.src = s.bg; } epFrom = from; epIdx = -1; $('#epilogue .ep').classList.remove('skip'); $('#epilogue').hidden = false; epNext(); } // 三張場景圖先載，淡入時不會黑底先亮
+let epIdx = -1, epTimer = 0, epRevealTimer = 0, epFrom = '', epShown = Infinity; // epRevealTimer：最後一頁尾句與按鈕現身的保險絲（11/8） // epShown：這一頁畫出來的時間；還沒畫出來（Infinity）或剛畫出來 0.6 秒內的點擊不算，手機連點兩下不會整頁跳過（審查 11/6 動畫 review）
+function openEpilogue(from) { for (const s of EPILOGUE) if (s.bg) { const i = new Image(); i.src = s.bg; } epFrom = from; epIdx = -1; $('#epilogue .ep').classList.remove('skip'); $('#epilogue').hidden = false; epNext(); }
+function epReveal() { const a = $('#epilogue .ep-after'); if (a) a.classList.add('on'); $('#ep-hint').textContent = ''; } // 名單捲完：尾句與「回首頁」現身、提示字收掉
+function epSkip() { $('#epilogue .ep').classList.add('skip'); epReveal(); } // 點畫面或按 Enter：名單直接到底、按鈕立刻出來 // 三張場景圖先載，淡入時不會黑底先亮
 function epNext() {
   epIdx++; const sl = EPILOGUE[epIdx]; if (!sl) { closeEpilogue(); return; }
   const bg = $('#ep-bg'), body = $('#ep-body');
   bg.classList.remove('on'); body.classList.remove('on');
-  clearTimeout(epTimer); epShown = Infinity;
+  clearTimeout(epTimer); clearTimeout(epRevealTimer); epShown = Infinity;
   epTimer = setTimeout(() => {
     epShown = performance.now();
     bg.style.backgroundImage = sl.bg ? `url(${sl.bg})` : 'none';
-    body.innerHTML = `<div class="ep-kicker">${sl.kicker}</div><h1>${sl.title}</h1>${(typeof sl.lines === 'function' ? sl.lines() : sl.lines || []).map(l => `<p>${l}</p>`).join('')}${sl.small ? `<div class="ep-small${sl.end ? ' ep-roll' : ''}"><div>${sl.small.join('<br>')}</div></div>` : ''}${sl.end ? '<div class="ep-after">' : ''}${sl.tail ? `<p>${sl.tail}</p>` : ''}${sl.end ? `<button class="btn" id="ep-done">${epFrom === 'result' ? '回選夜' : '回首頁'}</button></div>` : ''}`; // 最後一頁的名單包 .ep-roll 往上捲、尾句與按鈕包 .ep-after 晚點淡入（11/8）。按鈕照實際落點寫：從結算頁進來的關掉會回選夜（backToLevels），首頁 🌅 進來的回首頁（11/2 審查交集 G）
-    $('#ep-hint').textContent = sl.end ? '' : '點一下繼續';
+    const tail = sl.tail ? `<p>${sl.tail}</p>` : '';
+    body.innerHTML = `<div class="ep-kicker">${sl.kicker}</div><h1>${sl.title}</h1>${(typeof sl.lines === 'function' ? sl.lines() : sl.lines || []).map(l => `<p>${l}</p>`).join('')}${sl.small ? `<div class="ep-small${sl.end ? ' ep-roll' : ''}"><div>${sl.small.join('<br>')}</div></div>` : ''}${sl.end ? `<div class="ep-after">${tail}<button class="btn" id="ep-done">${epFrom === 'result' ? '回選夜' : '回首頁'}</button></div>` : tail}`; // 最後一頁：名單包 .ep-roll 往上捲，尾句與按鈕包 .ep-after、捲完才現身（11/8）。按鈕照實際落點寫：從結算頁進來的關掉會回選夜（backToLevels），首頁 🌅 進來的回首頁（11/2 審查交集 G）
+    $('#ep-hint').textContent = sl.end ? '點一下直接看完' : '點一下繼續';
     if (sl.bg) bg.classList.add('on'); body.classList.add('on');
-    if (sl.end) $('#ep-done').addEventListener('click', ev => { ev.stopPropagation(); closeEpilogue(); });
+    if (sl.end) { $('#ep-done').addEventListener('click', ev => { ev.stopPropagation(); closeEpilogue(); }); const roll = $('#epilogue .ep-roll > div'); if (!roll || REDUCE_MOTION.matches) epReveal(); else { roll.addEventListener('animationend', epReveal, { once: true }); epRevealTimer = setTimeout(epReveal, 7000); } } // 名單捲完（或減少動態、沒有名單）才讓尾句與按鈕現身；7 秒保險絲以防 animationend 沒來。之前 .ep-after 透明 5.6 秒但按得到，點畫面跳過會誤按到「回首頁」（審查 11/8 四路都抓到）
   }, REDUCE_MOTION.matches ? 0 : 350);
 }
 function closeEpilogue() { clearTimeout(epTimer); $('#epilogue').hidden = true; Sound.play('tap'); if (epFrom === 'result') backToLevels(); }
-$('#epilogue').addEventListener('click', () => { const sl = EPILOGUE[epIdx]; if (!sl) return; if (sl.end) { $('#epilogue .ep').classList.add('skip'); return; } if (performance.now() - epShown < 600) return; epNext(); Sound.play('tap'); }); // 最後一頁點一下：名單直接捲到底、按鈕立刻出來（11/8）
+$('#epilogue').addEventListener('click', () => { const sl = EPILOGUE[epIdx]; if (!sl || performance.now() - epShown < 600) return; if (sl.end) { epSkip(); return; } epNext(); Sound.play('tap'); }); // 最後一頁點一下：名單直接捲到底、按鈕立刻出來（11/8）。0.6 秒守門要放最前面：倒數第二頁連點兩下，第二下不能把還沒畫出來的名單直接跳掉（審查 11/8）
 $('#ep-close').addEventListener('click', ev => { ev.stopPropagation(); closeEpilogue(); }); // 右上角 ✕：手機沒有 Esc 的出口
 $('#epilogue-btn').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('result'); });
 $('#levels-epilogue').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('home'); });
