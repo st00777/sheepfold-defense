@@ -72,6 +72,27 @@
   .snd-row .seg { display: flex; gap: 4px; }
   .snd-row button { font: inherit; font-size: 14px; background: var(--card); color: var(--text); border: 2px solid transparent; border-radius: 8px; padding: 5px 14px; cursor: pointer; min-width: 52px; }
   .snd-row button.on { border-color: var(--gold); background: var(--card-on); }
+  /* 蠟燭開關（11/8，靈感來自 AIMRAN Library 的 Candle toggle，照自己的寫法重寫）：開＝燭芯點成火苗、微微晃；關＝只剩燭身與黑燭芯。「開／關」兩個字照留，大字與讀屏都看得到。音量的小中大、存檔碼的匯出匯入不是開關，不掛 */
+  .snd-row button.cdl { position: relative; padding-left: 34px; text-align: left; min-width: 74px; }
+  .snd-row button.cdl::before { content: ''; position: absolute; left: 12px; bottom: 6px; width: 9px; height: 14px; border-radius: 2px 2px 1px 1px; background: linear-gradient(90deg, #efe3c6, #cdbb92); box-shadow: inset -2px 0 0 #b8a37a; }
+  .snd-row button.cdl::after { content: ''; position: absolute; left: 15.5px; bottom: 20px; width: 2px; height: 4px; border-radius: 1px; background: #2a1d12; transform-origin: 50% 100%; transition: left 260ms var(--ease-out), width 260ms var(--ease-out), height 260ms var(--ease-out), background 260ms, box-shadow 260ms; }
+  .snd-row button.cdl.on::after { left: 13px; width: 7px; height: 11px; border-radius: 50% 50% 50% 50% / 65% 65% 35% 35%; background: radial-gradient(ellipse at 50% 80%, #fff7cf 0 25%, #f5b03f 55%, #d4531c 100%); box-shadow: 0 0 6px 2px #f5b03f66, 0 0 14px 4px #f5b03f33; animation: candle-flicker 1.3s ease-in-out infinite alternate; }
+  @keyframes candle-flicker { 0% { transform: scale(1, 1) rotate(-2deg); } 50% { transform: scale(.9, 1.08) rotate(2deg); } 100% { transform: scale(1.05, .94) rotate(-1deg); } }
+  /* 畫出來的勾（11/8）：存檔碼複製成功、試煉冊過了的題共用。.draw 才從頭畫，沒掛就直接是完整的勾 */
+  .ck { display: inline-block; width: 1em; height: 1em; vertical-align: -.15em; stroke: currentColor; stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .ck path { stroke-dasharray: 26; }
+  .ck.draw path { animation: ck-draw 360ms var(--ease-out) 120ms both; }
+  .ck.draw { animation: ck-pop 420ms var(--ease-out); }
+  @keyframes ck-draw { from { stroke-dashoffset: 26; } to { stroke-dashoffset: 0; } }
+  @keyframes ck-pop { from { transform: scale(.4); } 60% { transform: scale(1.18); } to { transform: none; } }
+  #set-copy.done { background: var(--ok); }
+  #set-copy.shake { animation: shake 320ms; }
+  @keyframes shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+  .lv .s .tm .ck { color: var(--gold); width: 1.1em; height: 1.1em; }
+  @media (prefers-reduced-motion: reduce) {
+    .snd-row button.cdl.on::after { animation: none; }
+    .ck.draw, .ck.draw path, #set-copy.shake { animation: none; }
+  }
   .snd-row.off { opacity: .4; pointer-events: none; } /* 音效關著時，蟲鳴與音量先壓暗 */
   .snd-note { font-size: 13px; color: var(--muted); margin-top: 6px; text-align: left; }
   #share-note { text-align: center; margin: 2px 0 6px; }
@@ -339,6 +360,16 @@
   #epilogue .ep-small { color: var(--muted); font-size: 13px; line-height: 1.8; }
   #epilogue .ep-hint { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; color: var(--muted); font-size: 12px; }
   #epilogue .btn { margin-top: 18px; }
+  /* 製作名單像片尾一樣往上捲（11/8，靈感 AIMRAN Library 的 Rolling film end credits）：6 秒捲到定位停住，底下那句與按鈕再淡入；點一下畫面直接捲到底（.skip）。八行 × 1.8 行高＝14.4em，框多留 1em 給底邊漸隱 */
+  #epilogue .ep-roll { height: 15.4em; overflow: hidden; -webkit-mask: linear-gradient(#000 calc(100% - 1em), transparent); mask: linear-gradient(#000 calc(100% - 1em), transparent); }
+  #epilogue .ep-roll > div { animation: ep-roll 6s cubic-bezier(.2, .6, .3, 1) both; }
+  @keyframes ep-roll { from { transform: translateY(15.4em); } to { transform: none; } }
+  #epilogue .ep-after { animation: ach-fade 600ms 5.6s both; }
+  #epilogue .ep.skip .ep-roll > div, #epilogue .ep.skip .ep-after { animation-duration: 0s; animation-delay: 0s; }
+  @media (prefers-reduced-motion: reduce) {
+    #epilogue .ep-roll > div, #epilogue .ep-after { animation: none; }
+    #epilogue .ep-roll { height: auto; -webkit-mask: none; mask: none; }
+  }
   #epilogue .ep-close { position: fixed; top: 12px; right: 12px; font-size: 16px; padding: 4px 10px; opacity: .75; z-index: 1; } /* 手機沒有 Esc，右上角給一顆看得到的出口（11/2 審查交集 G） */
   @media (prefers-reduced-motion: reduce) { #epilogue .ep-bg, #epilogue .ep-body { transition: none; } }
   /* ====== 頭目登場橫幅（期 4）：名字＋稱號從右邊滑進來、停一下、往左淡出；外框的震動與金邊照舊 ====== */
@@ -515,12 +546,12 @@
     <h1>暫停中</h1>
     <p id="pause-note">狼也在等。回來再按繼續。</p>
     <div class="snd" id="snd-panel">
-      <div class="snd-row"><span>大字</span><button id="big-btn">關</button></div>
-      <div class="snd-row"><span>省效能</span><button id="lite-btn" title="畫面卡的電腦開這個：解析度降一級、雨和火花減量">關</button></div>
-      <div class="snd-row"><span>高對比</span><button id="contrast-btn" title="字更白、血條加白邊、提示框更粗">關</button></div>
-      <div class="snd-row"><span>音樂</span><button data-snd="music">開</button></div>
-      <div class="snd-row"><span>音效</span><button data-snd="sfx">開</button></div>
-      <div class="snd-row" data-dep="sfx"><span>蟲鳴</span><button data-snd="amb">關</button></div>
+      <div class="snd-row"><span>大字</span><button class="cdl" id="big-btn">關</button></div>
+      <div class="snd-row"><span>省效能</span><button class="cdl" id="lite-btn" title="畫面卡的電腦開這個：解析度降一級、雨和火花減量">關</button></div>
+      <div class="snd-row"><span>高對比</span><button class="cdl" id="contrast-btn" title="字更白、血條加白邊、提示框更粗">關</button></div>
+      <div class="snd-row"><span>音樂</span><button class="cdl" data-snd="music">開</button></div>
+      <div class="snd-row"><span>音效</span><button class="cdl" data-snd="sfx">開</button></div>
+      <div class="snd-row" data-dep="sfx"><span>蟲鳴</span><button class="cdl" data-snd="amb">關</button></div>
       <div class="snd-row"><span>音量</span><div class="seg"><button data-vol="0">小</button><button data-vol="1">中</button><button data-vol="2">大</button></div></div><!-- 音量不跟著音效壓暗：背景音樂也吃同一個音量，關了音效只留音樂時還要調得了（審查 11/6） -->
     </div>
     <div class="snd-note">手機切到靜音時不會有聲音。</div>
@@ -595,7 +626,7 @@
         <div class="set-note" id="set-import-preview"></div>
         <button class="btn small warn" id="set-import-go" hidden>確定匯入，蓋掉目前紀錄</button>
       </div>
-      <div class="snd-row"><span>使用統計 <small>用 Google Analytics 記遊戲事件：玩到第幾夜、用了哪些卡、勝負與耗時。不要求填姓名帳號，隨時可關</small></span><button id="ga-btn">開</button></div>
+      <div class="snd-row"><span>使用統計 <small>用 Google Analytics 記遊戲事件：玩到第幾夜、用了哪些卡、勝負與耗時。不要求填姓名帳號，隨時可關</small></span><button class="cdl" id="ga-btn">開</button></div>
     </div>
     <div class="set-note" id="set-version"></div>
     <div class="set-notes" id="set-notes"></div>
@@ -698,10 +729,15 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '先備糧，再排陣。從第一隻狼開始練起，最後迎戰兩隻獅子！', 2: '月亮藏起來，腳印也看不見了。提防換排的敵人，也別忘了接回路上的迷羊。', 3: '羊圈搬上山，老擺法得換一換。拋石越過斜坡、陷坑留住敵人，最後挑戰兩隻野牛！' };
-const HOME_UPDATE = '最近更新 11/6：全遊戲審查修正——雇工嚇跑、牆被咬垮終於有離場動畫；偷羊人抱著的羊救回來就不算失；豺狼被狗咬傷害照規格；送卡夜放卡不再沒聲音；細節在設定頁的更新紀錄';
+const HOME_UPDATE = '最近更新 11/8：設定頁的開關變成小蠟燭；存檔碼複製成功會打勾；試煉過了的題改金勾；尾聲的製作名單像片尾一樣往上捲；細節在設定頁的更新紀錄';
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.11.08', notes: [ // 11/8：周邊 UI 小點綴，靈感來自 AIMRAN Library（library.aimran.es）的 Candle toggle／Copy button／Task completed check／Rolling end credits，都照自己的寫法重寫、不照貼；棋盤與成就卡不動
+    '設定頁的開關變成一支小蠟燭：開了燭芯點成火苗、微微晃，關了只剩燭身；減少動態時火苗不晃',
+    '存檔碼「複製」成功時按鈕畫一個勾再回到「複製」，失敗抖一下；試煉冊過了的題改成金色的勾，剛過的那題回到選夜時會畫一次',
+    '尾聲的製作名單像片尾一樣慢慢往上捲，捲完「回首頁」才出來；點一下畫面直接捲到底',
+  ] },
   { ver: '2026.11.06.1', notes: [ // 11/6 晚上：全遊戲審查四部奏（不只最近改動）採納的修正，表在 docs/review-full-2026-11-06.md
     '單位離場終於有動畫：雇工被嚇跑轉身跑掉、荊棘被野豬踩扁、牆被咬垮倒下、荊棘磨光縮小淡出（10/29 做好的動畫一直沒接上）',
     '偷羊人、大鷹：羊正被抱走或正走回圈時，後到的找不到羊會空手跑掉，不再「抱走」同一隻羊害你被判輸',
@@ -943,14 +979,15 @@ function openNights(mode, c) {
     } else {
       const ts = trialsOf(L); if (!ts.length) { missing++; continue; }
       const ok = trialUnlocked(ts[0]), isDaily = !!daily && ts.some(T => T.id === daily.id);
-      // 一題一個標記：✅ 過了／3波 最遠打到／存 有檢查點／— 還沒打
-      const mark = T => { const b = SD.trials.best[T.id], done = SD.trials.cleared[T.id], cp = SD.trials.checkpoints[T.id]; return `<span class="tm">${TRIAL_KINDS[T.kind].ico}${done ? '✅' : b ? `${b.wave}波` : cp ? '存' : '—'}</span>`; };
+      // 一題一個標記：金勾 過了（剛過的那題畫一次，11/8）／3波 最遠打到／存 有檢查點／— 還沒打
+      const mark = T => { const b = SD.trials.best[T.id], done = SD.trials.cleared[T.id], cp = SD.trials.checkpoints[T.id]; return `<span class="tm">${TRIAL_KINDS[T.kind].ico}${done ? CHECK_SVG(T.id === freshTrial ? ' draw' : '') : b ? `${b.wave}波` : cp ? '存' : '—'}</span>`; };
       d = row(ok ? Engine.posOf(L.id) : '🔒', L.name, ok ? (isDaily ? '<span class="trial-tag">今日</span> ' : '') + L.ref.replace('取材：', '') : `暴風夜 ${'★'.repeat(Engine.starSlots(L))} 就會開`, ok ? ts.map(mark).join(' ') : '', (ok ? '' : 'locked') + (isDaily ? ' next' : ''));
       // 點一夜：今日推薦的那題優先，否則先開還沒過的；都過了從守望開始
       if (ok) d.addEventListener('click', () => openTrial((isDaily && ts.find(T => T.id === daily.id)) || ts.find(T => !SD.trials.cleared[T.id]) || ts[0]));
     }
     list.appendChild(d);
   }
+  if (!story) freshTrial = null; // 剛過的題這一次畫過勾了（11/8）
   const note = $('#lv-note'); note.hidden = !missing; note.textContent = missing ? `還有 ${missing} 夜的守望與烈火在寫，之後的更新陸續加進來。` : '';
   showMenu('#nights');
 }
@@ -1185,6 +1222,8 @@ function tapCell(r, c) {
 
 // 棋盤上的動畫（受擊、倒下、回彈、天色、閃電…）都在 render.js；這裡剩看門的（走道）與外框這兩個 DOM 元素的動作
 const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
+const CHECK_SVG = (cls = '') => `<svg class="ck${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 7"/></svg>`; // 畫出來的勾（11/8）：存檔碼複製成功、試煉過關共用；帶 ' draw' 才從頭畫
+let copyTimer = 0, freshTrial = null; // copyTimer：複製按鈕 1.6 秒後回到「複製」；freshTrial：剛第一次過的試煉題 id，回選夜畫一次勾後清掉
 const EASE_OUT = 'cubic-bezier(.23, 1, .32, 1)';
 // 頭目登場：只震外框一次（2px、350ms）＋金邊閃一下；棋盤格子不動
 let bannerAnim = null, bannerTimer = 0;
@@ -1332,7 +1371,7 @@ function recordBest(cleared) {
     // 贏：第一次贏、或一筆糧的題剩糧更多才改寫；輸：沒贏過且撐得更久才改寫
     const better = cleared ? (!old.cleared || (level.noShepherd && !(old.food >= food))) : (!old.cleared && !(old.wave >= G.wave));
     if (better) T.best[trial.id] = { wave: G.wave, cleared, ...(cleared && level.noShepherd ? { food } : {}) };
-    if (cleared) T.cleared[trial.id] = true;
+    if (cleared) { if (!T.cleared[trial.id]) freshTrial = trial.id; T.cleared[trial.id] = true; } // 第一次過的題記下來，回試煉選夜那一次把勾畫出來（11/8）
     return saveProgress();
   }
   if (devUsed) return true; // 故事模式也一樣：開著開發者面板的那局整個不記（最高紀錄、守過、星）。原本只擋星，+500 糧清場過的夜會記成守過、下一夜也跟著開（審查 11/6 小居＋index 兩路都抓到；要全開用 ?all）
@@ -1937,6 +1976,10 @@ $('#set-copy').addEventListener('click', async () => {
   const ta = $('#set-export-code'); let ok = false;
   try { await navigator.clipboard.writeText(ta.value); ok = true; } catch (e) { try { ta.focus(); ta.select(); ok = document.execCommand('copy'); } catch (e2) {} }
   $('#set-copy-note').textContent = ok ? '已複製。貼到 LINE 或備忘錄留著；換手機時在設定頁按「匯入」貼回來。' : '這支瀏覽器不讓自動複製：請長按上面的字、全選後複製。';
+  // 按鈕本身也回話（11/8）：成功畫一個勾、1.6 秒後回到「複製」；失敗抖兩下。手機上只看按鈕也知道成功了沒
+  const btn = $('#set-copy'); clearTimeout(copyTimer); btn.classList.remove('shake');
+  if (ok) { btn.classList.add('done'); btn.innerHTML = `${CHECK_SVG(' draw')} 已複製`; copyTimer = setTimeout(() => { btn.classList.remove('done'); btn.textContent = '複製'; }, 1600); }
+  else { void btn.offsetWidth; btn.classList.add('shake'); }
   Sound.play(ok ? 'clear' : 'tap');
 });
 $('#set-import').addEventListener('click', () => { $('#set-import-box').hidden = false; $('#set-export-box').hidden = true; $('#set-import-code').value = ''; $('#set-import-preview').textContent = ''; $('#set-import-go').hidden = true; importPending = null; Sound.play('tap'); });
@@ -2007,7 +2050,7 @@ const EPILOGUE = [
   { kicker: '製作', title: '羊圈守夜', small: ['企劃與驗收：葉真旭', '程式與關卡：Claude Code', '審查與生圖：Codex', '人物、道具與場景圖：ChatGPT', '棋盤繪圖：PixiJS 8.9.2（MIT）', '像素特效：pixelfx（MIT）', '經文：和合本（CUNP）', '2026 年 10–11 月'], tail: '試煉冊還有幾夜，等你去守。', end: true },
 ];
 let epIdx = -1, epTimer = 0, epFrom = '', epShown = Infinity; // epShown：這一頁畫出來的時間；還沒畫出來（Infinity）或剛畫出來 0.6 秒內的點擊不算，手機連點兩下不會整頁跳過（審查 11/6 動畫 review）
-function openEpilogue(from) { for (const s of EPILOGUE) if (s.bg) { const i = new Image(); i.src = s.bg; } epFrom = from; epIdx = -1; $('#epilogue').hidden = false; epNext(); } // 三張場景圖先載，淡入時不會黑底先亮
+function openEpilogue(from) { for (const s of EPILOGUE) if (s.bg) { const i = new Image(); i.src = s.bg; } epFrom = from; epIdx = -1; $('#epilogue .ep').classList.remove('skip'); $('#epilogue').hidden = false; epNext(); } // 三張場景圖先載，淡入時不會黑底先亮
 function epNext() {
   epIdx++; const sl = EPILOGUE[epIdx]; if (!sl) { closeEpilogue(); return; }
   const bg = $('#ep-bg'), body = $('#ep-body');
@@ -2016,14 +2059,14 @@ function epNext() {
   epTimer = setTimeout(() => {
     epShown = performance.now();
     bg.style.backgroundImage = sl.bg ? `url(${sl.bg})` : 'none';
-    body.innerHTML = `<div class="ep-kicker">${sl.kicker}</div><h1>${sl.title}</h1>${(typeof sl.lines === 'function' ? sl.lines() : sl.lines || []).map(l => `<p>${l}</p>`).join('')}${sl.small ? `<div class="ep-small">${sl.small.join('<br>')}</div>` : ''}${sl.tail ? `<p>${sl.tail}</p>` : ''}${sl.end ? `<button class="btn" id="ep-done">${epFrom === 'result' ? '回選夜' : '回首頁'}</button>` : ''}`; // 按鈕照實際落點寫：從結算頁進來的關掉會回選夜（backToLevels），首頁 🌅 進來的回首頁（11/2 審查交集 G）
+    body.innerHTML = `<div class="ep-kicker">${sl.kicker}</div><h1>${sl.title}</h1>${(typeof sl.lines === 'function' ? sl.lines() : sl.lines || []).map(l => `<p>${l}</p>`).join('')}${sl.small ? `<div class="ep-small${sl.end ? ' ep-roll' : ''}"><div>${sl.small.join('<br>')}</div></div>` : ''}${sl.end ? '<div class="ep-after">' : ''}${sl.tail ? `<p>${sl.tail}</p>` : ''}${sl.end ? `<button class="btn" id="ep-done">${epFrom === 'result' ? '回選夜' : '回首頁'}</button></div>` : ''}`; // 最後一頁的名單包 .ep-roll 往上捲、尾句與按鈕包 .ep-after 晚點淡入（11/8）。按鈕照實際落點寫：從結算頁進來的關掉會回選夜（backToLevels），首頁 🌅 進來的回首頁（11/2 審查交集 G）
     $('#ep-hint').textContent = sl.end ? '' : '點一下繼續';
     if (sl.bg) bg.classList.add('on'); body.classList.add('on');
     if (sl.end) $('#ep-done').addEventListener('click', ev => { ev.stopPropagation(); closeEpilogue(); });
   }, REDUCE_MOTION.matches ? 0 : 350);
 }
 function closeEpilogue() { clearTimeout(epTimer); $('#epilogue').hidden = true; Sound.play('tap'); if (epFrom === 'result') backToLevels(); }
-$('#epilogue').addEventListener('click', () => { const sl = EPILOGUE[epIdx]; if (!sl || sl.end || performance.now() - epShown < 600) return; epNext(); Sound.play('tap'); });
+$('#epilogue').addEventListener('click', () => { const sl = EPILOGUE[epIdx]; if (!sl) return; if (sl.end) { $('#epilogue .ep').classList.add('skip'); return; } if (performance.now() - epShown < 600) return; epNext(); Sound.play('tap'); }); // 最後一頁點一下：名單直接捲到底、按鈕立刻出來（11/8）
 $('#ep-close').addEventListener('click', ev => { ev.stopPropagation(); closeEpilogue(); }); // 右上角 ✕：手機沒有 Esc 的出口
 $('#epilogue-btn').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('result'); });
 $('#levels-epilogue').addEventListener('click', () => { Sound.play('dawn'); openEpilogue('home'); });
