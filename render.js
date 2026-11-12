@@ -28,7 +28,8 @@ const Board = (() => {
   const key = (r, c) => r + ',' + c, unkey = k => k.split(',').map(Number); // 格子鑰匙 'r,c' 與拆回 [r, c]
 
   const REDUCE = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
-  const reduce = () => REDUCE.matches;
+  let reducePref = null; // 減少動態的自家開關（2026-11-13）：null 跟系統、true 開、false 關；index.html 的設定頁經 setReduce 傳進來，這裡 37 處 reduce() 都看它
+  const reduce = () => reducePref === null ? REDUCE.matches : reducePref;
   let contrast = false; // 高對比（期 5）：血條加白邊、提示框白色加粗、範圍預覽更亮
   let lite = false, glName = '', fno = 0; // 省效能模式（2026-10-28 James：電腦卡）：解析度 1、粒子減量、雨量減、黑暗／光照離屏圖隔幀才重畫；glName 給 index.html 判斷是不是軟體繪圖
 
@@ -521,7 +522,9 @@ const Board = (() => {
   function dieFx(e) {
     const v = EN.get(e.id); if (!v) return;
     EN.delete(e.id); v.dying = true; const c = v.cont, rd = reduce(); if (v.pxPoison) { v.pxPoison.fx.stop(); v.pxPoison = null; }
-    tween(.22, k => { c.alpha = 1 - k; if (!rd) c.scale.set(1 - .15 * EASE(k)); }, () => c.destroy({ children: true }));
+    const boss = !!(ENEMIES[e.type] && ENEMIES[e.type].boss); // 頭目倒下走大一級（2026-11-13，gamedev-skills game-feel 的分級）：金色一圈＋一把碎石、淡出慢一點；外框抖動與低音在 index.html 的 bossDown
+    if (boss) { ring(c.x, c.y, cw * 1.3, 0xffd166, .55); burst(c.x, c.y + ch * .1, 18, [0xffd166, 0xe8dcc4, 0xc9bda0], ch * .7, .5); }
+    tween(boss ? .45 : .22, k => { c.alpha = 1 - k; if (!rd) c.scale.set(1 - (boss ? .25 : .15) * EASE(k)); }, () => c.destroy({ children: true }));
     if (!e.underground && !v.fly && pxCount('poof') < 6 && pxPlay('poof', c.x, c.y + ch * .3, { seed: Math.floor(Math.random() * 97) })) return; // pixelfx 試用：地面敵人倒下放卡通煙圈，放得出來就不再撒原本的塵；同時最多六朵（一群狐狸被火把燒倒不疊成一片，審查 11/6）
     if (rd || speed > 1 || e.underground || v.fly || state.dust >= 4) return;
     state.dust++; setTimeout(() => { state.dust = Math.max(0, state.dust - 1); }, 300); // clear() 可能已把它歸零，別減成負的
@@ -811,6 +814,7 @@ const Board = (() => {
       } catch (err) { report(err); }
     },
     setHints, setCursor, setRange, setTeach, placed, squashUnit, lightning, dawn, lose,
+    setReduce(v) { reducePref = typeof v === 'boolean' ? v : null; }, // 減少動態：設定頁的開關（null＝跟系統）
     setContrast(on) { contrast = !!on; state.cellsDirty = true; for (const M of [UN, EN, MV]) for (const v of M.values()) if (v && v.hp) v.hpLast = -1; }, get contrast() { return contrast; }, // 血條下一幀全部重畫
     setSpeed(n) { speed = n; }, setPaused(p) { paused = p; }, setStill(s) { still = s; },
     // 省效能模式：開關時把畫布解析度切到 1／回到裝置值，離屏圖跟著 layout 重建；software：WebGL 是軟體模擬（沒開硬體加速）的電腦一開始就該用省效能

@@ -90,11 +90,10 @@
   @keyframes copy-shake { 0%, 100% { transform: none; } 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
   .lv .s .tm .ck { color: var(--gold); width: 1.1em; height: 1.1em; }
   html.contrast .snd-row button.cdl:not(.on)::after { background: #8a7a5c; } /* 高對比：關著的燭芯原本深褐配深底幾乎看不見（動畫 review 11/8）；:not(.on) 才不會蓋掉火苗 */
-  @media (prefers-reduced-motion: reduce) {
-    .snd-row button.cdl.on::after { animation: none; }
-    .snd-row button.cdl::after { transition: none; }
-    .ck.draw, .ck.draw path, #set-copy.shake { animation: none; }
-  }
+  /* 減少動態（2026-11-13 起走 html.reduce 類別，不直接寫媒體查詢）：系統設定或設定頁的「減少動態」開關都由 applyMotion 掛上這個類別，CSS、index.html、render.js 只看同一個來源 */
+  html.reduce .snd-row button.cdl.on::after { animation: none; }
+  html.reduce .snd-row button.cdl::after { transition: none; }
+  html.reduce .ck.draw, html.reduce .ck.draw path, html.reduce #set-copy.shake { animation: none; }
   .snd-row.off { opacity: .4; pointer-events: none; } /* 音效關著時，蟲鳴與音量先壓暗 */
   .snd-note { font-size: 13px; color: var(--muted); margin-top: 6px; text-align: left; }
   #share-note { text-align: center; margin: 2px 0 6px; }
@@ -347,7 +346,7 @@
   #achv-card:not([hidden]) .dialog { animation: ach-in 520ms var(--ease-out) both, ach-glow 2.4s ease-in-out 520ms 4; } /* 光暈跑四輪就停，不要一直重繪陰影（動畫 review 11/1） */
   #achv-card:not([hidden]) .ach-ico { animation: ach-in 700ms var(--ease-out) 120ms both; }
   @keyframes ach-fade { from { opacity: 0; } to { opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { #achv-card:not([hidden]) .dialog { animation: ach-fade 200ms both !important; } #achv-card .ach-ico { animation: none !important; } } /* 減少動態：只留 200ms 淡入，跟其他對話框一致 */
+  html.reduce #achv-card:not([hidden]) .dialog { animation: ach-fade 200ms both !important; } html.reduce #achv-card .ach-ico { animation: none !important; } /* 減少動態：只留 200ms 淡入，跟其他對話框一致 */
   @media (max-height: 540px) { #achv-card .ach-ico { font-size: 40px; margin: 2px 0; } #achv-card .verse { margin: 6px 0 2px; } }
   /* ====== 尾聲（期 4）：第 30 夜守過後的結局——三章回顧、經文、製作名單；點一下換頁 ====== */
   #epilogue { z-index: 25; background: #000; padding: 0; cursor: pointer; }
@@ -369,14 +368,17 @@
   #epilogue .ep-after { visibility: hidden; opacity: 0; transition: opacity 600ms, visibility 0s 600ms; }
   #epilogue .ep-after.on { visibility: visible; opacity: 1; transition: opacity 600ms; }
   #epilogue .ep.skip .ep-roll > div { animation: none; } /* 直接拿掉動畫就是終點（transform none），比把時長歸零穩（Safari 中途改時長有過不套用的案例） */
-  @media (prefers-reduced-motion: reduce) {
-    #epilogue .ep-roll > div { animation: none; }
-    #epilogue .ep-roll { padding-bottom: 0; -webkit-mask: none; mask: none; }
-    #epilogue .ep-after { transition: none; }
-  }
+  html.reduce #epilogue .ep-roll > div { animation: none; }
+  html.reduce #epilogue .ep-roll { padding-bottom: 0; -webkit-mask: none; mask: none; }
+  html.reduce #epilogue .ep-after { transition: none; }
   #epilogue .ep-close { position: fixed; top: 12px; right: 12px; font-size: 16px; padding: 4px 10px; opacity: .75; z-index: 1; } /* 手機沒有 Esc，右上角給一顆看得到的出口（11/2 審查交集 G） */
-  @media (prefers-reduced-motion: reduce) { #epilogue .ep-bg, #epilogue .ep-body { transition: none; } }
+  html.reduce #epilogue .ep-bg, html.reduce #epilogue .ep-body { transition: none; }
   /* ====== 頭目登場橫幅（期 4）：名字＋稱號從右邊滑進來、停一下、往左淡出；外框的震動與金邊照舊 ====== */
+  /* 下一波預告（2026-11-13，gamedev-skills tower-defense：提前一波秀組成）：準備與波間休息時貼在棋盤上方的天空裡（棋盤從 21% 起，上面有空），開打就收；種類照波表順序、隻數已含難度加量 */
+  #next-wave { position: absolute; left: 50%; top: 6px; transform: translateX(-50%); z-index: 3; pointer-events: none; background: #000a; border: 1px solid #e6b84a66; border-radius: 999px; padding: 3px 10px 3px 12px; font-size: 13px; color: var(--text); white-space: nowrap; max-width: 94%; overflow: hidden; text-overflow: ellipsis; }
+  #next-wave .ei { width: 18px; height: 18px; vertical-align: -4px; margin: 0 1px 0 6px; }
+  #next-wave b { color: var(--gold); font-weight: 600; }
+  #scene.plain #next-wave { top: 3px; padding: 2px 8px 2px 10px; font-size: 12px; } /* 棋盤填滿場景的版面（窄或矮的視窗）沒有天空可放，縮小一點、貼上緣，少擋第 0 排 */
   #boss-banner { position: absolute; left: 0; right: 0; top: 38%; z-index: 3; pointer-events: none; text-align: center; opacity: 0; }
   #boss-banner .bb { display: inline-block; background: #000b; border-top: 2px solid var(--gold); border-bottom: 2px solid var(--gold); padding: 8px 22px; }
   #boss-banner .bb b { display: block; font-size: 22px; color: var(--gold); letter-spacing: .1em; }
@@ -393,14 +395,12 @@
   #roster-detail .new { color: var(--new); font-size: 13px; }
 
   /* 減少動態：留透明度變化，拿掉位移與閃爍 */
-  @media (prefers-reduced-motion: reduce) {
-    .card.new::after { animation: none; opacity: .8; }
-    .gate.used span { transform: none; }
-    .gate.flash::before { animation-duration: .6s; }
-    #stars .st, #stars.full .st.on { animation: none; opacity: 1; }
-    .dialog { transition: opacity 200ms; }
-    .card:active, .btn:active, .diff:active, .tab:active, .lv:active, .rc:active, #pause-btn:active, #snd-btn:active, .corner:active, .snd-row button:active, #tut-skip:active { transform: none; }
-  }
+  html.reduce .card.new::after { animation: none; opacity: .8; }
+  html.reduce .gate.used span { transform: none; }
+  html.reduce .gate.flash::before { animation-duration: .6s; }
+  html.reduce #stars .st, html.reduce #stars.full .st.on { animation: none; opacity: 1; }
+  html.reduce .dialog { transition: opacity 200ms; }
+  html.reduce :is(.card, .btn, .diff, .tab, .lv, .rc, #pause-btn, #snd-btn, .corner, .snd-row button, #tut-skip):active { transform: none; }
   @keyframes fadeOut { to { opacity: 0; } }
   /* 設定頁（首頁左上 ⚙️）與更新公告（2026-10-29 期 0） */
   .corner.left { right: auto; left: 12px; }
@@ -440,7 +440,7 @@
 </div>
 
 <div id="board-wrap"><div id="stage">
-  <div id="scene"><div id="boss-banner"><div class="bb"><b></b><span></span></div></div><div id="shell"><div id="lane"></div><div id="board"><div id="board-fail">這支瀏覽器開不了棋盤畫面（需要 WebGL）。請換 Chrome 或 Safari 試試，或把瀏覽器更新到最新版。</div></div><div id="frame"></div></div></div>
+  <div id="scene"><div id="next-wave" hidden></div><div id="boss-banner"><div class="bb"><b></b><span></span></div></div><div id="shell"><div id="lane"></div><div id="board"><div id="board-fail">這支瀏覽器開不了棋盤畫面（需要 WebGL）。請換 Chrome 或 Safari 試試，或把瀏覽器更新到最新版。</div></div><div id="frame"></div></div></div>
   <!-- 提示列貼在棋盤正下方（2026-10-21 James 實機回饋：放頁面最底下根本不會看到） -->
   <div id="bottom">
     <div id="bar"><i></i></div>
@@ -553,6 +553,7 @@
       <div class="snd-row"><span>大字</span><button class="cdl" id="big-btn">關</button></div>
       <div class="snd-row"><span>省效能</span><button class="cdl" id="lite-btn" title="畫面卡的電腦開這個：解析度降一級、雨和火花減量">關</button></div>
       <div class="snd-row"><span>高對比</span><button class="cdl" id="contrast-btn" title="字更白、血條加白邊、提示框更粗">關</button></div>
+      <div class="snd-row"><span>減少動態</span><button class="cdl" id="motion-btn" title="沒設過就跟系統走。開了：畫面不震、暴風夜不閃電、動畫只留淡入">關</button></div>
       <div class="snd-row"><span>音樂</span><button class="cdl" data-snd="music">開</button></div>
       <div class="snd-row"><span>音效</span><button class="cdl" data-snd="sfx">開</button></div>
       <div class="snd-row" data-dep="sfx"><span>蟲鳴</span><button class="cdl" data-snd="amb">關</button></div>
@@ -660,11 +661,11 @@
 
 <script src="data.js?v=29"></script>
 <script src="engine.js?v=29"></script>
-<script src="save.js?v=7"></script>
-<script src="sound.js?v=10"></script>
+<script src="save.js?v=8"></script>
+<script src="sound.js?v=11"></script>
 <script src="lib/pixi.min.js"></script>
 <script src="lib/pixelfx.js?v=4"></script>
-<script src="render.js?v=31"></script>
+<script src="render.js?v=32"></script>
 <script>
 'use strict';
 // ROWS、COLS、UNITS、ENEMIES、STRAY、DIFFS、LEVELS、TRIALS、TRIAL_KINDS 由 data.js 直接提供
@@ -733,10 +734,15 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '先備糧，再排陣。從第一隻狼開始練起，最後迎戰兩隻獅子！', 2: '月亮藏起來，腳印也看不見了。提防換排的敵人，也別忘了接回路上的迷羊。', 3: '羊圈搬上山，老擺法得換一換。拋石越過斜坡、陷坑留住敵人，最後挑戰兩隻野牛！' };
-const HOME_UPDATE = '最近更新 11/8：設定頁的開關變成小蠟燭；存檔碼複製成功會打勾；試煉過了的題改金勾；尾聲的製作名單像片尾一樣往上捲；細節在設定頁的更新紀錄';
+const HOME_UPDATE = '最近更新 11/13：準備時先看得到下一波來什麼、各幾隻；設定頁多了「減少動態」開關；頭目倒下有金光、抖動和一聲低音；細節在設定頁的更新紀錄';
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.11.13', notes: [ // 11/13：對照 gamedev-skills（awesome-gamedev-agent-skills）的塔防與手感文件後做的三項，對照報告在 docs/review-gamedev-skills-2026-11-13.md
+    '準備與波間休息時，棋盤上方會先告訴你下一波來的是什麼、各幾隻（無月夜也看得到種類，看不到的只有從哪排來）',
+    '設定頁多了「減少動態」開關：沒設過就跟系統走；開了畫面不震、暴風夜不閃電、動畫只留淡入',
+    '獅子、豹、野牛這些頭目倒下時多了一圈金光、一把碎石、畫面抖一下和一聲低音，不再跟一隻狼倒下一樣安靜',
+  ] },
   { ver: '2026.11.08', notes: [ // 11/8：周邊 UI 小點綴，靈感來自 AIMRAN Library（library.aimran.es）的 Candle toggle／Copy button／Task completed check／Rolling end credits，都照自己的寫法重寫、不照貼；棋盤與成就卡不動
     '設定頁的開關變成一支小蠟燭：開了燭芯點成火苗、微微晃，關了只剩燭身；減少動態時火苗不晃',
     '存檔碼「複製」成功時按鈕畫一個勾再回到「複製」，失敗抖一下；試煉冊過了的題改成金色的勾，剛過的那題回到選夜時會畫一次',
@@ -1227,6 +1233,7 @@ function tapCell(r, c) {
 
 // 棋盤上的動畫（受擊、倒下、回彈、天色、閃電…）都在 render.js；這裡剩看門的（走道）與外框這兩個 DOM 元素的動作
 const REDUCE_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
+const reduceMotion = () => (SD.prefs.motion === null || SD.prefs.motion === undefined) ? REDUCE_MOTION.matches : !!SD.prefs.motion; // 減少動態（2026-11-13）：設定頁有自家開關，沒設過（null）才跟系統；render.js 經 Board.setReduce 看同一個值，CSS 看 html.reduce，三邊由 applyMotion 一起更新
 const CHECK_SVG = (draw = false, label = '') => `<svg class="ck${draw ? ' draw' : ''}" viewBox="0 0 24 24" ${label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"'}><path d="M4 12.5l5 5L20 7"/></svg>`; // 畫出來的勾（11/8）：存檔碼複製成功、試煉過關共用；draw 才從頭畫；label 給讀屏唸（試煉冊沒別的字說「過了」，小居 11/8）
 let copyTimer = 0, freshTrial = null; // copyTimer：複製按鈕 1.6 秒後回到「複製」；freshTrial：剛第一次過的試煉題 id，回選夜畫一次勾後清掉
 const EASE_OUT = 'cubic-bezier(.23, 1, .32, 1)';
@@ -1236,20 +1243,23 @@ function bossBanner(type) {
   const e = ENEMIES[type], b = $('#boss-banner'); if (!e || !b) return;
   b.querySelector('b').textContent = e.name; b.querySelector('span').textContent = e.title || '';
   clearTimeout(bannerTimer); if (bannerAnim) { try { bannerAnim.cancel(); } catch (err) {} bannerAnim = null; }
-  if (REDUCE_MOTION.matches || !b.animate) { b.style.opacity = 1; bannerTimer = setTimeout(() => { b.style.opacity = 0; }, 1400); return; } // 減少動態：直接出現、1.4 秒後消失
+  if (reduceMotion() || !b.animate) { b.style.opacity = 1; bannerTimer = setTimeout(() => { b.style.opacity = 0; }, 1400); return; } // 減少動態：直接出現、1.4 秒後消失
   bannerAnim = b.animate([{ opacity: 0, transform: 'translateX(40px)' }, { opacity: 1, transform: 'translateX(0)', offset: .18 }, { opacity: 1, transform: 'translateX(0)', offset: .8 }, { opacity: 0, transform: 'translateX(-24px)' }], { duration: 2000 / (speed > 1 ? 1.6 : 1), easing: 'ease-out', fill: 'forwards' });
   bannerAnim.onfinish = () => { b.style.opacity = 0; try { bannerAnim.cancel(); } catch (err) {} bannerAnim = null; }; // fill forwards 的終態要 cancel 掉，之後減少動態那條路的 style.opacity 才壓得過
 }
 function bossEnter(type) {
   if (type) bossBanner(type);
   const f = $('#frame'); if (!f) return;
-  if (!REDUCE_MOTION.matches && speed <= 1) f.animate([{ transform: 'translate(0, 0)' }, { transform: 'translate(-2px, 1px)', offset: .2 }, { transform: 'translate(2px, -1px)', offset: .45 }, { transform: 'translate(-1px, 0)', offset: .7 }, { transform: 'translate(0, 0)' }], { duration: 350, easing: 'ease-out' });
+  frameShake(f);
   f.animate([{ boxShadow: '0 0 0 2px #e6b84a, 0 0 18px 4px #e6b84a88' }, { boxShadow: '0 0 0 0 #e6b84a00, 0 0 0 0 #e6b84a00' }], { duration: 700, easing: 'ease-out' });
 }
+function frameShake(f) { if (!reduceMotion() && speed <= 1) f.animate([{ transform: 'translate(0, 0)' }, { transform: 'translate(-2px, 1px)', offset: .2 }, { transform: 'translate(2px, -1px)', offset: .45 }, { transform: 'translate(-1px, 0)', offset: .7 }, { transform: 'translate(0, 0)' }], { duration: 350, easing: 'ease-out' }); } // 外框抖 0.35 秒：頭目登場與倒下共用；減少動態或加速時不抖
+// 頭目倒下（2026-11-13，gamedev-skills game-feel 的「大級」回饋）：跟登場同一套外框抖動、金邊亮一點久一點，加一聲低音；棋盤上的金圈與碎石在 render.js 的 dieFx
+function bossDown() { Sound.play('bossdown'); const f = $('#frame'); if (!f) return; frameShake(f); f.animate([{ boxShadow: '0 0 0 3px #ffd166, 0 0 26px 8px #ffd16699' }, { boxShadow: '0 0 0 0 #ffd16600, 0 0 0 0 #ffd16600' }], { duration: 900, easing: 'ease-out' }); }
 // 天亮：金光罩上來、黑暗退掉、場上的人由左到右跳一下（render.js）；看門的發亮、由上到下跳一下（走道是 DOM，在這裡）
 function dawn() {
   dawned = true; $('#shell').classList.add('dawn'); $('#scene').classList.add('dawn'); Board.dawn();
-  if (REDUCE_MOTION.matches) return;
+  if (reduceMotion()) return;
   gateEls.forEach((g, i) => { if (g && !g.classList.contains('used')) g.firstElementChild.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-28%)', offset: .4 }, { transform: 'translateY(0)' }], { duration: 420, delay: i * 70, easing: EASE_OUT }); });
 }
 // 失守：冷色罩上來（跟天亮同一套格式），結算頁一樣慢 0.9 秒出來
@@ -1265,7 +1275,7 @@ function flushEvents() {
     switch (e.t) {
       case 'spawn': spawned.push(e.e.type); if (SPAWN_SFX[e.e.type]) Sound.play(SPAWN_SFX[e.e.type]); if (ENEMIES[e.e.type].boss) bossEnter(e.e.type); break;
       case 'toast': toast(e.msg); break;
-      case 'die': Sound.play('die'); Board.event(e, G); break;
+      case 'die': Sound.play('die'); if (ENEMIES[e.e.type] && ENEMIES[e.e.type].boss) bossDown(); Board.event(e, G); break; // 頭目倒下多一套大級回饋（2026-11-13）
       case 'hit': Board.event(e, G); break;
       case 'callout': if (!seenEnemy(e.type)) { toast(`${ENEMIES[e.type].ico} ${e.tip}`, true); markSeenEnemy(e.type); } break;
       case 'pop': Board.event(e, G); if (String(e.text)[0] === '+') Sound.play('food'); break;
@@ -1326,6 +1336,21 @@ function setSpeed(n) {
 $('#fast-btn').addEventListener('click', () => { setSpeed(speed > 1 ? 1 : 2); Sound.play('tap'); });
 if (SD.prefs.speed === 2) setSpeed(2);
 
+// 下一波預告（2026-11-13，gamedev-skills tower-defense：特殊敵人提前一波預告才不會覺得不公平；11/10 數據新人第 3 夜輸在第 1 波，跟「領頭狼橫幅出來、還沒放好就被衝」一致）
+// 準備與波間休息時貼在棋盤上方：種類照波表順序（同一種分兩段來的合成一筆）、隻數是已乘過難度的數字；教學中、最後一波打完、開打中都收起來。無月夜照列：那條規則藏的是「排」，不是「種類」
+let nwKey = '', nwG = null; // 上次畫的是哪一局的哪一波；沒變就不重排 innerHTML
+function drawNextWave() {
+  const el = $('#next-wave'); if (!el) return;
+  if (nwG !== G) { nwG = G; nwKey = ''; }
+  const show = !G.over && !G.holdWaves && (G.phase === 'prep' || G.phase === 'rest') && G.wave < G.waves.length;
+  const key = show ? `${G.phase}:${G.wave}` : '';
+  if (key === nwKey) return; nwKey = key;
+  if (!show) { el.hidden = true; return; }
+  const sum = new Map(); for (const [t, k] of G.waves[G.wave].list) sum.set(t, (sum.get(t) || 0) + k);
+  el.innerHTML = `下一波${[...sum].map(([t, k]) => { const d = ENEMIES[t]; return `<span title="${d.name}">${icoImg(icoKey(d), d.ico)}<b>${k}</b></span>`; }).join('')}`;
+  el.hidden = false;
+}
+
 function draw(dt = 0) {
   setText($('#food'), G.level.conveyor ? '—' : String(Math.floor(G.food)));
   const t = Math.ceil(G.timer), n = G.waves.length;
@@ -1334,6 +1359,7 @@ function draw(dt = 0) {
     G.phase === 'prep' ? (G.started ? `第 1 波 ${t} 秒後來` : '放下第一個單位才開始倒數') :
     G.phase === 'rest' ? (G.wave >= n ? '天快亮了' : `第 ${G.wave + 1} 波 ${t} 秒後來`) :
     `第 ${G.wave} / ${n} 波`);
+  drawNextWave();
   // 棋盤裡的一切（單位、敵人、投射物、效果、天色）交給 render.js；它回報有沒有人在咬、這一幀新出手幾發，聲音在這裡放
   const info = Board.frame(G, dt);
   if (info.shots) Sound.play('shot');
@@ -1347,7 +1373,7 @@ function draw(dt = 0) {
     if (g.classList.contains('used') === on) {
       g.classList.toggle('used', !on);
       if (!on && G.gateRows.includes(r)) { g.classList.remove('flash'); void g.offsetWidth; g.classList.add('flash'); } // 用掉：門口閃紅一下（減少動態也閃，只是短）
-      if (!on && !REDUCE_MOTION.matches && speed <= 1) g.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(45%)', offset: .35 }, { transform: 'translateX(0)' }], { duration: 520, easing: EASE_OUT }); // 用掉那一刻：往門裡跨一步再退回來變灰
+      if (!on && !reduceMotion() && speed <= 1) g.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(45%)', offset: .35 }, { transform: 'translateX(0)' }], { duration: 520, easing: EASE_OUT }); // 用掉那一刻：往門裡跨一步再退回來變灰
     }
   }
   if (biting) Sound.play('bite'); // sound.js 自己限流，每 0.45 秒最多一聲
@@ -1400,7 +1426,7 @@ function showStars() {
   if (slots > 2 && !st.gates) why.push(`用掉了 ${G.gateRows.length - G.gates.length} 位看門的`);
   const got = items.filter(([k]) => st[k]).length, full = !devUsed && got >= slots;
   box.classList.toggle('full', full); box.style.setProperty('--n', slots); // 三星全拿：跳完後一起亮金光＋一聲高音（11/6 James：可加）
-  if (full && !REDUCE_MOTION.matches) setTimeout(() => { if (!$('#result').hidden) Sound.play('achieve'); }, slots * 180 + 670);
+  if (full && !reduceMotion()) setTimeout(() => { if (!$('#result').hidden) Sound.play('achieve'); }, slots * 180 + 670);
   $('#stars-note').textContent = devUsed ? '開著開發者模式，這局的星不記' : got >= slots ? '這一夜的星全拿了' : why.length ? `差的：${why.join('；')}` : '';
   if (!devUsed) items.forEach(([k], i) => { if (st[k]) setTimeout(() => Sound.play('food'), 350 + i * 180 + 120); }); // 每顆星一聲叮，跟著跳出
 }
@@ -1431,7 +1457,7 @@ function onWin() {
         more.addEventListener('click', () => { more.remove(); box.querySelectorAll('div:not(.ref)').forEach(d => d.remove()); lines.forEach((line, i) => addLine(line, 100 + i * 250)); Sound.play('tap'); });
       }
     }
-  }, REDUCE_MOTION.matches ? 1500 : 2600); // 2026-10-26 James：場景淡成清晨要 1.8 秒，0.9 秒就被結算頁蓋住看不到；延到 2.6 秒（淡完再停 0.8 秒），失守那邊維持 0.9。減少動態減的是位移不是時間：清晨淡入只是透明度，留 1.5 秒讓人看到「熬過了」（審查 11/6 動畫 review；原本 0 秒直接蓋掉）
+  }, reduceMotion() ? 1500 : 2600); // 2026-10-26 James：場景淡成清晨要 1.8 秒，0.9 秒就被結算頁蓋住看不到；延到 2.6 秒（淡完再停 0.8 秒），失守那邊維持 0.9。減少動態減的是位移不是時間：清晨淡入只是透明度，留 1.5 秒讓人看到「熬過了」（審查 11/6 動畫 review；原本 0 秒直接蓋掉）
 }
 // 結語依實際羊數選（2026-10-21 小居第 6 項）：有羊數的夜才講；接回幾隻、失去幾隻、圈裡剩幾隻都從引擎帶，不再一句「一隻不少」到底
 function sheepSummary() {
@@ -1455,7 +1481,7 @@ function onLose(reason, by) {
   const sk = streakKey(), n = lossStreak[sk] = (lossStreak[sk] || 0) + 1;
   const comfort = n < 3 ? '' : trial ? ' 這一題連著幾回了，歇一歇；回選夜挑另一題也行。' : diff !== 'calm' ? ' 這樣的夜，大衛也守過。先換寧靜夜，看清牠們走哪條路。' : ' 這樣的夜，大衛也守過。歇一歇，回開場頁再看一次今晚的提示。';
   nightfall();
-  setTimeout(() => { endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}${comfort}`); $('#next').hidden = true; $('#epilogue-btn').hidden = true; $('#retry').textContent = trial ? '再打這一題' : '再守一夜'; $('#result-swap').hidden = !pickedFor(level); }, REDUCE_MOTION.matches ? 0 : 900);
+  setTimeout(() => { endGame(titles[reason] || '守夜失敗', `你撐到了第 ${G.wave} 波。${text}${comfort}`); $('#next').hidden = true; $('#epilogue-btn').hidden = true; $('#retry').textContent = trial ? '再打這一題' : '再守一夜'; $('#result-swap').hidden = !pickedFor(level); }, reduceMotion() ? 0 : 900);
 }
 const lossStreak = {}; // 鍵＝streakKey()，值＝這一夜（或這一題）這次開頁連輸幾次；贏了就刪
 const streakKey = () => (trial ? 'trial:' + trial.id : 'n' + level.id);
@@ -1850,6 +1876,11 @@ applyBig(SD.prefs.big, false);
 function applyContrast(on, save = true) { document.documentElement.classList.toggle('contrast', !!on); if (Board.setContrast) Board.setContrast(!!on); const b = $('#contrast-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) { SD.prefs.contrast = !!on; SAVE.save(); } }
 $('#contrast-btn').addEventListener('click', () => { applyContrast(!document.documentElement.classList.contains('contrast')); Sound.play('tap'); });
 applyContrast(SD.prefs.contrast, false);
+// 減少動態（2026-11-13，gamedev-skills game-feel 的無障礙開關；iOS 玩家佔三分之二、很多人不知道系統設定在哪）：三個值——null 跟系統、true 開、false 關。蠟燭顯示的是「現在生效的」，點一下就改成明確的開或關；沒設過時系統設定中途變了也跟著變
+function applyMotion(v, save = true) { const unset = v === null || v === undefined, on = unset ? REDUCE_MOTION.matches : !!v; document.documentElement.classList.toggle('reduce', on); if (Board.setReduce) Board.setReduce(unset ? null : !!v); const b = $('#motion-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', on); b.title = (unset ? '目前跟系統設定走。' : '') + '開了：畫面不震、暴風夜不閃電、動畫只留淡入'; SD.prefs.motion = unset ? null : !!v; if (save) SAVE.save(); } // 記憶體裡的值一律跟著改（reduceMotion() 才跟畫面一致），save 只管要不要寫進存檔
+$('#motion-btn').addEventListener('click', () => { applyMotion(!reduceMotion()); Sound.play('tap'); });
+applyMotion(SD.prefs.motion, false);
+try { REDUCE_MOTION.addEventListener('change', () => { if (SD.prefs.motion === null) applyMotion(null, false); }); } catch (e) { try { REDUCE_MOTION.addListener(() => { if (SD.prefs.motion === null) applyMotion(null, false); }); } catch (e2) {} } // 舊 Safari 只有 addListener
 // 省效能模式（2026-10-28 James：手機順、電腦卡）：暫停選單手動開（存 sheepfold-lite）；沒設過的電腦若 WebGL 是軟體模擬就自動開；玩到一半連續三秒掉到 30fps 以下也自動開、說一聲（每次開頁只自動切一次，不會來回跳）
 function applyLite(on, save = true) { Board.setLite(on); const b = $('#lite-btn'); b.textContent = on ? '開' : '關'; b.classList.toggle('on', !!on); if (save) { SD.prefs.lite = !!on; SAVE.save(); } }
 $('#lite-btn').addEventListener('click', () => { applyLite(!Board.lite); Sound.play('tap'); });
@@ -2071,8 +2102,8 @@ function epNext() {
     body.innerHTML = `<div class="ep-kicker">${sl.kicker}</div><h1>${sl.title}</h1>${(typeof sl.lines === 'function' ? sl.lines() : sl.lines || []).map(l => `<p>${l}</p>`).join('')}${sl.small ? `<div class="ep-small${sl.end ? ' ep-roll' : ''}"><div>${sl.small.join('<br>')}</div></div>` : ''}${sl.end ? `<div class="ep-after">${tail}<button class="btn" id="ep-done">${epFrom === 'result' ? '回選夜' : '回首頁'}</button></div>` : tail}`; // 最後一頁：名單包 .ep-roll 往上捲，尾句與按鈕包 .ep-after、捲完才現身（11/8）。按鈕照實際落點寫：從結算頁進來的關掉會回選夜（backToLevels），首頁 🌅 進來的回首頁（11/2 審查交集 G）
     $('#ep-hint').textContent = sl.end ? '點一下直接看完' : '點一下繼續';
     if (sl.bg) bg.classList.add('on'); body.classList.add('on');
-    if (sl.end) { $('#ep-done').addEventListener('click', ev => { ev.stopPropagation(); closeEpilogue(); }); const roll = $('#epilogue .ep-roll > div'); if (!roll || REDUCE_MOTION.matches) epReveal(); else { roll.addEventListener('animationend', epReveal, { once: true }); epRevealTimer = setTimeout(epReveal, 7000); } } // 名單捲完（或減少動態、沒有名單）才讓尾句與按鈕現身；7 秒保險絲以防 animationend 沒來。之前 .ep-after 透明 5.6 秒但按得到，點畫面跳過會誤按到「回首頁」（審查 11/8 四路都抓到）
-  }, REDUCE_MOTION.matches ? 0 : 350);
+    if (sl.end) { $('#ep-done').addEventListener('click', ev => { ev.stopPropagation(); closeEpilogue(); }); const roll = $('#epilogue .ep-roll > div'); if (!roll || reduceMotion()) epReveal(); else { roll.addEventListener('animationend', epReveal, { once: true }); epRevealTimer = setTimeout(epReveal, 7000); } } // 名單捲完（或減少動態、沒有名單）才讓尾句與按鈕現身；7 秒保險絲以防 animationend 沒來。之前 .ep-after 透明 5.6 秒但按得到，點畫面跳過會誤按到「回首頁」（審查 11/8 四路都抓到）
+  }, reduceMotion() ? 0 : 350);
 }
 function closeEpilogue() { clearTimeout(epTimer); $('#epilogue').hidden = true; Sound.play('tap'); if (epFrom === 'result') backToLevels(); }
 $('#epilogue').addEventListener('click', () => { const sl = EPILOGUE[epIdx]; if (!sl || performance.now() - epShown < 600) return; if (sl.end) { epSkip(); return; } epNext(); Sound.play('tap'); }); // 最後一頁點一下：名單直接捲到底、按鈕立刻出來（11/8）。0.6 秒守門要放最前面：倒數第二頁連點兩下，第二下不能把還沒畫出來的名單直接跳掉（審查 11/8）

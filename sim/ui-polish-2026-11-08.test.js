@@ -8,16 +8,17 @@ const path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 test('更新紀錄第一筆是 2026.11.08，首頁一句話也換了', () => {
-  assert.match(html, /const CHANGELOG = \[\s*\{ ver: '2026\.11\.08'/);
-  assert.match(html, /const HOME_UPDATE = '最近更新 11\/8/);
+  assert.match(html, /const CHANGELOG = \[\s*\{ ver: '2026\.11\.13'/); // 11/13 又加了一筆在最前面
+  assert.match(html, /const HOME_UPDATE = '最近更新 11\/13/);
+  assert.match(html, /\{ ver: '2026\.11\.08', notes: \[/);
 });
 
-test('設定頁七個開關都掛了蠟燭（大字、省效能、高對比、音樂、音效、蟲鳴、使用統計），音量與存檔碼不掛', () => {
-  assert.strictEqual((html.match(/<button class="cdl"/g) || []).length, 7);
+test('設定頁八個開關都掛了蠟燭（大字、省效能、高對比、減少動態、音樂、音效、蟲鳴、使用統計），音量與存檔碼不掛', () => {
+  assert.strictEqual((html.match(/<button class="cdl"/g) || []).length, 8); // 11/13 加了「減少動態」
   assert.doesNotMatch(html, /<button class="cdl" data-vol/);
   assert.doesNotMatch(html, /<button class="cdl" id="set-(export|import)"/);
   assert.match(html, /\.snd-row button\.cdl\.on::after \{[^}]*animation: candle-flicker/);
-  assert.match(html, /prefers-reduced-motion: reduce\) \{\s*\.snd-row button\.cdl\.on::after \{ animation: none; \}\s*\.snd-row button\.cdl::after \{ transition: none; \}/);
+  assert.match(html, /html\.reduce \.snd-row button\.cdl\.on::after \{ animation: none; \}\s*html\.reduce \.snd-row button\.cdl::after \{ transition: none; \}/); // 11/13 起減少動態走 html.reduce 類別，不是媒體查詢
   assert.match(html, /html\.contrast \.snd-row button\.cdl:not\(\.on\)::after/, '高對比只改關著的燭芯，不能蓋掉火苗');
 });
 
@@ -35,7 +36,7 @@ test('複製按鈕：成功／失敗都先清掉上一次的狀態、都會在 1
   assert.match(html, /btn\.classList\.remove\('shake', 'done'\);/);
   assert.match(html, /copyTimer = setTimeout\(\(\) => \{ btn\.classList\.remove\('done'\); btn\.textContent = '複製'; \}, 1600\);/);
   assert.match(html, /#set-copy\.shake \{ animation: copy-shake 320ms; \}/);
-  assert.match(html, /\.ck\.draw, \.ck\.draw path, #set-copy\.shake \{ animation: none; \}/, '減少動態要關掉勾與抖動');
+  assert.match(html, /html\.reduce \.ck\.draw, html\.reduce \.ck\.draw path, html\.reduce #set-copy\.shake \{ animation: none; \}/, '減少動態要關掉勾與抖動');
   assert.match(html, /id="set-copy-note" aria-live="polite"/);
 });
 
@@ -48,7 +49,7 @@ test('尾聲最後一頁：名單包 ep-roll 往上捲（高度跟內容走）�
   assert.match(html, /#epilogue \.ep-after \{ visibility: hidden; opacity: 0;/);
   assert.match(html, /#epilogue \.ep-after\.on \{ visibility: visible; opacity: 1;/);
   assert.match(html, /roll\.addEventListener\('animationend', epReveal, \{ once: true \}\)/);
-  assert.match(html, /if \(!roll \|\| REDUCE_MOTION\.matches\) epReveal\(\);/, '減少動態沒有 animationend，要直接現身');
+  assert.match(html, /if \(!roll \|\| reduceMotion\(\)\) epReveal\(\);/, '減少動態沒有 animationend，要直接現身');
   assert.match(html, /if \(!sl \|\| performance\.now\(\) - epShown < 600\) return; if \(sl\.end\) \{ epSkip\(\); return; \}/);
   assert.match(html, /function epSkip\(\) \{ \$\('#epilogue \.ep'\)\.classList\.add\('skip'\); epReveal\(\); \}/);
   assert.match(html, /function openEpilogue\(from\) \{[^\n]*classList\.remove\('skip'\)/);
