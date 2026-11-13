@@ -138,7 +138,7 @@ test('index.html：送卡夜放下最後一張卡不再讀被清掉的 selected�
   assert.match(html, /banner && banner\.getAnimations \? banner\.getAnimations\(\) : \[\]/);
   assert.match(html, /clearTimeout\(bannerTimer\); if \(bannerAnim\)[^\n]*\n\s*\$\('#result'\)\.hidden = true;/);
   assert.match(html, /performance\.now\(\) - epShown < 600/, '尾聲連點不跳頁');
-  assert.match(html, /REDUCE_MOTION\.matches \? 1500 : 2600/, '減少動態結算留 1.5 秒');
+  assert.match(html, /reduceMotion\(\) \? 1500 : 2600/, '減少動態結算留 1.5 秒');
   assert.ok(!/data-dep="sfx"><span>音量/.test(html), '音量列不跟著音效壓暗');
   assert.match(html, /SD\.announced = APP_VERSION; SAVE\.save\(\);/, '新玩家也存公告版本');
   assert.match(html, /MENU_IDS\.some\(m => !\$\(m\)\.hidden\) && \$\('#result'\)\.hidden && \$\('#settings'\)\.hidden/, '只在選單畫面才因別的分頁存檔而重載');

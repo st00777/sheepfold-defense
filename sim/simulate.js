@@ -232,14 +232,17 @@ function play(levelId, diff, seed, skill, mods = ENV_MODS) {
     if (seed === 1000 && process.env.SIM_SHOW) console.log('  隊伍：' + pick.join(' '));
     E.applyPick(G, pick);
   }
-  const dt = 1 / 30; let acc = 0, minX = COLS;
+  const dt = 1 / 30; let acc = 0, minX = COLS; const waveMin = []; // waveMin[i]：第 i+1 波期間（含波後休息）敵人最靠近羊圈到哪（2026-11-13，gamedev-skills 的「每波壓力」：哪一波是牆、哪幾波太鬆一眼看得出）
   while (!G.over && G.time < 900) {
     E.step(G, dt); G.events.length = 0;
-    for (const e of G.enemies) if (!e.dead && !e.carrying && !e.underground && e.x < minX) minX = e.x; // 敵人最靠近羊圈到哪（壓力指標，0 就差點輸）
+    for (const e of G.enemies) if (!e.dead && !e.carrying && !e.underground) { if (e.x < minX) minX = e.x; const wi = G.wave - 1; if (wi >= 0 && (waveMin[wi] === undefined || e.x < waveMin[wi])) waveMin[wi] = e.x; } // 敵人最靠近羊圈到哪（壓力指標，0 就差點輸）；整局一個數＋每波一個數
     acc += dt; if (acc >= 0.5) { acc = 0; decide(G, skill); }
   }
-  return { win: !!(G.result && G.result.win), wave: G.wave, reason: G.result ? G.result.reason : 'timeout', time: G.time, sheepLost: G.sheepLost, minX };
+  return { win: !!(G.result && G.result.win), wave: G.wave, reason: G.result ? G.result.reason : 'timeout', time: G.time, sheepLost: G.sheepLost, minX, waveMin };
 }
+
+// 每波平均最近幾格：只算打到那一波的局（前面就輸的局不拉低後面的波），沒人打到的波印 -；波與波之間用 / 隔開
+function waveAvg(res) { const n = res.reduce((a, r) => Math.max(a, r.waveMin.length), 0), out = []; for (let i = 0; i < n; i++) { const v = res.map(r => r.waveMin[i]).filter(x => x !== undefined); out.push(v.length ? (v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : '-'); } return out.join('/'); }
 
 function run(levelId, diff, n, skill, mods = ENV_MODS) {
   const res = []; for (let i = 0; i < n; i++) res.push(play(levelId, diff, 1000 + i, skill, mods));
@@ -248,7 +251,7 @@ function run(levelId, diff, n, skill, mods = ENV_MODS) {
   const avgWave = (res.reduce((a, r) => a + r.wave, 0) / n).toFixed(2);
   const sheep = res.reduce((a, r) => a + r.sheepLost, 0) / n;
   const press = res.reduce((a, r) => a + r.minX, 0) / n; // 平均最近距離：越小越驚險
-  console.log(`關 ${levelId} ${D.DIFFS[diff].name} ${skill}${modsLabel(mods)}：勝率 ${(wins / n * 100).toFixed(0)}%（${n} 局）平均撐到 ${avgWave} 波 最近 ${press.toFixed(2)} 格 ${sheep ? `平均失羊 ${sheep.toFixed(2)} ` : ''}輸法 ${JSON.stringify(reasons)}`);
+  console.log(`關 ${levelId} ${D.DIFFS[diff].name} ${skill}${modsLabel(mods)}：勝率 ${(wins / n * 100).toFixed(0)}%（${n} 局）平均撐到 ${avgWave} 波 最近 ${press.toFixed(2)} 格 每波 ${waveAvg(res)} ${sheep ? `平均失羊 ${sheep.toFixed(2)} ` : ''}輸法 ${JSON.stringify(reasons)}`);
   return res;
 }
 
@@ -263,7 +266,7 @@ function compare(levelId, diff, n, mods = ENV_MODS) { // 跟 run 不同：沒有
     all[k] = res;
     const wins = res.filter(r => r.win).length;
     const f = (g, d = 2) => (res.reduce((a, r) => a + g(r), 0) / n).toFixed(d);
-    console.log(`  ${k.padEnd(6)} ${STRAT_NAME[k].padEnd(4, '　')} 勝率 ${String((wins / n * 100).toFixed(0)).padStart(3)}%  平均 ${f(r => r.wave)} 波  最近 ${f(r => r.minX)} 格  失羊 ${f(r => r.sheepLost)}`);
+    console.log(`  ${k.padEnd(6)} ${STRAT_NAME[k].padEnd(4, '　')} 勝率 ${String((wins / n * 100).toFixed(0)).padStart(3)}%  平均 ${f(r => r.wave)} 波  最近 ${f(r => r.minX)} 格  每波 ${waveAvg(res)}  失羊 ${f(r => r.sheepLost)}`);
   }
   const only = {}, allWin = [], allLose = [];
   for (let i = 0; i < n; i++) {

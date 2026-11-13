@@ -50,7 +50,7 @@ test('舊 key 全部搬進 sheepfold-save，搬成功後舊 key 刪掉、lasterr
   assert.deepStrictEqual(d.loadouts[12], ['shepherd', 'slinger', 'wall']);
   assert.deepStrictEqual(d.seen, { intro: ['1:shepherd', 'gate'], cards: ['shepherd', 'dog'], enemies: ['wolf'] });
   assert.strictEqual(d.tutorial, true);
-  assert.deepStrictEqual(d.prefs, { diff: 'windy', speed: 2, big: true, lite: false, contrast: false, sound: { sfx: true, amb: true, music: true, vol: 2 }, analytics: true });
+  assert.deepStrictEqual(d.prefs, { diff: 'windy', speed: 2, big: true, lite: false, contrast: false, motion: null, sound: { sfx: true, amb: true, music: true, vol: 2 }, analytics: true }); // motion null＝沒設過（v7）
   assert.ok(st.get(Save.KEY), '新檔已寫入');
   for (const k of Save.LEGACY) assert.strictEqual(st.get(k), null, k + ' 應已刪除');
   assert.strictEqual(st.get('sheepfold-checkpoint-2'), null);
@@ -91,7 +91,7 @@ test('主檔壞掉、有備份：用備份接回來，壞檔留在 -broken', () 
   assert.deepStrictEqual(S.data.progress.cleared[1], { calm: true, windy: true });
   assert.strictEqual(st.get(Save.BROKEN), '{"version":4,"progress":{garbage');
   assert.ok(S.problems[0].includes('備份'));
-  assert.ok(st.get(Save.KEY).startsWith('{"version":6'), '接回來的立刻寫回主檔（升到現在的版本）');
+  assert.ok(st.get(Save.KEY).startsWith('{"version":7'), '接回來的立刻寫回主檔（升到現在的版本）');
 });
 
 test('主檔壞掉、沒備份：從頭開始、status broken、壞檔留著', () => {
@@ -133,7 +133,7 @@ test('validate 補齊缺欄、丟掉型別錯的，不會丟例外', () => {
   assert.deepStrictEqual(d.progress.best['3:calm'], { score: 5, cleared: false, wave: 0 });
   assert.strictEqual(d.loadouts[4], undefined);
   assert.deepStrictEqual(d.loadouts[5], ['a', 'b']);
-  assert.deepStrictEqual(d.prefs, { diff: 'calm', speed: 1, big: false, lite: null, contrast: false, sound: { sfx: true, amb: false, music: true, vol: 1 }, analytics: true });
+  assert.deepStrictEqual(d.prefs, { diff: 'calm', speed: 1, big: false, lite: null, contrast: false, motion: null, sound: { sfx: true, amb: false, music: true, vol: 1 }, analytics: true });
   assert.strictEqual(d.playerKind, '');
   assert.deepStrictEqual(d.seen, { intro: [], cards: [], enemies: [] });
   for (const bad of [null, 'x', 42, [1, 2]]) assert.strictEqual(Save.validate(bad, OPTS).data, null);
@@ -144,7 +144,7 @@ test('存檔碼來回：中文、檢查點都在，格式純 ASCII，貼進去�
   const S = Save.open(st, OPTS);
   S.data.loadouts[7] = ['牧人測試']; // 存檔裡出現中文也要能來回
   const code = Save.encode(S.data);
-  assert.match(code, /^SF6\.[A-Za-z0-9_-]+\.[0-9a-f]{8}$/);
+  assert.match(code, /^SF7\.[A-Za-z0-9_-]+\.[0-9a-f]{8}$/);
   const r = Save.decode(code.slice(0, 40) + '\n  ' + code.slice(40) + ' \n', OPTS);
   assert.ok(r.data, r.error);
   assert.deepStrictEqual(r.data.loadouts[7], ['牧人測試']);
@@ -156,11 +156,11 @@ test('存檔碼少字、改字、不是存檔碼、未來版本：各給一句�
   const S = Save.open(legacyStore(), OPTS);
   const code = Save.encode(S.data);
   assert.match(Save.decode(code.slice(0, 20) + code.slice(24), OPTS).error, /少了字|改過/);
-  const tampered = code.replace(/^SF6\.(.)/, (m, c) => 'SF6.' + (c === 'A' ? 'B' : 'A'));
+  const tampered = code.replace(/^SF7\.(.)/, (m, c) => 'SF7.' + (c === 'A' ? 'B' : 'A'));
   assert.match(Save.decode(tampered, OPTS).error, /少了字|改過/);
   assert.match(Save.decode('hello world', OPTS).error, /不是羊圈守夜/);
   assert.match(Save.decode('', OPTS).error, /還沒貼/);
-  assert.match(Save.decode(code.replace(/^SF6/, 'SF9'), OPTS).error, /更新/);
+  assert.match(Save.decode(code.replace(/^SF7/, 'SF9'), OPTS).error, /更新/);
 });
 
 test('replace 整份覆蓋後寫入；summary 算得出守過幾夜', () => {
@@ -228,16 +228,16 @@ test('v4 主檔升到 v5：多出 trials 四格，其餘原樣；SF4 存檔碼�
   const v4 = { version: 4, created: '2026-10-29T00:00:00.000Z', updated: '2026-10-29T00:00:00.000Z', progress: { cleared: { 7: { calm: true } }, best: {}, stars: {} }, checkpoints: {}, loadouts: {}, seen: { intro: [], cards: [], enemies: [] }, tutorial: true, prefs: { diff: 'windy' }, announced: 'x', playerKind: 'returning' };
   const st = Save.memoryStore({ [Save.KEY]: JSON.stringify(v4) });
   const S = Save.open(st, OPTS);
-  assert.strictEqual(S.status, 'ok'); assert.strictEqual(S.data.version, 6);
+  assert.strictEqual(S.status, 'ok'); assert.strictEqual(S.data.version, 7);
   assert.deepStrictEqual(S.data.trials, { cleared: {}, best: {}, checkpoints: {}, loadouts: {} });
   assert.deepStrictEqual(S.data.progress.cleared, { 7: { calm: true } }); assert.strictEqual(S.data.prefs.diff, 'windy');
-  assert.ok(st.get(Save.KEY).startsWith('{"version":6'));
+  assert.ok(st.get(Save.KEY).startsWith('{"version":7'));
   assert.strictEqual(st.get(Save.BAK), JSON.stringify(v4), '升版那一次的備份留著舊版原文');
   // 舊版遊戲匯出的 SF4 碼：版本不比現在新，照收
   const body = Buffer.from(JSON.stringify(v4), 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const fnv = s => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); };
   const r = Save.decode(`SF4.${body}.${fnv(body)}`, OPTS);
-  assert.ok(r.data, r.error); assert.strictEqual(r.data.version, 6); assert.deepStrictEqual(r.data.trials.cleared, {});
+  assert.ok(r.data, r.error); assert.strictEqual(r.data.version, 7); assert.deepStrictEqual(r.data.trials.cleared, {});
 });
 
 test('trials 欄位：過關、紀錄、檢查點、隊伍都存得回來；壞的試煉檢查點只丟那一份並說一聲；垃圾型別丟掉', () => {
@@ -271,10 +271,10 @@ test('v5 主檔升到 v6：多出 achievements、prefs.contrast、prefs.sound.mu
   const v5 = { version: 5, created: '2026-10-29T00:00:00.000Z', updated: '2026-10-29T00:00:00.000Z', progress: { cleared: { 1: { calm: true } }, best: {}, stars: {} }, checkpoints: {}, loadouts: {}, seen: { intro: [], cards: [], enemies: [] }, tutorial: false, prefs: { diff: 'calm', speed: 1, big: false, lite: null, sound: { sfx: true, amb: false, vol: 1 }, analytics: true }, trials: { cleared: {}, best: {}, checkpoints: {}, loadouts: {} }, announced: '', playerKind: '' };
   const st = Save.memoryStore({ [Save.KEY]: JSON.stringify(v5) });
   const S = Save.open(st, OPTS);
-  assert.strictEqual(S.data.version, 6);
+  assert.strictEqual(S.data.version, 7);
   assert.deepStrictEqual(S.data.achievements, {});
   assert.strictEqual(S.data.prefs.contrast, false); assert.strictEqual(S.data.prefs.sound.music, true);
-  assert.ok(st.get(Save.KEY).startsWith('{"version":6'));
+  assert.ok(st.get(Save.KEY).startsWith('{"version":7'));
   // 匯入：認得的 id 留著、怪 id 與非字串丟掉；contrast／music 讀得回來
   const ids = D.ACHIEVEMENTS.map(a => a.id);
   const r = Save.validate({ version: 6, achievements: { [ids[0]]: '2026-11-01T00:00:00.000Z', bogus: '2026-11-01', [ids[1]]: 5 }, prefs: { contrast: true, sound: { music: false } } }, { ...OPTS, achievementIds: ids });
