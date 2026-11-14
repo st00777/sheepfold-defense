@@ -36,6 +36,8 @@ function boot(net) {
       // 真的伺服器不管 ?all&dev 這些參數，index.html 跟根網址也是同一頁
       const v = net.get(url.replace(/\?(all|dev|sw)(&(all|dev|sw))*$/, '').replace(/\/index\.html$/, '/'));
       if (v === 'HANG') return new Promise(() => {});
+      // 值是 { moved: 內容 }：這個檔被轉址到別的網域。<img> 那種請求（傳進來的是請求物件）拿到看不到內容的回應，用網址字串抓才看得到
+      if (v && v.moved) return Promise.resolve(typeof u === 'string' ? res(v.moved) : Object.assign(res('', false), { type: 'opaque' }));
       if (v instanceof Error) return Promise.reject(v);
       return Promise.resolve(v === undefined ? res('', false) : res(v));
     },
@@ -215,4 +217,22 @@ test('PWA：背景更新一定跟伺服器對過（no-cache）；每次開頁算
   net.set(pixi, 'pixi 3');
   assert.strictEqual(await round(), 'pixi 2');
   assert.strictEqual(await round(), 'pixi 3');
+});
+
+// 11/14 測試站驗出來的：githack 把圖 301 到別的網域，進局後才載的圖（h-gatekeeper）一直存不進去。
+test('PWA：被轉址到別的網域的圖，第一次照給，背景另外抓一份存起來，下次就有', async () => {
+  const net = liveNet();
+  const pic = ROOT + 'img/ico/h-gatekeeper.webp';
+  net.set(pic, { moved: 'webp' });
+  const sw = boot(net);
+  await sw.fire('install', {});
+  const first = await sw.get(pic);
+  assert.strictEqual(first.type, 'opaque', '第一次把原本的回應照給頁面');
+  assert.strictEqual(sw.store.get(pic), 'webp', '背景抓到看得到內容的那份並存起來');
+  const n = sw.calls.length;
+  assert.strictEqual((await sw.get(pic)).body, 'webp', '第二次用存的');
+  net.set(pic, new Error('offline'));
+  await sw.fire('fetch', { request: { url: ROOT, method: 'GET', mode: 'navigate' } }).catch(() => null);
+  assert.strictEqual((await sw.get(pic)).body, 'webp', '斷線也有');
+  assert.ok(sw.calls.length > n);
 });

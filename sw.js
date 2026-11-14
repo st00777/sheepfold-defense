@@ -105,6 +105,11 @@ async function savedThenRefresh(event) {
   if (res.ok) {
     fresh.add(req.url);
     event.waitUntil(put(cache, req.url, res.clone()).catch(() => null));
+  } else if (res.type === 'opaque' && !fresh.has(req.url)) {
+    // 測試站（githack）會把圖轉址到別的網域，<img> 拿到的是「看不到內容」的回應，存不了。
+    // 背景再用看得到內容的方式抓一次存起來。正式站沒有轉址，走不到這裡。
+    fresh.add(req.url);
+    event.waitUntil(fetch(req.url).then((r) => (r.ok ? put(cache, req.url, r) : null)).catch(() => null));
   }
   return res;
 }
