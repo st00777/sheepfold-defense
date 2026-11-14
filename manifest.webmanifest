@@ -1,0 +1,19 @@
+{
+  "name": "羊圈守夜",
+  "short_name": "羊圈守夜",
+  "description": "用聖經故事做的守塔小遊戲：你是夜裡看守羊圈的牧人，守住狼、熊、獅子，守到天亮。一夜一段經文，三十夜三章。",
+  "lang": "zh-Hant",
+  "dir": "ltr",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#2b2a26",
+  "theme_color": "#2b2a26",
+  "categories": ["games"],
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
