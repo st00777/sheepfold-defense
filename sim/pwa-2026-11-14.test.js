@@ -62,7 +62,7 @@ function boot(net) {
 
 // 從真的 index.html 抓出它現在用的 js 網址，當成「網路上有的東西」
 const scripts = [...html.matchAll(/<script src="([^"]+)"/g)].map(m => m[1]).filter(s => !/^https?:/.test(s));
-const liveNet = () => new Map([[ROOT, html], ...scripts.map(s => [ROOT + s, 'js:' + s]), [ROOT + 'img/icon-512.png', 'png'], [ROOT + 'img/icon-180.png', 'png'], [ROOT + 'manifest.webmanifest', '{}']]);
+const liveNet = () => new Map([[ROOT, html], ...scripts.map(s => [ROOT + s, 'js:' + s]), [ROOT + 'img/icon-512.png', 'png'], [ROOT + 'img/icon-180.png', 'png'], [ROOT + 'manifest.json', '{}']]);
 
 test('PWA：安裝時讀 index.html，把它用到的自家 js（連 ?v=）存起來；別的網域不存；sw.js 自己不寫版本號', async () => {
   const sw = boot(liveNet());
@@ -70,7 +70,7 @@ test('PWA：安裝時讀 index.html，把它用到的自家 js（連 ?v=）存�
   assert.ok(sw.store.has(ROOT), '首頁要存');
   assert.ok(scripts.length >= 6 && scripts.some(s => /\?v=\d+/.test(s)), 'index.html 應該有帶 ?v= 的 js');
   for (const s of scripts) assert.strictEqual(sw.store.get(ROOT + s), 'js:' + s, s + ' 要存');
-  assert.ok(sw.store.has(ROOT + 'manifest.webmanifest'));
+  assert.ok(sw.store.has(ROOT + 'manifest.json'));
   assert.ok([...sw.store.keys()].every(k => k.startsWith(ROOT)), '只存自家的檔');
   assert.ok(sw.calls.includes('skipWaiting'));
   // 去掉註解之後，sw.js 不能出現任何 ?v=——版本號只有 index.html 一個來源
@@ -169,7 +169,7 @@ test('PWA：頁面第一次開時載過的檔，交給 sw.js 補存（只收自�
 });
 
 test('PWA：manifest 欄位齊、圖示檔都在；index.html 掛了 manifest、iPhone 三行 meta、註冊 sw.js 且本機預設不裝', () => {
-  const m = JSON.parse(src('manifest.webmanifest'));
+  const m = JSON.parse(src('manifest.json'));
   assert.strictEqual(m.name, '羊圈守夜');
   assert.strictEqual(m.display, 'standalone');
   // 網址一律相對：正式站在 /sheepfold-defense/ 底下，寫成 / 開頭會跑到別的地方
@@ -184,7 +184,7 @@ test('PWA：manifest 欄位齊、圖示檔都在；index.html 掛了 manifest、
   }
   const bg = html.match(/--bg:\s*(#[0-9a-f]{6})/)[1];
   assert.strictEqual(m.background_color, bg, '開啟畫面底色跟遊戲夜色底一樣');
-  assert.ok(html.includes('<link rel="manifest" href="manifest.webmanifest">'));
+  assert.ok(html.includes('<link rel="manifest" href="manifest.json">'));
   assert.ok(html.includes('<meta name="apple-mobile-web-app-capable" content="yes">'));
   assert.ok(html.includes('<meta name="apple-mobile-web-app-title" content="羊圈守夜">'));
   assert.ok(html.includes('<link rel="apple-touch-icon" sizes="180x180" href="img/icon-180.png">'));
