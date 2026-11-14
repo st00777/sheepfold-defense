@@ -18,6 +18,12 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" sizes="512x512" href="img/icon-512.png">
 <link rel="apple-touch-icon" sizes="180x180" href="img/icon-180.png">
+<!-- PWA 樣品（2026-11-14）：加到主畫面用。manifest 給 Android／電腦 Chrome，下面三行 meta 給 iPhone／iPad（Safari 不看 manifest 的 display） -->
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="羊圈守夜">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <title>羊圈守夜</title>
 <style>
   /* 色票集中在這裡，之後換美術只改這一區 */
@@ -2190,6 +2196,25 @@ $('#result-swap').addEventListener('click', () => afterAchv(() => { Sound.play('
 $('#back').addEventListener('click', backToLevels);
 $('#next').addEventListener('click', () => { const nx = trial ? null : Engine.nextOf(level.id); clearBoard(); if (nx) openIntro(nx); else backToLevels(); });
 showUpdateNotice();
+// PWA 樣品（2026-11-14）：裝 sw.js，讓加到主畫面後沒網路也開得起來。規則寫在 sw.js 檔頭。
+// 本機開發（localhost）預設不裝，免得改了檔拿到存的舊檔；要在本機測，網址加 ?sw。
+(function () {
+  if (!('serviceWorker' in navigator)) return;
+  const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  if (location.protocol !== 'https:' && !local) return;
+  if (local && !/[?&]sw\b/.test(location.search)) {
+    // 本機之前用 ?sw 裝過的，沒帶 ?sw 再開就拆掉
+    navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function () {});
+    return;
+  }
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').then(function () { return navigator.serviceWorker.ready; }).then(function (reg) {
+      // 第一次開頁時檔案是在 sw.js 上工之前載的，把「剛剛載過哪些檔」交給它補存一份
+      const urls = performance.getEntriesByType('resource').map(function (e) { return e.name; }).filter(function (n) { return n.indexOf(location.origin) === 0; });
+      if (reg.active) reg.active.postMessage({ type: 'warm', urls: urls });
+    }).catch(function () {});
+  });
+})();
 </script>
 </body>
 </html>
