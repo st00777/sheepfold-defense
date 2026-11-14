@@ -80,9 +80,9 @@ test('模擬器：每局多回 waveMin（每波最近幾格），run 與 compare
   if (r) { assert.ok(Array.isArray(r.waveMin) && r.waveMin.length >= 1 && r.waveMin.length <= 3, '第 1 夜三波：' + JSON.stringify(r.waveMin)); for (const x of r.waveMin) if (x !== undefined) assert.ok(x >= -1 && x <= 8); }
 });
 
-test('更新紀錄 2026.11.13 三條在最前面，首頁一句話也換了', () => {
-  assert.match(html, /const CHANGELOG = \[\s*\{ ver: '2026\.11\.13', notes: \[/);
-  assert.match(html, /const HOME_UPDATE = '最近更新 11\/13/);
+test('更新紀錄 2026.11.13 三條都在（11/14 又加了一筆在它前面，首頁一句話跟著換到 11/14）', () => {
+  assert.match(html, /\{ ver: '2026\.11\.13', notes: \[/);
+  assert.match(html, /const HOME_UPDATE = '最近更新 11\/14/);
   const block = html.slice(html.indexOf("{ ver: '2026.11.13'"), html.indexOf("{ ver: '2026.11.08'"));
   assert.strictEqual((block.match(/^\s+'/gm) || []).length, 3);
 });

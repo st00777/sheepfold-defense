@@ -18,7 +18,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" sizes="512x512" href="img/icon-512.png">
 <link rel="apple-touch-icon" sizes="180x180" href="img/icon-180.png">
-<!-- PWA 樣品（2026-11-14）：加到主畫面用。manifest 給 Android／電腦 Chrome，下面三行 meta 給 iPhone／iPad（Safari 不看 manifest 的 display） -->
+<!-- PWA（2026-11-14）：加到主畫面用。manifest 給 Android／電腦 Chrome，下面三行 meta 給 iPhone／iPad（Safari 不看 manifest 的 display） -->
 <link rel="manifest" href="manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -741,10 +741,15 @@ function unlockedUnits() { const all = []; for (const l of LEVELS) if (unlocked(
 
 const CHAPTER_NAMES = { 1: '守夜', 2: '另外的羊', 3: '諸山間' };
 const CHAPTERS = { 1: '先備糧，再排陣。從第一隻狼開始練起，最後迎戰兩隻獅子！', 2: '月亮藏起來，腳印也看不見了。提防換排的敵人，也別忘了接回路上的迷羊。', 3: '羊圈搬上山，老擺法得換一換。拋石越過斜坡、陷坑留住敵人，最後挑戰兩隻野牛！' };
-const HOME_UPDATE = '最近更新 11/13：準備時先看得到下一波來什麼、各幾隻；設定頁多了「減少動態」開關；頭目倒下有金光、抖動和一聲低音；細節在設定頁的更新紀錄';
+const HOME_UPDATE = '最近更新 11/14：可以加到手機主畫面了，像 App 一樣點開，沒網路也能玩（iPhone 的進度要用存檔碼搬）；細節在設定頁的更新紀錄';
 // 更新紀錄：最新的放最前面。只列玩家玩起來有差的改動；純整理程式、文件、測試的進版不列、也不用改版本號
 // 版本變了，已經有存檔的玩家開頁彈一次第一筆（看過記在存檔 announced）；設定頁「更新紀錄」可以翻全部
 const CHANGELOG = [
+  { ver: '2026.11.14', notes: [ // 11/14：PWA（manifest.json＋sw.js），藍圖 §4 樣品輪第一個，James Android 真機驗過後合進來；說明在 docs/pwa-sample-2026-11-14.md
+    '可以把遊戲加到手機主畫面了：在瀏覽器的選單裡選「加入主畫面」或「安裝」，之後像 App 一樣從桌面點開',
+    '開過一次之後，沒網路也開得起來、玩得下去（飛航、地下室、訊號差都行）；有網路時照樣自動拿到新版',
+    'iPhone 提醒：加到主畫面的那一份，進度跟 Safari 裡的是分開的。想把進度帶過去，到設定頁複製「存檔碼」，在主畫面那一份貼上',
+  ] },
   { ver: '2026.11.13', notes: [ // 11/13：對照 gamedev-skills（awesome-gamedev-agent-skills）的塔防與手感文件後做的三項，對照報告在 docs/review-gamedev-skills-2026-11-13.md
     '準備與波間休息時，棋盤上方會先告訴你下一波來的是什麼、各幾隻（無月夜也看得到種類，看不到的只有從哪排來）',
     '設定頁多了「減少動態」開關：沒設過就跟系統走；開了畫面不震、暴風夜不閃電、動畫只留淡入',
@@ -2196,7 +2201,7 @@ $('#result-swap').addEventListener('click', () => afterAchv(() => { Sound.play('
 $('#back').addEventListener('click', backToLevels);
 $('#next').addEventListener('click', () => { const nx = trial ? null : Engine.nextOf(level.id); clearBoard(); if (nx) openIntro(nx); else backToLevels(); });
 showUpdateNotice();
-// PWA 樣品（2026-11-14）：裝 sw.js，讓加到主畫面後沒網路也開得起來。規則寫在 sw.js 檔頭。
+// PWA（2026-11-14）：裝 sw.js，讓加到主畫面後沒網路也開得起來。規則寫在 sw.js 檔頭。
 // 本機開發（localhost）預設不裝，免得改了檔拿到存的舊檔；要在本機測，網址加 ?sw。
 (function () {
   if (!('serviceWorker' in navigator)) return;

@@ -1,4 +1,4 @@
-// 2026-11-14：PWA 樣品（加到主畫面＋離線）。說明在 docs/pwa-sample-2026-11-14.md。
+// 2026-11-14：PWA（加到主畫面＋離線；同一天 James Android 真機驗過後上正式站）。說明在 docs/pwa-sample-2026-11-14.md。
 // 藍圖 §4 的通過標準是「更新後無痕與舊快取都拿到新版」，所以這裡把 sw.js 放進假的瀏覽器環境真的跑：
 // 開頁先問網路、斷線用存的、網路卡住 3 秒用存的、?v= 換號拿新檔並丟舊檔、沒版本號的檔下次開就是新的。
 const test = require('node:test');
@@ -153,6 +153,10 @@ test('PWA：不該管的不管——別的網域、非 GET、sw.js 自己、prot
   assert.strictEqual(await sw.get('https://game.test/other-site/a.js'), undefined);
   assert.strictEqual(await sw.get(ROOT + 'sw.js'), undefined);
   assert.strictEqual(await sw.get(ROOT + 'proto/canvas.html', 'navigate'), undefined);
+  // 開發用資料夾底下的檔也不管（不存、不給存的）
+  for (const f of ['proto/canvas.js', 'sim/simulate.js', 'scripts/ga4-sheepfold.js', 'docs/x.md']) assert.strictEqual(await sw.get(ROOT + f), undefined, f);
+  await sw.fire('message', { data: { type: 'warm', urls: [ROOT + 'proto/canvas.js'] } });
+  assert.ok(!sw.store.has(ROOT + 'proto/canvas.js'), '補存也不收開發用的檔');
   assert.strictEqual(await sw.fire('fetch', { request: { url: ROOT + 'data.js', method: 'POST', mode: 'cors' } }), undefined);
   assert.deepStrictEqual(sw.calls, [], '這些請求 sw.js 一個都沒碰');
 });
@@ -235,4 +239,29 @@ test('PWA：被轉址到別的網域的圖，第一次照給，背景另外抓�
   await sw.fire('fetch', { request: { url: ROOT, method: 'GET', mode: 'navigate' } }).catch(() => null);
   assert.strictEqual((await sw.get(pic)).body, 'webp', '斷線也有');
   assert.ok(sw.calls.length > n);
+});
+
+test('更新紀錄 2026.11.14 三條在最前面，首頁一句話也換了；公告有提 iPhone 要用存檔碼搬', () => {
+  assert.match(html, /const CHANGELOG = \[\s*\{ ver: '2026\.11\.14', notes: \[/);
+  assert.match(html, /const HOME_UPDATE = '最近更新 11\/14/);
+  const block = html.slice(html.indexOf("{ ver: '2026.11.14'"), html.indexOf("{ ver: '2026.11.13'"));
+  assert.strictEqual((block.match(/^\s+'/gm) || []).length, 3);
+  assert.match(block, /iPhone[^']*存檔碼/);
+});
+
+// 退路：萬一 sw.js 出事，把 scripts/sw-rollback.js 的內容蓋到 sw.js 推上去
+test('PWA 退路程式：上工就清掉自家存的檔、把自己拆掉；不攔任何請求、不叫頁面重整（免得跟註冊打轉）', async () => {
+  const code = src('scripts/sw-rollback.js');
+  const handlers = {}, log = [];
+  vm.runInNewContext(code, { Promise, self: {
+    addEventListener: (t, fn) => { handlers[t] = fn; },
+    skipWaiting: () => { log.push('skipWaiting'); },
+    registration: { unregister: async () => { log.push('unregister'); } },
+  }, caches: { keys: async () => ['sheepfold-v1', 'sheepfold-v2', 'other'], delete: async n => { log.push('drop ' + n); } } });
+  assert.ok(!handlers.fetch, '不能有 fetch 處理');
+  handlers.install({});
+  let wait; handlers.activate({ waitUntil: p => { wait = p; } });
+  await wait;
+  assert.deepStrictEqual(log, ['skipWaiting', 'drop sheepfold-v1', 'drop sheepfold-v2', 'unregister']);
+  assert.ok(!/navigate|reload/.test(code.split('\n').filter(l => !/^\s*\/\//.test(l)).join('\n')));
 });

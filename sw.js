@@ -1,4 +1,4 @@
-// 羊圈守夜 service worker（PWA 樣品，2026-11-14；說明在 docs/pwa-sample-2026-11-14.md）
+// 羊圈守夜 service worker（PWA，2026-11-14 上正式站；說明在 docs/pwa-sample-2026-11-14.md）
 //
 // 白話：這支小程式住在瀏覽器裡，幫遊戲把檔案存一份在手機上。
 // 這樣把遊戲「加到主畫面」之後，沒網路也開得起來。
@@ -19,12 +19,14 @@ const CACHE = 'sheepfold-v1';
 const NAV_TIMEOUT = 3000;
 // 這個網站的根網址（正式站是 …/sheepfold-defense/，測試站是 githack 的分支網址）
 const ROOT = new URL('./', self.location).href;
+// 開發用的資料夾（原型頁、模擬器、小工具、文件）底下的檔一律不管，免得改了檔還拿到存的那份
+const DEV = /^(proto|sim|scripts|docs)\//;
 // 這一輪（開一次頁算一輪）已經在背景重抓過的網址，不重複抓；每次開頁清空重算
 const fresh = new Set();
 
 // 是不是「這個網站自己的檔」：別的網域（GA 統計等）一律不碰
 function mine(u) {
-  return u.origin === self.location.origin && u.href.startsWith(ROOT);
+  return u.origin === self.location.origin && u.href.startsWith(ROOT) && !DEV.test(u.href.slice(ROOT.length));
 }
 
 // 是不是「開頁」：只管根網址與 index.html（後面帶 ?all 之類的參數也算），proto／sim 底下的頁面不管

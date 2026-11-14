@@ -8,8 +8,8 @@ const path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 
 test('更新紀錄第一筆是 2026.11.08，首頁一句話也換了', () => {
-  assert.match(html, /const CHANGELOG = \[\s*\{ ver: '2026\.11\.13'/); // 11/13 又加了一筆在最前面
-  assert.match(html, /const HOME_UPDATE = '最近更新 11\/13/);
+  assert.match(html, /const CHANGELOG = \[\s*\{ ver: '2026\.11\.14'/); // 11/13、11/14 各又加了一筆在最前面
+  assert.match(html, /const HOME_UPDATE = '最近更新 11\/14/);
   assert.match(html, /\{ ver: '2026\.11\.08', notes: \[/);
 });
 
